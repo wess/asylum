@@ -1,0 +1,10 @@
+[package]
+autotests = false
+name = "preview"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Rich file previews: markdown to HTML, plus image / PDF / text / binary classification."
+
+[dependencies]
+pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }

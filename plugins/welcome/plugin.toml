@@ -1,0 +1,30 @@
+id = "welcome"
+name = "Welcome"
+version = "1.0.0"
+description = "A first-party example plugin: a command, a trigger, and an agent tool. Copy it as a starting point."
+capabilities = ["notify", "store"]
+
+# A one-shot process runtime the app invokes over JSON on stdin/stdout.
+[runtime]
+type = "process"
+command = "bun run runtime.ts"
+
+# A palette command that invokes the runtime's `greet` method.
+[[command]]
+id = "greet"
+title = "Welcome: Say Hello"
+run = "greet"
+keybind = "cmd-shift-h"
+
+# When any run finishes, ask the runtime to summarize it.
+[[trigger]]
+on = "run_finished"
+invoke = "on_run_finished"
+
+# A tool the coding agents can call to note a decision on the current task.
+[[tool]]
+id = "note"
+description = "Record a short note against the current task."
+param = [
+    { name = "text", type = "string", description = "The note body", required = true },
+]

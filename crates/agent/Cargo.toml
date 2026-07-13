@@ -1,0 +1,10 @@
+[package]
+autotests = false
+name = "agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Agent registry, command building, and fan-out planning for the ADE."
+
+[dependencies]
+config = { path = "../config" }

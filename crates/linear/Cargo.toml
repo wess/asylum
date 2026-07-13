@@ -1,0 +1,12 @@
+[package]
+autotests = false
+name = "linear"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Linear integration: teams, projects, and issues over the Linear GraphQL API."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

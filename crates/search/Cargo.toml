@@ -1,0 +1,10 @@
+[package]
+autotests = false
+name = "search"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Cross-worktree content search via ripgrep, falling back to git grep."
+
+[dependencies]
+thiserror = { workspace = true }

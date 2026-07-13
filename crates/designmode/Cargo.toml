@@ -1,0 +1,11 @@
+[package]
+autotests = false
+name = "designmode"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Design mode: click a UI element in the embedded browser to capture its HTML/CSS/selector and hand it to an agent."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

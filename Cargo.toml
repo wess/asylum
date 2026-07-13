@@ -1,0 +1,67 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/git",
+    "crates/store",
+    "crates/config",
+    "crates/agent",
+    "crates/runner",
+    "crates/github",
+    "crates/linear",
+    "crates/checks",
+    "crates/search",
+    "crates/preview",
+    "crates/remote",
+    "crates/notify",
+    "crates/designmode",
+    "crates/companion",
+    "crates/fuzzy",
+    "crates/plugin",
+    "crates/pluginrt",
+    "crates/cli",
+    "crates/app",
+]
+# `thirdparty/block` is a `[patch.crates-io]` target, not a workspace member.
+exclude = ["thirdparty/block"]
+
+# cargo `[patch.crates-io]` entries do not propagate through git dependencies,
+# so the root workspace must carry them. See docs/gpui.md.
+[patch.crates-io]
+# Redirect the crates.io gpui that `guise-ui` requests (^0.2.x) onto the exact
+# pinned gpui git rev the app builds, so a single gpui resolves across the tree.
+gpui = { git = "https://github.com/zed-industries/zed", rev = "96285fc1" }
+async-process = { git = "https://github.com/zed-industries/async-process.git", rev = "0b6d6713570af61806e1e5cb40e0f757cb93fd9d" }
+async-task = { git = "https://github.com/smol-rs/async-task.git", rev = "b4486cd71e4e94fbda54ce6302444de14f4d190e" }
+# Vendored copy of `block` (transitive via gpui -> cocoa) with a one-line fix
+# for a future-incompatibility lint, kept in this workspace's `thirdparty/`.
+block = { path = "thirdparty/block" }
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+# Shared deps pinned once. The crates.io `gpui` that `guise-ui` requests is
+# redirected to this same pinned rev by the `[patch]` above, so a single gpui
+# resolves across the whole tree.
+gpui = { git = "https://github.com/zed-industries/zed", rev = "96285fc1" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "96285fc1", features = ["font-kit", "wayland", "x11"] }
+# The component-library and embeddable-terminal dependencies, pulled from their
+# git repos (pin a `rev`/`tag` here to lock a version).
+guise-ui = { git = "https://github.com/wess/guise" }
+# Headless by default; the `app` crate re-enables the `ui` (gpui) feature. This
+# lets `runner` depend on the headless core without dragging gpui into it.
+libsinclair = { git = "https://github.com/wess/sinclair", default-features = false }
+
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+thiserror = "1"
+
+[profile.dev]
+debug = "limited"
+
+[profile.release]
+lto = "thin"

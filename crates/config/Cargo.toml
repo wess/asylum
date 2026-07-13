@@ -1,0 +1,12 @@
+[package]
+autotests = false
+name = "config"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Layered settings for the ADE: compiled defaults overridden by the user's settings.json."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }

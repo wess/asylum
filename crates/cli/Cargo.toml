@@ -1,0 +1,17 @@
+[package]
+autotests = false
+name = "cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The asylum CLI: scripting worktrees, agent runs, search, and computer use."
+
+[[bin]]
+name = "asylum"
+path = "src/main.rs"
+
+[dependencies]
+agent = { path = "../agent" }
+git = { path = "../git" }
+runner = { path = "../runner" }
+search = { path = "../search" }

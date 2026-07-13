@@ -1,0 +1,22 @@
+[package]
+autotests = false
+name = "pluginrt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Runtime host for ADE plugins: a process runtime (JSON over stdio) and a sandboxed WASM runtime (wasmi)."
+
+[dependencies]
+plugin = { path = "../plugin" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+# Pure-Rust WASM interpreter for the sandboxed plugin runtime. No system deps,
+# fast to build, and it never gives a guest ambient authority — the host links
+# only the capability functions the plugin declared.
+wasmi = "0.31"
+
+[dev-dependencies]
+# Compile WAT test fixtures to wasm in-process, so the runtime is tested with no
+# external toolchain.
+wat = "1"

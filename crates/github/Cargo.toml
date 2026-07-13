@@ -1,0 +1,12 @@
+[package]
+autotests = false
+name = "github"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "GitHub integration via the gh CLI: browse PRs and issues, create PRs."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

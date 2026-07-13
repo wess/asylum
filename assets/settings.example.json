@@ -1,0 +1,31 @@
+{
+    // Chrome theme: "dark" or "light".
+    "theme": "dark",
+
+    // Where per-task worktrees are created, relative to a project root.
+    "worktree_dir": ".asylum/worktrees",
+
+    // Agents fanned out by default when a task is dispatched. Ids come from the
+    // built-in registry (claude-code, codex, opencode, gemini, aider, cursor-agent).
+    "default_agents": ["claude-code", "codex"],
+
+    // Cap on concurrent agent runs across all tasks (0 = unlimited).
+    "max_parallel_runs": 4,
+
+    // Per-agent overrides.
+    "agents": {
+        "codex": { "extra_args": ["--model", "o1"] },
+        "aider": { "enabled": false }
+    },
+
+    // Built-in editor.
+    "editor": {
+        "font_family": "monospace",
+        "font_size": 13,
+        "tab_width": 4,
+        "autosave": true
+    },
+
+    // Keybindings layered over the defaults, as "chord=action".
+    "keybindings": []
+}

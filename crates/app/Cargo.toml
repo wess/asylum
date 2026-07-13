@@ -1,0 +1,44 @@
+[package]
+autotests = false
+name = "app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Asylum — an Agent Development Environment."
+
+# The bin is `asylumdev`: a dev build never collides with an installed `asylum`.
+# Release packaging installs this same binary as `asylum`.
+[[bin]]
+name = "asylumdev"
+path = "src/main.rs"
+
+[dependencies]
+gpui = { workspace = true }
+gpui_platform = { workspace = true }
+# The gpui component library. Its crates.io gpui request is redirected to our
+# pinned gpui rev by the root [patch.crates-io], so the whole tree shares one gpui.
+guise-ui = { workspace = true, features = ["webview"] }
+# The embeddable terminal library — the ADE's terminal panes. Enable the
+# gpui `ui` feature (TermView) on top of the headless workspace default.
+libsinclair = { workspace = true, features = ["ui"] }
+
+agent = { path = "../agent" }
+checks = { path = "../checks" }
+companion = { path = "../companion" }
+config = { path = "../config" }
+designmode = { path = "../designmode" }
+fuzzy = { path = "../fuzzy" }
+git = { path = "../git" }
+github = { path = "../github" }
+linear = { path = "../linear" }
+notify = { path = "../notify" }
+plugin = { path = "../plugin" }
+pluginrt = { path = "../pluginrt" }
+preview = { path = "../preview" }
+remote = { path = "../remote" }
+runner = { path = "../runner" }
+search = { path = "../search" }
+store = { path = "../store" }
+
+anyhow = { workspace = true }
+serde_json = { workspace = true }

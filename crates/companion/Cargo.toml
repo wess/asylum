@@ -1,0 +1,11 @@
+[package]
+autotests = false
+name = "companion"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The mobile companion server: monitor runs/notifications and send follow-ups from a phone."
+
+[dependencies]
+store = { path = "../store" }
+serde_json = { workspace = true }

@@ -1,0 +1,12 @@
+[package]
+autotests = false
+name = "runner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Run an agent on a pty and supervise its lifecycle (spawn, output, exit)."
+
+[dependencies]
+# Headless embeddable terminal core: pty spawn + vt, no gpui.
+libsinclair = { workspace = true, default-features = false }
+agent = { path = "../agent" }

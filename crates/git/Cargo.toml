@@ -1,0 +1,10 @@
+[package]
+autotests = false
+name = "git"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Git worktree, status, and diff operations for the ADE — pure, shells out to git."
+
+[dependencies]
+thiserror = { workspace = true }
