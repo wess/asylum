@@ -4,13 +4,13 @@
 //! each in its own isolated worktree, then comparing. This crate owns the
 //! agent-facing half of that:
 //!
-//! - [`registry`] — the catalog of known CLI agents (Claude Code, Codex,
+//! - [`registry`] - the catalog of known CLI agents (Claude Code, Codex,
 //!   OpenCode, …) and how each is launched, plus the vocabulary for how a prompt
 //!   reaches an agent ([`Delivery`]).
-//! - [`command`] — resolve an [`AgentDef`] + user [`config::AgentPrefs`] + a
+//! - [`command`] - resolve an [`AgentDef`] + user [`config::AgentPrefs`] + a
 //!   prompt + a working directory into a concrete [`SpawnSpec`] the host launches
 //!   on a pty.
-//! - [`plan`] — turn a task (a prompt + a set of agent ids) into a set of
+//! - [`plan`] - turn a task (a prompt + a set of agent ids) into a set of
 //!   [`RunPlan`]s: one branch and worktree path per agent.
 //!
 //! The crate is pure and gpui-free: it never spawns a process itself. The app

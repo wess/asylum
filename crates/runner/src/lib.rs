@@ -5,7 +5,7 @@
 //! terminal core), pumps its output into a `vt` grid you can snapshot, and
 //! tracks when it exits. The gpui app renders interactive panes with
 //! embedded terminal panes; the `runner` is the headless supervisor used for
-//! background runs, the CLI, and tests — anywhere there is no window.
+//! background runs, the CLI, and tests - anywhere there is no window.
 //!
 //! ```no_run
 //! use runner::Runner;
@@ -133,7 +133,7 @@ impl Runner {
         self.session.write(bytes)
     }
 
-    /// Snapshot the visible terminal grid as text — the agent's current output.
+    /// Snapshot the visible terminal grid as text - the agent's current output.
     pub fn screen_text(&self) -> String {
         self.session.with_term(|term| {
             let rows = term.rows();
@@ -146,7 +146,7 @@ impl Runner {
         })
     }
 
-    /// The terminal history as text — every non-empty row of the grid, top to
+    /// The terminal history as text - every non-empty row of the grid, top to
     /// bottom. Persisted via [`scrollback::save`] so it can be restored on a
     /// later launch.
     pub fn history_text(&self) -> String {

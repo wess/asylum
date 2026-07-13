@@ -16,7 +16,7 @@ pub struct Project {
     pub created_at: i64,
     /// Pinned to the top of the workspace list.
     pub pinned: bool,
-    /// When the project was last opened (unix seconds; 0 = never) — drives the
+    /// When the project was last opened (unix seconds; 0 = never) - drives the
     /// "recent repositories" ordering.
     pub last_opened_at: i64,
 }
@@ -105,7 +105,7 @@ impl Side {
     }
 }
 
-/// A review comment anchored to a line of a run's diff — the annotatable
+/// A review comment anchored to a line of a run's diff - the annotatable
 /// diff. Comments are collected and shipped back to the agent as feedback.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Annotation {

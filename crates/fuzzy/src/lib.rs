@@ -27,7 +27,7 @@ pub fn score(query: &str, candidate: &str) -> Option<i32> {
         }
         if lc == q[qi] {
             let mut points = 1;
-            // Consecutive match bonus — the dominant signal (fzf-style): a run
+            // Consecutive match bonus - the dominant signal (fzf-style): a run
             // of adjacent matches beats the same characters scattered across
             // word boundaries.
             if prev_match == Some(ci.wrapping_sub(1)) {

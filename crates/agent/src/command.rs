@@ -67,7 +67,7 @@ pub fn build(agent: &Agent, prefs: Option<&AgentPrefs>, prompt: &str, cwd: &str)
 
 impl SpawnSpec {
     /// A shell-ish preview of the command, for display in the UI (not for
-    /// execution — the host runs `program`/`args` directly, no shell).
+    /// execution - the host runs `program`/`args` directly, no shell).
     pub fn preview(&self) -> String {
         let mut parts = vec![self.program.clone()];
         parts.extend(self.args.iter().map(|a| {

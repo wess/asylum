@@ -1,7 +1,7 @@
 //! Fan-out planning: turn a task into one run per agent.
 //!
 //! Given a task (identified by an id and a human title) and the set of agent
-//! ids to run it against, produce a [`RunPlan`] per agent — each with a unique
+//! ids to run it against, produce a [`RunPlan`] per agent - each with a unique
 //! branch name and worktree path so the agents never collide. The host then
 //! creates the worktree (`git::worktree::create`) and the run row
 //! (`store::Db::create_run`) from each plan.
@@ -48,7 +48,7 @@ pub fn fanout(task_id: i64, title: &str, agents: &[String], worktree_dir: &str) 
 }
 
 /// Lowercase, collapse non-alphanumerics to single hyphens, trim hyphens, and
-/// cap length — for branch/worktree names derived from free text.
+/// cap length - for branch/worktree names derived from free text.
 pub fn slugify(text: &str) -> String {
     let mut out = String::new();
     let mut prev_dash = false;

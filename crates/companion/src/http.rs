@@ -1,4 +1,4 @@
-//! A minimal blocking HTTP/1.1 request reader and response writer — just enough
+//! A minimal blocking HTTP/1.1 request reader and response writer - just enough
 //! for the companion API. No keep-alive, no chunking: one request, one response,
 //! close.
 

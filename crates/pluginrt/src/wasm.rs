@@ -9,9 +9,9 @@
 //! ## ABI
 //!
 //! The guest module must export:
-//! - `memory` — its linear memory.
-//! - `alloc(len: i32) -> i32` — bump-allocate `len` bytes, return the pointer.
-//! - `invoke(method_ptr, method_len, params_ptr, params_len: i32) -> i64` —
+//! - `memory` - its linear memory.
+//! - `alloc(len: i32) -> i32` - bump-allocate `len` bytes, return the pointer.
+//! - `invoke(method_ptr, method_len, params_ptr, params_len: i32) -> i64` -
 //!   handle a call and return a packed `(ptr << 32) | len` pointing at a UTF-8
 //!   JSON result in guest memory.
 //!
@@ -28,7 +28,7 @@ use crate::Error;
 
 /// The host-side state a guest's imports operate on.
 pub struct HostState {
-    /// Capabilities granted to this plugin — gates which imports are linked.
+    /// Capabilities granted to this plugin - gates which imports are linked.
     caps: HashSet<String>,
     /// Log lines the guest emitted via `host_log` (surfaced to the app).
     pub logs: Vec<String>,
@@ -69,7 +69,7 @@ impl WasmRuntime {
             )
             .map_err(|e| Error::Protocol(e.to_string()))?;
 
-        // cap: notify — a desktop notification bridge (recorded here).
+        // cap: notify - a desktop notification bridge (recorded here).
         if store.data().caps.contains("notify") {
             linker
                 .func_wrap(

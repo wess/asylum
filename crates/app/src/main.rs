@@ -1,4 +1,4 @@
-//! Asylum — an Agent Development Environment.
+//! Asylum - an Agent Development Environment.
 //!
 //! `main` loads settings, installs the guise theme, wires the native menu bar,
 //! and opens the root window. The heavy lifting lives in the domain crates

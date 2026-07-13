@@ -12,7 +12,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 # Pure-Rust WASM interpreter for the sandboxed plugin runtime. No system deps,
-# fast to build, and it never gives a guest ambient authority — the host links
+# fast to build, and it never gives a guest ambient authority - the host links
 # only the capability functions the plugin declared.
 wasmi = "0.31"
 

@@ -3,22 +3,22 @@
 //! A plugin is a directory containing a `plugin.toml` manifest. Modeled on
 //! a manifest-based extension model, a manifest contributes:
 //!
-//! - `[[command]]` — palette actions with optional default keybindings.
-//! - `[panel]` — a side-drawer panel rendered from the plugin's runtime.
-//! - `[webview]` — a native web surface (panel / tab / window).
-//! - `[[trigger]]` — hooks that fire an action on an ADE event
+//! - `[[command]]` - palette actions with optional default keybindings.
+//! - `[panel]` - a side-drawer panel rendered from the plugin's runtime.
+//! - `[webview]` - a native web surface (panel / tab / window).
+//! - `[[trigger]]` - hooks that fire an action on an ADE event
 //!   (`run_finished`, `worktree_created`, …; see [`TRIGGER_EVENTS`]).
-//! - `[[tool]]` — tools exposed to the coding agents themselves.
+//! - `[[tool]]` - tools exposed to the coding agents themselves.
 //!
-//! Plugins declare `capabilities` (see [`CAPABILITIES`]) — advisory under the
+//! Plugins declare `capabilities` (see [`CAPABILITIES`]) - advisory under the
 //! process runtime (`pluginrt`), and the vocabulary the future WASM runtime
 //! enforces. This crate is pure parsing + validation; the host (`app`) drives
 //! the runtime, renders the surfaces, and dispatches triggers.
 //!
 //! Submodules:
-//! - [`model`] — the parsed manifest types and fixed vocabularies.
-//! - [`parse`] — TOML → [`Plugin`], with friendly [`Diagnostic`]s.
-//! - [`load`] — discover and load plugins from a directory.
+//! - [`model`] - the parsed manifest types and fixed vocabularies.
+//! - [`parse`] - TOML → [`Plugin`], with friendly [`Diagnostic`]s.
+//! - [`load`] - discover and load plugins from a directory.
 
 pub mod load;
 pub mod model;

@@ -46,6 +46,6 @@ fn missing_nodes_is_parse_error() {
 #[test]
 fn client_endpoint_override() {
     let c = Client::new("lin_key").with_endpoint("http://localhost:9999/graphql");
-    // No network call here — just confirm the builder is wired.
+    // No network call here - just confirm the builder is wired.
     let _ = c;
 }

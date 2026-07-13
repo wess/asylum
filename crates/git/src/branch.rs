@@ -1,4 +1,4 @@
-//! Branch operations: list, create, delete, checkout, and merge — plus a
+//! Branch operations: list, create, delete, checkout, and merge - plus a
 //! non-destructive conflict check.
 //!
 //! The ADE's merge flow ("merge the winner") lives here: after comparing runs,
@@ -22,7 +22,7 @@ pub struct Branch {
 /// The result of a [`merge`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MergeOutcome {
-    /// Nothing to do — already contains the branch.
+    /// Nothing to do - already contains the branch.
     UpToDate,
     /// Fast-forwarded (no merge commit).
     FastForward,
@@ -100,7 +100,7 @@ pub fn would_conflict(repo: &Path, ours: &str, theirs: &str) -> Result<Vec<Strin
 }
 
 /// Merge `branch` into the current branch of `repo`. Never returns `Err` for a
-/// conflict — that is a [`MergeOutcome::Conflicts`]. `Err` is reserved for git
+/// conflict - that is a [`MergeOutcome::Conflicts`]. `Err` is reserved for git
 /// being unavailable or a bad invocation.
 pub fn merge(repo: &Path, branch: &str) -> Result<MergeOutcome, Error> {
     let out = git_capture(repo, &["merge", "--no-edit", branch])?;

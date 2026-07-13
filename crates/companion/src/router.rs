@@ -1,4 +1,4 @@
-//! Request routing — pure over a [`store::Db`], so it is tested without sockets.
+//! Request routing - pure over a [`store::Db`], so it is tested without sockets.
 
 use serde_json::json;
 use store::Db;

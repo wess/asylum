@@ -1,7 +1,7 @@
 //! Provider accounts + usage snapshots.
 //!
 //! An account belongs to a provider (`claude`, `codex`, …). Exactly one account
-//! per provider is `active` — [`Db::activate_account`] hot-swaps it. Usage
+//! per provider is `active` - [`Db::activate_account`] hot-swaps it. Usage
 //! snapshots record consumption against a limit with a reset time, so the UI can
 //! show "Claude: 62% · resets in 3h".
 

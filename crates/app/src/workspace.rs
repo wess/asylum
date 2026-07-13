@@ -1,6 +1,6 @@
 //! The tabbed, splittable main-area workspace.
 //!
-//! The main area isn't a single screen — it's a set of **panes** laid out
+//! The main area isn't a single screen - it's a set of **panes** laid out
 //! side by side, each holding **tabs** (an agent terminal, a plain terminal, an
 //! editor, a browser, a diff, …). This module is the pure model of that: a
 //! [`Workspace`] owns a row of [`Pane`]s, each pane owns [`Tab`]s. Opening a

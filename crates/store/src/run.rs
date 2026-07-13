@@ -1,4 +1,4 @@
-//! Run CRUD — one agent's attempt at a task in its own worktree.
+//! Run CRUD - one agent's attempt at a task in its own worktree.
 
 use rusqlite::{params, Row};
 

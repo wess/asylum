@@ -95,7 +95,7 @@ fn parse(out: &str) -> Vec<Entry> {
 
 /// Parse a changed-entry line ("1"/"2"). The XY field is the two-char status;
 /// X is the index (staged) state, Y is the working-tree state. The path is the
-/// last whitespace field (for renames, `<new>\t<old>` — we keep the new path).
+/// last whitespace field (for renames, `<new>\t<old>` - we keep the new path).
 fn parse_changed(tag: &str, rest: &str) -> Option<Entry> {
     let mut fields = rest.split(' ');
     let xy = fields.next()?;

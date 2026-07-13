@@ -1,4 +1,4 @@
-//! The `asylum` CLI — script the ADE from the shell or an agent.
+//! The `asylum` CLI - script the ADE from the shell or an agent.
 //!
 //! ```text
 //! asylum worktree create <path> [--branch <b>] [--start <ref>] [--repo <dir>]

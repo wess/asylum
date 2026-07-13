@@ -1,4 +1,4 @@
-//! Review annotation CRUD — line comments on a run's diff.
+//! Review annotation CRUD - line comments on a run's diff.
 
 use rusqlite::{params, Row};
 
@@ -48,7 +48,7 @@ impl Db {
             })
     }
 
-    /// All annotations on a run, in file/line order — the batch shipped back to
+    /// All annotations on a run, in file/line order - the batch shipped back to
     /// the agent as review feedback.
     pub fn annotations(&self, run_id: i64) -> Result<Vec<Annotation>> {
         let conn = self.conn();

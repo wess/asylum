@@ -2,15 +2,15 @@
 //!
 //! The store holds the ADE's durable state: the **projects** you work in (git
 //! repositories), the **tasks** you pose (a prompt, optionally fanned across
-//! several agents), and the **runs** — one per agent working a task in its own
+//! several agents), and the **runs** - one per agent working a task in its own
 //! isolated worktree. It is deliberately synchronous (`rusqlite`, bundled
 //! SQLite): the gpui app owns one [`Db`] and calls into it directly, running
 //! the occasional heavy query on a background executor.
 //!
 //! Submodules:
-//! - [`schema`] — connection open + idempotent migrations.
-//! - [`model`] — the row types and their enums.
-//! - [`project`], [`task`], [`run`] — CRUD for each entity.
+//! - [`schema`] - connection open + idempotent migrations.
+//! - [`model`] - the row types and their enums.
+//! - [`project`], [`task`], [`run`] - CRUD for each entity.
 
 use std::path::Path;
 
@@ -43,7 +43,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// The database handle: a single owned SQLite connection plus the ADE's schema.
 ///
-/// One [`Db`] per running app. Not `Sync` — wrap it in the app's state cell and
+/// One [`Db`] per running app. Not `Sync` - wrap it in the app's state cell and
 /// touch it from one place, or clone the underlying file path and open a second
 /// connection for a worker thread.
 pub struct Db {
@@ -58,7 +58,7 @@ impl Db {
         Ok(Self { conn })
     }
 
-    /// Open a private in-memory database — used by tests and ephemeral sessions.
+    /// Open a private in-memory database - used by tests and ephemeral sessions.
     pub fn memory() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
         schema::migrate(&conn)?;

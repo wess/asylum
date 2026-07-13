@@ -2,13 +2,13 @@
 //!
 //! Migrations are an ordered list of SQL steps guarded by `user_version`. On
 //! open we read the pragma, apply every step past it, and bump the version.
-//! Add a migration by appending to [`MIGRATIONS`] — never edit an existing one.
+//! Add a migration by appending to [`MIGRATIONS`] - never edit an existing one.
 
 use rusqlite::Connection;
 
 /// Ordered schema steps. The index+1 is the `user_version` after applying it.
 const MIGRATIONS: &[&str] = &[
-    // 1 — core entities.
+    // 1 - core entities.
     "CREATE TABLE projects (
         id          INTEGER PRIMARY KEY,
         name        TEXT NOT NULL,
@@ -38,7 +38,7 @@ const MIGRATIONS: &[&str] = &[
         exit_code  INTEGER
     );
     CREATE INDEX idx_runs_task ON runs(task_id);",
-    // 2 — review annotations, provider accounts + usage, notifications, and
+    // 2 - review annotations, provider accounts + usage, notifications, and
     // project pin/recency.
     "CREATE TABLE annotations (
         id         INTEGER PRIMARY KEY,

@@ -1,10 +1,10 @@
 //! Linear integration over the Linear GraphQL API.
 //!
-//! Browse your teams, projects, and issues, and create an issue — the Linear
+//! Browse your teams, projects, and issues, and create an issue - the Linear
 //! half of the task integration. Transport is the system `curl` (so there is
 //! no async HTTP stack to carry); the [`Client`] builds the request and parses
 //! the GraphQL response. The query builders and response parsers are pure and
-//! tested against canned JSON — only [`Client::query`] needs the network.
+//! tested against canned JSON - only [`Client::query`] needs the network.
 //!
 //! Set the API key from a personal API token (Linear → Settings → API).
 

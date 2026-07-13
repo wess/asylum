@@ -20,7 +20,7 @@ const ECHO_WAT: &str = r#"
       (i64.extend_i32_u (local.get $pl)))))
 "#;
 
-/// A plugin that imports the gated `host_notify` — only instantiable with the
+/// A plugin that imports the gated `host_notify` - only instantiable with the
 /// `notify` capability granted.
 const NOTIFY_WAT: &str = r#"
 (module

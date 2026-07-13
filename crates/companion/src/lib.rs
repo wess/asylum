@@ -27,7 +27,7 @@ pub fn serve(db_path: impl Into<PathBuf>, addr: impl ToSocketAddrs) -> std::io::
     serve_on(TcpListener::bind(addr)?, db_path)
 }
 
-/// Serve on an already-bound listener — lets a caller (or a test) choose the
+/// Serve on an already-bound listener - lets a caller (or a test) choose the
 /// port and read it back before serving.
 pub fn serve_on(listener: TcpListener, db_path: impl Into<PathBuf>) -> std::io::Result<()> {
     let db_path = db_path.into();

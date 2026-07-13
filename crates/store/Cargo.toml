@@ -7,7 +7,7 @@ license.workspace = true
 description = "SQLite persistence for projects, tasks, agent runs, and worktrees."
 
 [dependencies]
-# Synchronous embedded SQLite (bundles its own libsqlite3 — no system dep, no
+# Synchronous embedded SQLite (bundles its own libsqlite3 - no system dep, no
 # async runtime). The gpui app has no tokio; persistence is blocking calls made
 # off the UI thread when needed.
 rusqlite = { version = "0.32", features = ["bundled"] }

@@ -25,7 +25,7 @@ pub fn default_dir() -> PathBuf {
 }
 
 /// Load every plugin under `dir` (each an immediate subdirectory holding a
-/// `plugin.toml`). A missing directory is not an error — it yields empty.
+/// `plugin.toml`). A missing directory is not an error - it yields empty.
 pub fn load_dir(dir: &Path) -> Installed {
     let mut out = Installed::default();
     let entries = match std::fs::read_dir(dir) {

@@ -1,7 +1,7 @@
 //! The catalog of coding agents and how each is launched.
 //!
 //! Two shapes: [`AgentDef`] is a `'static` built-in (the compiled catalog), and
-//! [`Agent`] is the owned, resolved form used everywhere else — it can also come
+//! [`Agent`] is the owned, resolved form used everywhere else - it can also come
 //! from a user's `config::CustomAgent` ("bring your own agent"). Argument
 //! templates use the `{prompt}` token, substituted at [`command`](crate::command)
 //! build time. Definitions are starting points, overridable via
@@ -55,7 +55,7 @@ impl AgentDef {
     }
 }
 
-/// An owned, resolved agent — from a built-in or a user's custom definition.
+/// An owned, resolved agent - from a built-in or a user's custom definition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Agent {
     pub id: String,

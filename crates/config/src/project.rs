@@ -1,7 +1,7 @@
 //! Per-project configuration: `asylum.toml` at a repository root.
 //!
 //! Where `settings.json` is the user's global config, `asylum.toml` is committed
-//! with a repo and describes *that project* — the base branch its worktrees fork
+//! with a repo and describes *that project* - the base branch its worktrees fork
 //! from, which agents to fan out by default, setup commands to run when a
 //! worktree is created, and environment overrides for agents. This is the
 //! a committed, per-project config file. A malformed file yields defaults plus a

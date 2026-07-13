@@ -1,7 +1,7 @@
 //! GitHub integration via the `gh` CLI.
 //!
 //! Rather than embed an HTTP client and OAuth, Asylum reuses the user's existing
-//! `gh` authentication — the same tool their agents use. This crate shells out
+//! `gh` authentication - the same tool their agents use. This crate shells out
 //! to `gh ... --json ...` and parses the structured output into typed models:
 //! browse pull requests and issues, and open a PR straight from a run's branch
 //! (open a PR from the IDE). An issue can then seed a task/worktree.

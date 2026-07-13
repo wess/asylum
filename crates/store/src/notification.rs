@@ -1,4 +1,4 @@
-//! Notification CRUD — agent-finished / attention / check-failed events with an
+//! Notification CRUD - agent-finished / attention / check-failed events with an
 //! unread state ("return to later").
 
 use rusqlite::{params, Row};
@@ -62,7 +62,7 @@ impl Db {
         Ok(n as usize)
     }
 
-    /// Mark one notification read (or unread — "return to later").
+    /// Mark one notification read (or unread - "return to later").
     pub fn mark_read(&self, id: i64, read: bool) -> Result<()> {
         let n = self.conn().execute(
             "UPDATE notifications SET read = ?2 WHERE id = ?1",

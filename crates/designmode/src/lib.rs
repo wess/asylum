@@ -4,11 +4,11 @@
 //! sends its HTML, CSS, and a screenshot to an agent. This crate provides the
 //! two pure halves of that:
 //!
-//! - [`INJECT_JS`] — a script injected into the web view at document start. In
+//! - [`INJECT_JS`] - a script injected into the web view at document start. In
 //!   design mode it highlights the hovered element and, on click, captures the
 //!   element's tag, a unique CSS selector, its `outerHTML`, computed styles, and
 //!   text, then hands them to the host via `window.ipc.postMessage(...)`.
-//! - [`parse`] / [`Capture`] / [`to_prompt`] — parse that payload and turn a
+//! - [`parse`] / [`Capture`] / [`to_prompt`] - parse that payload and turn a
 //!   capture into a ready-to-send agent prompt.
 //!
 //! The host (the gpui app) owns the wiring: install `INJECT_JS` via

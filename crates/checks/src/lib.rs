@@ -1,4 +1,4 @@
-//! Run a worktree's checks — type-check, lint, test — and report PASS/FAIL.
+//! Run a worktree's checks - type-check, lint, test - and report PASS/FAIL.
 //!
 //! A run's health is shown with PASS/FAIL indicators from type checking,
 //! ESLint, and tests. This crate detects the appropriate checks for a project
@@ -144,7 +144,7 @@ pub fn overall(results: &[CheckResult]) -> Status {
     }
 }
 
-/// The last non-empty line across stderr (preferred) then stdout — the bit most
+/// The last non-empty line across stderr (preferred) then stdout - the bit most
 /// tools put their summary on.
 fn last_meaningful_line(stdout: &[u8], stderr: &[u8]) -> String {
     let pick = |bytes: &[u8]| -> Option<String> {

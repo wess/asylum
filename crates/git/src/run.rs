@@ -38,7 +38,7 @@ pub(crate) fn git(dir: &Path, args: &[&str]) -> Result<String, Error> {
 
 /// The full result of a `git` run when the caller needs the exit status *and*
 /// output regardless of success (e.g. a merge that conflicts is not an error to
-/// us — it's an outcome to inspect).
+/// us - it's an outcome to inspect).
 pub(crate) struct Output {
     pub success: bool,
     pub stdout: String,

@@ -1,4 +1,4 @@
-//! Computer Use: drive the desktop — screenshot, click, and type — so an agent
+//! Computer Use: drive the desktop - screenshot, click, and type - so an agent
 //! (or a script) can operate GUI apps. Each function builds the platform command
 //! (`screencapture`/`cliclick`/`osascript` on macOS, `scrot`/`xdotool` on Linux)
 //! and is pure, so the builders are unit-tested on any host; execution is a thin

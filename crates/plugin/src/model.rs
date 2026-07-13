@@ -1,5 +1,5 @@
 //! The parsed `plugin.toml` data model and the fixed vocabularies. No parsing
-//! logic here — see [`parse`](crate::parse).
+//! logic here - see [`parse`](crate::parse).
 
 use std::path::PathBuf;
 
@@ -57,7 +57,7 @@ pub const TRIGGER_EVENTS: &[&str] = &[
     "task_merged",
 ];
 
-/// `[runtime]` — how to launch the plugin's function host.
+/// `[runtime]` - how to launch the plugin's function host.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Runtime {
     pub kind: RuntimeKind,
@@ -77,7 +77,7 @@ pub enum RuntimeKind {
     #[default]
     Process,
     /// A WebAssembly module run in-process, sandboxed to its declared
-    /// capabilities. Declaration is supported; execution is planned — see
+    /// capabilities. Declaration is supported; execution is planned - see
     /// docs/plugins.md.
     Wasm,
 }
@@ -92,7 +92,7 @@ impl RuntimeKind {
     }
 }
 
-/// `[panel]` — a contributed side-drawer panel rendered from runtime responses.
+/// `[panel]` - a contributed side-drawer panel rendered from runtime responses.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Panel {
     pub id: String,
@@ -101,7 +101,7 @@ pub struct Panel {
     pub icon: String,
 }
 
-/// `[webview]` — a native web surface a plugin contributes.
+/// `[webview]` - a native web surface a plugin contributes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Webview {
     pub id: String,
@@ -151,7 +151,7 @@ pub enum WebviewSource {
     Service(String),
 }
 
-/// `[[tool]]` — a tool a plugin exposes to the coding agents.
+/// `[[tool]]` - a tool a plugin exposes to the coding agents.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tool {
     /// Stable id; the exposed tool name is `<plugin-id>_<id>`.
@@ -170,7 +170,7 @@ pub struct ToolParam {
     pub required: bool,
 }
 
-/// `[[trigger]]` — run an action when an ADE event fires.
+/// `[[trigger]]` - run an action when an ADE event fires.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Trigger {
     /// The event to hook; one of [`TRIGGER_EVENTS`].

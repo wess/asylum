@@ -2,7 +2,7 @@
 //!
 //! A worktree can run on a remote host over SSH, with auto-reconnect and
 //! port forwarding, caching the passphrase across connections. This crate builds
-//! the `ssh` command lines for those flows — it does not run them, so the argv
+//! the `ssh` command lines for those flows - it does not run them, so the argv
 //! is fully unit-testable. Connection multiplexing (`ControlMaster`) provides
 //! the passphrase caching; `ServerAliveInterval` (or `autossh`) provides
 //! keepalive/auto-reconnect.

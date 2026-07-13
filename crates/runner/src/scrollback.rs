@@ -3,7 +3,7 @@
 //! Terminal scrollback is restored when the app restarts. A run's scrollback
 //! is captured as text and written to a per-run file; on the next launch it is
 //! read back and can be replayed above a fresh terminal. This module is the
-//! pure persistence half — the [`Runner`](crate::Runner) supplies the text via
+//! pure persistence half - the [`Runner`](crate::Runner) supplies the text via
 //! [`Runner::history_text`](crate::Runner::history_text).
 
 use std::io;

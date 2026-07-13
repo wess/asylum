@@ -2,7 +2,7 @@
 //!
 //! When an agent finishes, needs attention, or a check fails, the ADE posts a
 //! desktop notification (and the mobile companion mirrors it). This crate builds
-//! the platform command — `osascript` on macOS, `notify-send` on Linux — and
+//! the platform command - `osascript` on macOS, `notify-send` on Linux - and
 //! sends it. The command builder is pure and tested for both platforms; only
 //! [`send`] touches the system.
 

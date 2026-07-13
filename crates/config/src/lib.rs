@@ -3,13 +3,13 @@
 //! Configuration is compiled-in defaults overridden by the user's
 //! `settings.json` (JSON with `//` and `/* */` comments). A bad value never
 //! aborts the load: it is dropped, replaced by the default, and recorded as a
-//! [`Diagnostic`] the app can surface — the app always gets a usable
+//! [`Diagnostic`] the app can surface - the app always gets a usable
 //! [`Settings`], with warnings on the side.
 //!
 //! Submodules:
-//! - [`model`] — the typed [`Settings`] schema (serde defaults).
-//! - [`jsonc`] — strip comments so `serde_json` can parse the file.
-//! - [`load`] — path resolution and file loading.
+//! - [`model`] - the typed [`Settings`] schema (serde defaults).
+//! - [`jsonc`] - strip comments so `serde_json` can parse the file.
+//! - [`load`] - path resolution and file loading.
 
 mod jsonc;
 pub mod keys;

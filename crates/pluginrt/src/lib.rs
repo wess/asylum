@@ -5,12 +5,12 @@
 //! answered by a single newline-terminated [`Response`]. This crate provides two
 //! ways to run it:
 //!
-//! - [`invoke_once`] — spawn the command, send one request, read one response,
+//! - [`invoke_once`] - spawn the command, send one request, read one response,
 //!   let the process exit. Used for infrequent panel renders and tool calls.
-//! - [`Session`] — keep a `persistent` runtime warm and call it repeatedly.
+//! - [`Session`] - keep a `persistent` runtime warm and call it repeatedly.
 //!
 //! The `wasm` runtime tier ([`plugin::RuntimeKind::Wasm`]) runs in-process under
-//! `wasmi` — see [`wasm`] and [`invoke_wasm`]. It is sandboxed: the host links
+//! `wasmi` - see [`wasm`] and [`invoke_wasm`]. It is sandboxed: the host links
 //! only the capability functions the plugin declared.
 //!
 //! The protocol is transport-only: this crate never interprets a method name,

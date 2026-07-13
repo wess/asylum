@@ -1,17 +1,17 @@
 //! Git operations for the Agent Development Environment.
 //!
-//! Every task in the ADE runs in its own isolated git worktree — fan one prompt
+//! Every task in the ADE runs in its own isolated git worktree - fan one prompt
 //! across N agents, each editing its own tree, then compare and merge the
 //! winner. This crate is the pure, I/O-only git layer that makes that possible:
 //! it shells out to the `git` binary and returns typed results. No gpui, no
-//! async, no persistence — the higher layers (`agent`, `store`, `app`) build on
+//! async, no persistence - the higher layers (`agent`, `store`, `app`) build on
 //! it.
 //!
 //! Submodules:
-//! - [`run`] — the low-level `git` invocation helper and [`Error`].
-//! - [`worktree`] — create / list / remove worktrees.
-//! - [`status`] — working-tree status (porcelain v2).
-//! - [`diff`] — unified-diff capture and parsing into a reviewable model.
+//! - [`run`] - the low-level `git` invocation helper and [`Error`].
+//! - [`worktree`] - create / list / remove worktrees.
+//! - [`status`] - working-tree status (porcelain v2).
+//! - [`diff`] - unified-diff capture and parsing into a reviewable model.
 
 mod run;
 pub mod branch;

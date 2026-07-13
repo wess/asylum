@@ -1,6 +1,6 @@
 //! The diff review surface: render a run's changes as an annotatable unified
 //! diff. Added lines get a green wash, removed lines a red one, with old/new
-//! line numbers in the gutter — the base for inline review comments.
+//! line numbers in the gutter - the base for inline review comments.
 
 use gpui::prelude::*;
 use gpui::{div, px, rgba, App, Entity, IntoElement, SharedString, Window};

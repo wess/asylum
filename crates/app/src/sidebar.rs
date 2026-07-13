@@ -173,7 +173,7 @@ fn project_row(
         row = row.bg(p.hover);
     }
     row.child(
-        // Chevron — toggles expand.
+        // Chevron - toggles expand.
         div()
             .id(SharedString::from(format!("chev-p-{id}")))
             .p(px(2.0))
@@ -187,7 +187,7 @@ fn project_row(
     )
     .child(icon("folder", 15.0).text_color(p.primary))
     .child(
-        // Name — selects the project.
+        // Name - selects the project.
         div()
             .id(SharedString::from(format!("name-p-{id}")))
             .flex_1()

@@ -1,4 +1,4 @@
-//! The root view: composes the ADE frame with guise's [`AppShell`] — a header,
+//! The root view: composes the ADE frame with guise's [`AppShell`] - a header,
 //! an activity switcher + project/task navbar, the active surface in the main
 //! area, and a status footer.
 
@@ -594,7 +594,7 @@ fn header(
         .pl(px(TRAFFIC_LIGHT_INSET))
         .pr(px(10.0))
         // The whole bar drags the window (double-click zooms); the buttons on
-        // top handle their own clicks — a press with no movement isn't a drag.
+        // top handle their own clicks - a press with no movement isn't a drag.
         .window_control_area(WindowControlArea::Drag)
         .on_mouse_down(MouseButton::Left, |_, window, _| window.start_window_move())
         // Brand.

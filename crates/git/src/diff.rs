@@ -78,7 +78,7 @@ impl DiffFile {
 }
 
 /// Diff the worktree at `dir` against `base` (e.g. `"HEAD"`). Includes staged,
-/// unstaged, and — via `--`-less invocation — untracked changes are *not*
+/// unstaged, and - via `--`-less invocation - untracked changes are *not*
 /// included (git diff never shows untracked); callers wanting those add them
 /// with `git add -N` first.
 pub fn against(dir: &Path, base: &str) -> Result<Vec<DiffFile>, Error> {
@@ -90,7 +90,7 @@ pub fn against(dir: &Path, base: &str) -> Result<Vec<DiffFile>, Error> {
 }
 
 /// Diff the changes on a worktree's branch relative to where it forked from
-/// `base_branch` (the merge-base) — the "what has this agent done" view.
+/// `base_branch` (the merge-base) - the "what has this agent done" view.
 pub fn since_fork(dir: &Path, base_branch: &str) -> Result<Vec<DiffFile>, Error> {
     let spec = format!("{base_branch}...HEAD");
     let out = git(dir, &["diff", "--no-color", "--find-renames", &spec])?;
@@ -143,7 +143,7 @@ pub fn parse(out: &str) -> Vec<DiffFile> {
 }
 
 fn parse_diff_git_path(line: &str) -> String {
-    // "diff --git a/foo b/foo" — take the b/ side, strip the prefix.
+    // "diff --git a/foo b/foo" - take the b/ side, strip the prefix.
     line.rsplit(" b/")
         .next()
         .map(|s| s.to_string())

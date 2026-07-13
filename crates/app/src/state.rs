@@ -87,7 +87,7 @@ impl View {
     }
 }
 
-/// A clock helper — unix seconds. Kept in one place so the rest of the app never
+/// A clock helper - unix seconds. Kept in one place so the rest of the app never
 /// touches `SystemTime` directly.
 pub fn now() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -192,7 +192,7 @@ impl Root {
     }
 
     /// Open the on-disk store and select the most-recently-opened project (if
-    /// any). No demo data — the app starts empty and onboards via "Open project".
+    /// any). No demo data - the app starts empty and onboards via "Open project".
     pub fn seeded() -> Self {
         let path = Self::db_path();
         if let Some(parent) = path.parent() {
@@ -407,7 +407,7 @@ impl Root {
     }
 
     /// Add a review comment. Anchors it to the first changed file (line 1) of
-    /// the run under review — a real annotation the store persists and the
+    /// the run under review - a real annotation the store persists and the
     /// "send to agent" flow collects.
     pub fn add_review_note(&mut self, body: &str) {
         if body.trim().is_empty() {
@@ -554,7 +554,7 @@ impl Root {
         self.workspace.open(id, TabKind::Editor(editor, file.to_string()));
     }
 
-    /// Open a browser tab. Design mode is active — click an element to capture
+    /// Open a browser tab. Design mode is active - click an element to capture
     /// it (surfaced in the tab's toolbar as "Send to agent").
     pub fn open_browser(&mut self, cx: &mut Context<Self>) {
         let mut script = designmode::INJECT_JS.to_string();
@@ -709,7 +709,7 @@ impl Root {
         self.db.unread_count().unwrap_or(0)
     }
 
-    /// The diff under review for the selected run — the run's worktree diffed
+    /// The diff under review for the selected run - the run's worktree diffed
     /// against where it forked from the project's base branch.
     pub fn review_diff(&self) -> Vec<git::DiffFile> {
         let Some(rid) = self.current_run_id() else {
@@ -773,9 +773,9 @@ impl Root {
     }
 
     /// Fan the selected task out across the chosen agents: plan a branch +
-    /// worktree per agent, create the worktree (best effort — a non-repo demo
+    /// worktree per agent, create the worktree (best effort - a non-repo demo
     /// project just skips it), record a run row, move the task to Running, and
-    /// post a notification — the core loop: one prompt → N isolated agents.
+    /// post a notification - the core loop: one prompt → N isolated agents.
     pub fn run_fanout(&mut self) {
         let Some(tid) = self.task_id else {
             return;
@@ -808,7 +808,7 @@ impl Root {
         let _ = notify::send(&notify::Notification::new(title, body));
     }
 
-    /// Merge a run's branch into its project's base branch — "merge the winner".
+    /// Merge a run's branch into its project's base branch - "merge the winner".
     /// Reports the outcome (merged / conflicts / error) as a notification.
     pub fn merge_run(&mut self, run_id: i64) {
         let Ok(run) = self.db.run(run_id) else {
