@@ -44,6 +44,7 @@ fn bytes(name: &str) -> Option<&'static [u8]> {
     set!(
         "list-todo", "git-compare", "search", "github", "terminal", "file-pen", "eye", "globe",
         "puzzle", "circle-user", "inbox", "chevron-right", "chevron-down", "folder", "git-branch",
-        "play", "circle", "circle-check", "circle-x", "loader", "star", "sun", "command", "plus"
+        "play", "circle", "circle-check", "circle-x", "loader", "star", "sun", "command", "plus",
+        "settings"
     )
 }

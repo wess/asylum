@@ -1,6 +1,7 @@
 //! The diff review surface: render a run's changes as an annotatable unified
 //! diff. Added lines get a green wash, removed lines a red one, with old/new
-//! line numbers in the gutter - the base for inline review comments.
+//! line numbers in the gutter. Click any line to anchor a comment there;
+//! comments render inline under their line and ship back to the agent.
 
 use gpui::prelude::*;
 use gpui::{div, px, rgba, App, Entity, IntoElement, SharedString, Window};
@@ -9,7 +10,10 @@ use guise::prelude::*;
 use crate::state::Root;
 use checks::{CheckResult, Status};
 use git::{DiffFile, LineKind};
-use store::Annotation;
+use store::{Annotation, Side};
+
+/// The diff line a pending comment anchors to: (file, line, side).
+pub type Target = Option<(String, u32, Side)>;
 
 /// Build the diff review content from the parsed files.
 #[allow(clippy::too_many_arguments)]
@@ -17,6 +21,7 @@ pub fn review(
     files: Vec<DiffFile>,
     check_results: Vec<CheckResult>,
     annotations: Vec<Annotation>,
+    target: Target,
     branches: Vec<git::Branch>,
     note: Entity<guise::TextInput>,
     handle: Entity<Root>,
@@ -51,7 +56,7 @@ pub fn review(
         col = col.child(chips);
     }
 
-    col = col.child(annotations_panel(annotations, note, handle));
+    col = col.child(comment_panel(&annotations, target.clone(), note, handle.clone()));
 
     if files.is_empty() {
         return col.child(
@@ -62,43 +67,55 @@ pub fn review(
     }
 
     for file in files {
-        col = col.child(file_block(file));
+        col = col.child(file_block(file, &annotations, &target, handle.clone()));
     }
     col
 }
 
-/// The review-comment panel: existing annotations, an input to add a comment,
-/// and a button to ship the whole batch back to an agent.
-fn annotations_panel(
-    annotations: Vec<Annotation>,
+/// The review-comment panel: where the next comment lands, the input to add
+/// it, and the button that ships the open batch back to an agent.
+fn comment_panel(
+    annotations: &[Annotation],
+    target: Target,
     note: Entity<guise::TextInput>,
     handle: Entity<Root>,
 ) -> impl IntoElement {
     let mut panel = div().flex().flex_col().gap_2();
 
-    if !annotations.is_empty() {
-        let mut list = div().flex().flex_col().gap_1();
-        for a in &annotations {
-            list = list.child(
-                Text::new(SharedString::from(format!("💬 {}:{} — {}", a.file, a.line, a.body)))
-                    .size(Size::Sm),
-            );
-        }
+    let open = annotations.iter().filter(|a| !a.resolved).count();
+    let anchor = match &target {
+        Some((file, line, _)) => format!("Commenting on {file}:{line}"),
+        None => "Click a diff line to anchor your comment.".to_string(),
+    };
+    let mut status = div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap_2()
+        .child(Text::new(SharedString::from(anchor)).size(Size::Xs).dimmed());
+    if open > 0 {
         let send = handle.clone();
-        panel = panel.child(list).child(
-            Button::new("send-review", "Send review to agent")
-                .size(Size::Xs)
-                .variant(Variant::Filled)
-                .on_click(move |_, _, cx| {
-                    send.update(cx, |root, cx| {
-                        root.send_review_to_agent();
-                        cx.notify();
-                    });
-                }),
-        );
+        status = status
+            .child(
+                Badge::new(SharedString::from(format!("{open} open")))
+                    .color(ColorName::Blue)
+                    .variant(Variant::Light),
+            )
+            .child(
+                Button::new("send-review", "Send review to agent")
+                    .size(Size::Xs)
+                    .variant(Variant::Filled)
+                    .on_click(move |_, _, cx| {
+                        send.update(cx, |root, cx| {
+                            root.send_review_to_agent();
+                            cx.notify();
+                        });
+                    }),
+            );
     }
+    panel = panel.child(status);
 
-    let add = handle.clone();
+    let add = handle;
     let note_read = note.clone();
     panel = panel.child(
         div()
@@ -154,7 +171,12 @@ fn checks_bar(results: Vec<CheckResult>, handle: Entity<Root>) -> impl IntoEleme
     row
 }
 
-fn file_block(file: DiffFile) -> impl IntoElement {
+fn file_block(
+    file: DiffFile,
+    annotations: &[Annotation],
+    target: &Target,
+    handle: Entity<Root>,
+) -> impl IntoElement {
     let (added, removed) = file.line_stats();
     let header = div()
         .flex()
@@ -172,7 +194,7 @@ fn file_block(file: DiffFile) -> impl IntoElement {
         .font_family("monospace")
         .text_size(px(12.0));
 
-    for hunk in &file.hunks {
+    for (hi, hunk) in file.hunks.iter().enumerate() {
         body = body.child(
             div()
                 .px(px(8.0))
@@ -184,8 +206,28 @@ fn file_block(file: DiffFile) -> impl IntoElement {
                 )))
                 .dimmed()),
         );
-        for line in &hunk.lines {
-            body = body.child(diff_line(line));
+        for (li, line) in hunk.lines.iter().enumerate() {
+            let (line_no, side) = anchor_of(line);
+            let targeted = matches!(
+                (target, line_no),
+                (Some((f, l, s)), Some(n)) if *f == file.path && *l == n && *s == side
+            );
+            body = body.child(diff_line(
+                line,
+                SharedString::from(format!("dl-{}-{hi}-{li}", file.path)),
+                file.path.clone(),
+                line_no,
+                side,
+                targeted,
+                handle.clone(),
+            ));
+            if let Some(n) = line_no {
+                for a in annotations.iter().filter(|a| {
+                    a.file == file.path && a.line == n && a.side == side
+                }) {
+                    body = body.child(annotation_row(a, handle.clone()));
+                }
+            }
         }
     }
 
@@ -201,7 +243,24 @@ fn file_block(file: DiffFile) -> impl IntoElement {
     )
 }
 
-fn diff_line(line: &git::DiffLine) -> impl IntoElement {
+/// Which (line number, side) a comment on this line anchors to.
+fn anchor_of(line: &git::DiffLine) -> (Option<u32>, Side) {
+    match line.kind {
+        LineKind::Removed => (line.old_no, Side::Old),
+        _ => (line.new_no, Side::New),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn diff_line(
+    line: &git::DiffLine,
+    id: SharedString,
+    file: String,
+    line_no: Option<u32>,
+    side: Side,
+    targeted: bool,
+    handle: Entity<Root>,
+) -> impl IntoElement {
     let (bg, sign) = match line.kind {
         LineKind::Added => (rgba(0x2ea04326), "+"),
         LineKind::Removed => (rgba(0xf8514926), "-"),
@@ -211,11 +270,13 @@ fn diff_line(line: &git::DiffLine) -> impl IntoElement {
         Some(v) => format!("{v:>4}"),
         None => "    ".to_string(),
     };
-    div()
+    let mut row = div()
+        .id(id)
         .flex()
         .flex_row()
         .w_full()
-        .bg(bg)
+        .bg(if targeted { rgba(0x3b82f633) } else { bg })
+        .cursor_pointer()
         .child(
             div()
                 .px(px(6.0))
@@ -226,5 +287,66 @@ fn diff_line(line: &git::DiffLine) -> impl IntoElement {
                 )))
                 .dimmed()),
         )
-        .child(Text::new(SharedString::from(format!("{sign} {}", line.content))))
+        .child(Text::new(SharedString::from(format!("{sign} {}", line.content))));
+    if let Some(n) = line_no {
+        row = row.on_click(move |_, _, cx| {
+            handle.update(cx, |root, cx| {
+                root.target_review_line(&file, n, side);
+                cx.notify();
+            });
+        });
+    }
+    row
+}
+
+/// An inline review comment under its diff line, with resolve/delete.
+fn annotation_row(a: &Annotation, handle: Entity<Root>) -> impl IntoElement {
+    let (id, resolved) = (a.id, a.resolved);
+    let body = if resolved {
+        Text::new(SharedString::from(format!("💬 {}", a.body))).size(Size::Xs).dimmed()
+    } else {
+        Text::new(SharedString::from(format!("💬 {}", a.body))).size(Size::Xs)
+    };
+    let resolve = handle.clone();
+    let del = handle;
+    div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap_2()
+        .pl(px(56.0))
+        .pr(px(8.0))
+        .py(px(3.0))
+        .bg(rgba(0x3b82f61a))
+        .child(div().flex_1().overflow_hidden().child(body))
+        .child(
+            div()
+                .id(SharedString::from(format!("ann-res-{id}")))
+                .px(px(4.0))
+                .cursor_pointer()
+                .child(
+                    Text::new(if resolved { "↺" } else { "✓" })
+                        .size(Size::Xs)
+                        .dimmed(),
+                )
+                .on_click(move |_, _, cx| {
+                    resolve.update(cx, |root, cx| {
+                        root.resolve_review_note(id, !resolved);
+                        cx.notify();
+                    });
+                }),
+        )
+        .child(
+            div()
+                .id(SharedString::from(format!("ann-del-{id}")))
+                .px(px(4.0))
+                .cursor_pointer()
+                .child(Text::new("×").size(Size::Xs).dimmed())
+                .on_click(move |_, _, cx| {
+                    del.update(cx, |root, cx| {
+                        root.delete_review_note(id);
+                        cx.notify();
+                    });
+                }),
+        )
 }

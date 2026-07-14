@@ -4,9 +4,13 @@
 //! shortcuts (so the menu shows the shortcut *and* the key works), and handled
 //! globally against the root window. A standard macOS menu bar adapted to the
 //! ADE's surfaces (File/View for tasks/terminals/tabs).
+//!
+//! Shortcuts come from the [`config::Keymap`]: the compiled defaults layered
+//! under the user's `keybindings` in settings.json, re-applied on every
+//! settings reload (see [`rebind`]).
 
 use gpui::{
-    actions, App, Entity, KeyBinding, Menu, MenuItem, OsAction, WindowHandle,
+    actions, App, Entity, KeyBinding, Keystroke, Menu, MenuItem, OsAction, WindowHandle,
 };
 
 use crate::root::open_project;
@@ -19,6 +23,7 @@ actions!(
         // App
         About,
         OpenSettings,
+        OpenSettingsFile,
         Quit,
         // File
         NewTask,
@@ -49,19 +54,25 @@ actions!(
         GoPlugins,
         GoAccounts,
         GoInbox,
+        // Task
+        RunFanout,
         // Help
         Documentation,
     ]
 );
 
-/// Default settings file contents, written when the user first opens Settings.
-const DEFAULT_SETTINGS: &str = include_str!("../../../assets/settings.example.json");
-
 /// Install the menu bar, keybindings, and action handlers.
-pub fn install(root: Entity<Root>, window: WindowHandle<Root>, cx: &mut App) {
-    cx.set_menus(menus());
-    bind_keys(cx);
+pub fn install(root: Entity<Root>, window: WindowHandle<Root>, settings: &config::Settings, cx: &mut App) {
     register(root, window, cx);
+    rebind(settings, cx);
+}
+
+/// (Re-)apply the keymap from `settings` and refresh the menu bar so its
+/// shortcut hints match. Called at boot and on every settings reload.
+pub fn rebind(settings: &config::Settings, cx: &mut App) {
+    cx.clear_key_bindings();
+    cx.bind_keys(bindings(settings));
+    cx.set_menus(menus());
 }
 
 fn menus() -> Vec<Menu> {
@@ -73,6 +84,7 @@ fn menus() -> Vec<Menu> {
                 MenuItem::action("About Asylum", About),
                 MenuItem::separator(),
                 MenuItem::action("Settings…", OpenSettings),
+                MenuItem::action("Open settings.json", OpenSettingsFile),
                 MenuItem::separator(),
                 MenuItem::action("Quit Asylum", Quit),
             ],
@@ -135,20 +147,55 @@ fn menus() -> Vec<Menu> {
     ]
 }
 
-fn bind_keys(cx: &mut App) {
-    cx.bind_keys([
-        KeyBinding::new("cmd-n", NewTask, None),
-        KeyBinding::new("cmd-o", Open, None),
-        KeyBinding::new("cmd-t", NewTerminal, None),
-        KeyBinding::new("cmd-d", SplitRight, None),
-        KeyBinding::new("cmd-w", CloseTab, None),
-        KeyBinding::new("cmd-k", CommandPalette, None),
-        KeyBinding::new("cmd-p", QuickOpen, None),
-        KeyBinding::new("cmd-f", FindInProject, None),
-        KeyBinding::new("cmd-,", OpenSettings, None),
-        KeyBinding::new("cmd-shift-t", ToggleTheme, None),
-        KeyBinding::new("cmd-q", Quit, None),
-    ]);
+/// Build the gpui keybindings from the resolved keymap. A typo in
+/// settings.json (bad chord, unknown action) skips that entry with a note —
+/// it must never take the rest of the keymap down.
+fn bindings(settings: &config::Settings) -> Vec<KeyBinding> {
+    let keymap = config::Keymap::from_settings(&settings.keybindings);
+    let mut out = Vec::new();
+    for (chord, action) in keymap.bindings() {
+        if chord.split_whitespace().any(|part| Keystroke::parse(part).is_err()) {
+            eprintln!("settings: keybindings: cannot parse chord `{chord}`");
+            continue;
+        }
+        match binding(chord, action) {
+            Some(b) => out.push(b),
+            None => eprintln!("settings: keybindings: unknown action `{action}`"),
+        }
+    }
+    out
+}
+
+/// One keymap entry as a gpui binding. The action names here are the
+/// vocabulary settings.json `keybindings` entries can use.
+fn binding(chord: &str, action: &str) -> Option<KeyBinding> {
+    Some(match action {
+        "command_palette" => KeyBinding::new(chord, CommandPalette, None),
+        "quick_open" => KeyBinding::new(chord, QuickOpen, None),
+        "find_in_project" => KeyBinding::new(chord, FindInProject, None),
+        "new_task" => KeyBinding::new(chord, NewTask, None),
+        "open_project" => KeyBinding::new(chord, Open, None),
+        "run_fanout" => KeyBinding::new(chord, RunFanout, None),
+        "review_diff" => KeyBinding::new(chord, GoDiff, None),
+        "new_terminal" => KeyBinding::new(chord, NewTerminal, None),
+        "split_right" => KeyBinding::new(chord, SplitRight, None),
+        "close_tab" => KeyBinding::new(chord, CloseTab, None),
+        "settings" => KeyBinding::new(chord, OpenSettings, None),
+        "open_settings_file" => KeyBinding::new(chord, OpenSettingsFile, None),
+        "toggle_theme" => KeyBinding::new(chord, ToggleTheme, None),
+        "switch_account" => KeyBinding::new(chord, GoAccounts, None),
+        "notifications" => KeyBinding::new(chord, GoInbox, None),
+        "quit" => KeyBinding::new(chord, Quit, None),
+        "tasks" => KeyBinding::new(chord, GoTasks, None),
+        "search" => KeyBinding::new(chord, GoSearch, None),
+        "integrations" => KeyBinding::new(chord, GoIntegrations, None),
+        "terminal" => KeyBinding::new(chord, GoTerminal, None),
+        "editor" => KeyBinding::new(chord, GoEditor, None),
+        "browser" => KeyBinding::new(chord, GoBrowser, None),
+        "preview" => KeyBinding::new(chord, GoPreview, None),
+        "plugins" => KeyBinding::new(chord, GoPlugins, None),
+        _ => return None,
+    })
 }
 
 fn register(root: Entity<Root>, window: WindowHandle<Root>, cx: &mut App) {
@@ -172,15 +219,30 @@ fn register(root: Entity<Root>, window: WindowHandle<Root>, cx: &mut App) {
 
     cx.on_action::<Documentation>(|_, _| open_url("https://github.com/wess/asylum"));
 
-    cx.on_action::<OpenSettings>(|_, cx| {
-        let path = config::default_path();
-        if let Some(dir) = path.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
-        if !path.exists() {
-            let _ = std::fs::write(&path, DEFAULT_SETTINGS);
-        }
-        cx.open_with_system(&path);
+    // Settings opens the in-app surface; with no project yet (the onboarding
+    // screen has no tabs), fall back to the raw file.
+    cx.on_action::<OpenSettings>(move |_, cx| {
+        window
+            .update(cx, |root, w, cx| {
+                if root.is_empty() {
+                    open_settings_file(cx);
+                } else {
+                    root.open_view(View::Settings, w, cx);
+                    cx.notify();
+                }
+            })
+            .ok();
+    });
+
+    cx.on_action::<OpenSettingsFile>(|_, cx| open_settings_file(cx));
+
+    cx.on_action::<RunFanout>(move |_, cx| {
+        window
+            .update(cx, |root, _w, cx| {
+                root.run_fanout();
+                cx.notify();
+            })
+            .ok();
     });
 
     on_view::<GoTasks>(window, View::Tasks, cx);
@@ -253,6 +315,16 @@ fn on_view<A: gpui::Action>(window: WindowHandle<Root>, view: View, cx: &mut App
             })
             .ok();
     });
+}
+
+/// Open settings.json in the system editor, seeding a starter file if needed.
+pub fn open_settings_file(cx: &mut App) {
+    let path = config::default_path();
+    if let Err(e) = config::edit::ensure_file(&path) {
+        eprintln!("settings: {e}");
+        return;
+    }
+    cx.open_with_system(&path);
 }
 
 /// Open a URL in the system browser.

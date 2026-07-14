@@ -5,6 +5,7 @@
 //! (`store`, `agent`, `git`, `plugin`) and the view modules here.
 
 mod accounts;
+mod browser;
 mod diff;
 mod fleet;
 mod icons;
@@ -13,8 +14,10 @@ mod menu;
 mod menus;
 mod notifications;
 mod plugins;
+mod reload;
 mod root;
 mod search;
+mod settings;
 mod sidebar;
 mod state;
 mod theme;
@@ -27,11 +30,8 @@ use state::Root;
 
 fn main() {
     // Settings drive the initial theme; a missing file is fine (defaults).
+    // Diagnostics are reported when the load is applied (see `reload`).
     let loaded = config::load(&config::default_path());
-    for d in &loaded.diagnostics {
-        eprintln!("settings: {} {}", d.key, d.message);
-    }
-    let settings = loaded.settings;
 
     // Launch the mobile companion server on a background thread, serving the
     // same on-disk store the app uses.
@@ -43,7 +43,7 @@ fn main() {
     gpui_platform::application()
         .with_assets(icons::Assets)
         .run(move |cx: &mut App| {
-            theme::install(&settings, cx);
+            theme::install(&loaded.settings, cx);
 
             let bounds = Bounds::centered(None, size(px(1200.0), px(820.0)), cx);
             let root = cx.new(|_cx| Root::seeded());
@@ -70,7 +70,10 @@ fn main() {
                 .expect("open window");
 
             // The full menu bar, keybindings, and their handlers.
-            menus::install(root, window, cx);
+            menus::install(root, window, &loaded.settings, cx);
+
+            // Seed the root with the boot settings and live-reload on change.
+            reload::init(window, loaded, cx);
 
             cx.activate(true);
         });

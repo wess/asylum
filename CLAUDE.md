@@ -71,7 +71,10 @@ and the gpui-free core crates never import gpui.
   Deliberately blocking: the app owns one `Db` and calls it directly.
 - **`config`** — layered settings: compiled defaults overridden by the user's
   `settings.json` (JSON with comments). A bad value never aborts the load — it
-  becomes a `Diagnostic` and the default is used. `$XDG_CONFIG_HOME/asylum/settings.json`.
+  becomes a `Diagnostic` and the default is used. `edit` writes single keys
+  back without disturbing the user's comments (the Settings surface writes
+  through it); `watch` polls the file's mtime for live reload; `keys` is the
+  chord→action keymap layered over defaults. `$XDG_CONFIG_HOME/asylum/settings.json`.
 - **`agent`** — the agent-facing half of orchestration. A `registry` of known
   CLI agents (Claude Code, Codex, OpenCode, Gemini, Aider, Cursor) and how each
   is launched; `command` building (agent def + user prefs + prompt → a
@@ -107,8 +110,9 @@ and the gpui-free core crates never import gpui.
   (ControlMaster passphrase caching, ServerAlive/autossh reconnect). Pure argv.
 - **`notify`** — desktop notifications (`osascript` / `notify-send`).
 - **`designmode`** — the design-mode injectable JS (click an element → capture
-  its HTML/CSS/selector via `window.ipc.postMessage`) plus the capture parser and
-  agent-prompt builder.
+  its HTML/CSS/selector via `window.ipc.postMessage`, numbered pin badges on
+  annotated elements) plus the capture parser and the annotation model: a
+  capture + user note, batched into one agent prompt (`to_prompt_many`).
 - **`fuzzy`** — subsequence match + ranking (fzf-style scoring) behind the
   command palette and quick-open.
 - **`companion`** — the mobile companion HTTP server: a dependency-light blocking
@@ -120,12 +124,17 @@ and the gpui-free core crates never import gpui.
 - **`app`** — the gpui application. Owns the window, the guise theme bridge, and
   the ADE shell composed with guise's `AppShell`: a header (with the command
   palette + quick-open overlays), an activity switcher + project/task navbar
-  (with pins), a status footer, and a routed main area with eleven surfaces —
+  (with pins), a status footer, and a routed main area with twelve surfaces —
   Tasks (fan-out board with drag-drop, merge, PR-create), Diff review (+ PASS/FAIL
-  checks, branch chips, inline annotations), Search, Integrations (GitHub PRs/
+  checks, branch chips, click-a-line inline annotations with resolve/delete,
+  shipped back to an agent), Search, Integrations (GitHub PRs/
   issues + issue→worktree + Linear), Terminal (`libsinclair::TermView`, splittable),
   Editor (+ file tree), Preview (markdown/image/PDF), Browser (embedded web view +
-  design mode), Plugins, Accounts (+ usage), and the notification Inbox. `main`
+  design mode: toggle, click an element, attach a note, numbered pins, send the
+  batch to an agent — Preview shares the same design surface), Plugins, Accounts
+  (+ usage), the notification Inbox, and Settings
+  (cmd-, — a Zed-style editor over settings.json: controls write keys back with
+  comments preserved, and a watcher live-reloads theme/keybindings on save). `main`
   also launches the `companion` server on a background thread. State lives in the
   single `Root` entity, which owns the on-disk `store::Db` and the selection/view.
 

@@ -41,4 +41,5 @@ search = { path = "../search" }
 store = { path = "../store" }
 
 anyhow = { workspace = true }
+futures = { workspace = true }
 serde_json = { workspace = true }

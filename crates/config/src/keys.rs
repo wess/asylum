@@ -8,23 +8,26 @@
 
 use std::collections::BTreeMap;
 
-/// The ADE's default keybindings as `(chord, action)` pairs.
+/// The ADE's default keybindings as `(chord, action)` pairs. Chords use
+/// gpui keystroke syntax (`cmd-shift-t`, `cmd-,`); actions name the app's
+/// handlers, so every one of these can be rebound (or unbound) from
+/// `settings.json`.
 pub const DEFAULTS: &[(&str, &str)] = &[
     ("cmd-k", "command_palette"),
     ("cmd-p", "quick_open"),
-    ("cmd-shift-f", "search"),
+    ("cmd-f", "find_in_project"),
     ("cmd-n", "new_task"),
+    ("cmd-o", "open_project"),
     ("cmd-enter", "run_fanout"),
     ("cmd-shift-r", "review_diff"),
-    ("cmd-shift-m", "merge_winner"),
-    ("cmd-b", "toggle_sidebar"),
     ("cmd-t", "new_terminal"),
     ("cmd-d", "split_right"),
-    ("cmd-shift-d", "split_down"),
-    ("cmd-j", "toggle_panel"),
-    ("cmd-comma", "settings"),
+    ("cmd-w", "close_tab"),
+    ("cmd-,", "settings"),
+    ("cmd-shift-t", "toggle_theme"),
     ("cmd-shift-a", "switch_account"),
     ("cmd-shift-n", "notifications"),
+    ("cmd-q", "quit"),
 ];
 
 /// A resolved keymap.

@@ -1,3 +1,7 @@
+// Asylum settings — JSON with comments. Every key is optional: a missing or
+// removed key falls back to its built-in default. Edits apply live (the file
+// is watched), and the in-app Settings surface (cmd-,) writes back here
+// without touching your comments.
 {
     // Chrome theme: "dark" or "light".
     "theme": "dark",
@@ -26,6 +30,13 @@
         "autosave": true
     },
 
-    // Keybindings layered over the defaults, as "chord=action".
+    // Keybindings layered over the defaults, as "chord=action" strings in gpui
+    // keystroke syntax; "chord=" (empty action) unbinds a default.
+    //   e.g. ["cmd-shift-p=command_palette", "cmd-enter="]
+    // Actions: command_palette, quick_open, find_in_project, new_task,
+    // open_project, run_fanout, review_diff, new_terminal, split_right,
+    // close_tab, settings, open_settings_file, toggle_theme, switch_account,
+    // notifications, quit, tasks, search, integrations, terminal, editor,
+    // browser, preview, plugins.
     "keybindings": []
 }

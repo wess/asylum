@@ -34,6 +34,8 @@ pub enum View {
     Browser,
     /// Installed plugins.
     Plugins,
+    /// The settings editor (writes back to settings.json).
+    Settings,
 }
 
 impl View {
@@ -66,6 +68,7 @@ impl View {
             View::Plugins => "puzzle",
             View::Accounts => "circle-user",
             View::Notifications => "inbox",
+            View::Settings => "settings",
         }
     }
 
@@ -83,6 +86,7 @@ impl View {
             View::Plugins => "Plugins",
             View::Accounts => "Accounts",
             View::Notifications => "Inbox",
+            View::Settings => "Settings",
         }
     }
 }
@@ -116,8 +120,16 @@ pub struct Root {
     pub editor_file: Option<String>,
     /// The latest check results (type-check / lint / test) for the review view.
     pub check_results: Vec<checks::CheckResult>,
-    /// The most recent design-mode element capture.
-    pub last_capture: Option<designmode::Capture>,
+    /// The design-mode element capture awaiting a note (click → note → pin).
+    pub pending_capture: Option<designmode::Capture>,
+    /// Design annotations collected for the next "send to agent".
+    pub design_annotations: Vec<designmode::Annotation>,
+    /// The design-note input (built lazily), for the browser/preview toolbar.
+    pub design_note: Option<gpui::Entity<guise::TextInput>>,
+    /// Web views (by entity id) with design mode switched on.
+    pub design_enabled: std::collections::HashSet<gpui::EntityId>,
+    /// The diff line the next review comment anchors to (file, line, side).
+    pub review_target: Option<(String, u32, store::Side)>,
     /// The command palette and quick-open overlays (built lazily).
     pub palette: Option<gpui::Entity<guise::overlay::Spotlight>>,
     pub quickopen: Option<gpui::Entity<guise::overlay::Spotlight>>,
@@ -133,6 +145,15 @@ pub struct Root {
     pub workspace: crate::workspace::Workspace,
     /// Monotonic id source for tabs.
     pub next_tab_id: u64,
+    /// The resolved settings (settings.json layered over defaults), kept
+    /// current by the live-reload watcher.
+    pub settings: config::Settings,
+    /// Problems from the last settings load, surfaced on the Settings tab.
+    pub settings_diagnostics: Vec<config::Diagnostic>,
+    /// Keeps the settings.json watcher thread alive (drop = stop watching).
+    pub settings_watch: Option<config::WatchHandle>,
+    /// The Settings surface's text inputs (built lazily).
+    pub settings_inputs: Option<crate::settings::Inputs>,
 }
 
 /// A project node in the workspace tree.
@@ -215,7 +236,11 @@ impl Root {
             integration_error: None,
             editor_file: None,
             check_results: Vec::new(),
-            last_capture: None,
+            pending_capture: None,
+            design_annotations: Vec::new(),
+            design_note: None,
+            design_enabled: std::collections::HashSet::new(),
+            review_target: None,
             palette: None,
             quickopen: None,
             review_note: None,
@@ -224,6 +249,10 @@ impl Root {
             compose: None,
             workspace: crate::workspace::Workspace::new(0),
             next_tab_id: 1,
+            settings: config::Settings::default(),
+            settings_diagnostics: Vec::new(),
+            settings_watch: None,
+            settings_inputs: None,
         }
     }
 
@@ -406,9 +435,14 @@ impl Root {
             .unwrap_or_default()
     }
 
-    /// Add a review comment. Anchors it to the first changed file (line 1) of
-    /// the run under review - a real annotation the store persists and the
-    /// "send to agent" flow collects.
+    /// Anchor the next review comment to a diff line (click a line to target).
+    pub fn target_review_line(&mut self, file: &str, line: u32, side: store::Side) {
+        self.review_target = Some((file.to_string(), line, side));
+    }
+
+    /// Add a review comment on the targeted diff line - a real annotation the
+    /// store persists and the "send to agent" flow collects. With no target it
+    /// falls back to the first changed file, line 1.
     pub fn add_review_note(&mut self, body: &str) {
         if body.trim().is_empty() {
             return;
@@ -416,19 +450,35 @@ impl Root {
         let Some(rid) = self.current_run_id() else {
             return;
         };
-        let file = self
-            .review_diff()
-            .first()
-            .map(|f| f.path.clone())
-            .unwrap_or_else(|| "(file)".to_string());
-        let _ = self
-            .db
-            .add_annotation(rid, &file, 1, store::Side::New, body, now());
+        let (file, line, side) = self.review_target.take().unwrap_or_else(|| {
+            let file = self
+                .review_diff()
+                .first()
+                .map(|f| f.path.clone())
+                .unwrap_or_else(|| "(file)".to_string());
+            (file, 1, store::Side::New)
+        });
+        let _ = self.db.add_annotation(rid, &file, line, side, body, now());
     }
 
-    /// Ship all review annotations back to an agent as a follow-up task.
+    /// Mark a review annotation resolved or reopen it.
+    pub fn resolve_review_note(&mut self, id: i64, resolved: bool) {
+        let _ = self.db.resolve_annotation(id, resolved);
+    }
+
+    /// Delete a review annotation.
+    pub fn delete_review_note(&mut self, id: i64) {
+        let _ = self.db.delete_annotation(id);
+    }
+
+    /// Ship the open (unresolved) review annotations back to an agent as a
+    /// follow-up task, then mark them resolved.
     pub fn send_review_to_agent(&mut self) {
-        let annotations = self.review_annotations();
+        let annotations: Vec<store::Annotation> = self
+            .review_annotations()
+            .into_iter()
+            .filter(|a| !a.resolved)
+            .collect();
         if annotations.is_empty() {
             return;
         }
@@ -440,6 +490,9 @@ impl Root {
             prompt.push_str(&format!("- {}:{} — {}\n", a.file, a.line, a.body));
         }
         if let Ok(task) = self.db.create_task(pid, "Address review comments", &prompt, now()) {
+            for a in &annotations {
+                let _ = self.db.resolve_annotation(a.id, true);
+            }
             self.task_id = Some(task.id);
             self.open_kind(TabKind::Tasks);
             self.push_notification("run_started", "Review sent to agent", "", None);
@@ -516,6 +569,7 @@ impl Root {
             }
             View::Preview => self.open_preview(cx),
             View::Browser => self.open_browser(cx),
+            View::Settings => self.open_kind(TabKind::Settings),
         }
     }
 
@@ -554,48 +608,97 @@ impl Root {
         self.workspace.open(id, TabKind::Editor(editor, file.to_string()));
     }
 
-    /// Open a browser tab. Design mode is active - click an element to capture
-    /// it (surfaced in the tab's toolbar as "Send to agent").
+    /// Open a browser tab with design mode on - click an element, attach a
+    /// note, and collect numbered annotations for "send to agent".
     pub fn open_browser(&mut self, cx: &mut Context<Self>) {
-        let mut script = designmode::INJECT_JS.to_string();
-        script.push_str("\nwindow.__asylumDesign && window.__asylumDesign.enable();");
-        let wv = cx.new(|cx| guise::WebView::new(cx).init_script(script).url("https://example.com"));
-        cx.subscribe(&wv, |root, _wv, event: &guise::WebViewEvent, cx| {
-            if let guise::WebViewEvent::Message(payload) = event {
-                if let Some(capture) = designmode::parse(payload) {
-                    root.last_capture = Some(capture);
-                    cx.notify();
-                }
-            }
-        })
-        .detach();
+        let wv = cx.new(|cx| {
+            guise::WebView::new(cx)
+                .init_script(designmode::INJECT_JS)
+                .url("https://example.com")
+        });
+        self.design_enabled.insert(wv.entity_id());
+        self.watch_design_messages(&wv, cx);
         let id = self.next_tab_id();
         self.workspace.open(id, TabKind::Browser(wv));
     }
 
     /// Open a preview tab (the open editor file, or the project README).
+    /// Design mode is available from the toolbar but starts off.
     pub fn open_preview(&mut self, cx: &mut Context<Self>) {
         let html = self.preview_html();
-        let wv = cx.new(|cx| guise::WebView::new(cx).html(html));
+        let wv = cx.new(|cx| {
+            guise::WebView::new(cx)
+                .init_script(designmode::INJECT_JS)
+                .html(html)
+        });
+        self.watch_design_messages(&wv, cx);
         let id = self.next_tab_id();
         self.workspace.open(id, TabKind::Preview(wv));
     }
 
-    /// Turn the latest design-mode capture into a new task (click an
-    /// element → send HTML/CSS to an agent"), then switch to the Tasks board.
-    pub fn send_capture_to_agent(&mut self) {
-        let Some(capture) = self.last_capture.clone() else {
+    /// Route a web view's design-mode traffic: a capture becomes the pending
+    /// annotation, and every page load re-asserts the design-mode toggle and
+    /// redraws the pins (navigation wipes the page's state, not ours).
+    fn watch_design_messages(&mut self, wv: &gpui::Entity<guise::WebView>, cx: &mut Context<Self>) {
+        cx.subscribe(wv, |root, wv, event: &guise::WebViewEvent, cx| match event {
+            guise::WebViewEvent::Message(payload) => {
+                if let Some(capture) = designmode::parse(payload) {
+                    root.pending_capture = Some(capture);
+                    cx.notify();
+                }
+            }
+            guise::WebViewEvent::LoadFinished => {
+                if root.design_enabled.contains(&wv.entity_id()) {
+                    wv.read(cx).evaluate_script(designmode::ENABLE_JS);
+                }
+                if !root.design_annotations.is_empty() {
+                    wv.read(cx)
+                        .evaluate_script(&designmode::pins_js(&root.design_annotations));
+                }
+            }
+            _ => {}
+        })
+        .detach();
+    }
+
+    /// Attach a note to the pending capture, making it a numbered annotation.
+    /// Returns the new annotation's (selector, number) so the view can pin it.
+    pub fn attach_design_note(&mut self, note: &str) -> Option<(String, usize)> {
+        let capture = self.pending_capture.take()?;
+        let selector = capture.selector.clone();
+        self.design_annotations.push(designmode::Annotation {
+            capture,
+            note: note.trim().to_string(),
+        });
+        Some((selector, self.design_annotations.len()))
+    }
+
+    /// Drop a design annotation (the view renumbers the pins via `pins_js`).
+    pub fn remove_design_annotation(&mut self, index: usize) {
+        if index < self.design_annotations.len() {
+            self.design_annotations.remove(index);
+        }
+    }
+
+    /// Ship the collected design annotations to an agent as a new task, then
+    /// switch to the Tasks board.
+    pub fn send_design_to_agent(&mut self) {
+        if self.design_annotations.is_empty() {
             return;
-        };
+        }
         let Some(pid) = self.project_id else {
             return;
         };
-        let prompt = designmode::to_prompt(&capture, "Update this element as requested.");
-        let title = format!("Design: {}", capture.selector);
+        let prompt = designmode::to_prompt_many(&self.design_annotations);
+        let title = match self.design_annotations.as_slice() {
+            [a] => format!("Design: {}", a.capture.selector),
+            many => format!("Design: {} annotations", many.len()),
+        };
         if let Ok(task) = self.db.create_task(pid, &title, &prompt, now()) {
             self.task_id = Some(task.id);
+            self.design_annotations.clear();
+            self.pending_capture = None;
             self.open_kind(TabKind::Tasks);
-            self.last_capture = None;
         }
     }
 

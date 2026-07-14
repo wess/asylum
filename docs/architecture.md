@@ -56,7 +56,14 @@ are the CRUD, implemented as inherent methods on `Db`.
 still deserializes. `jsonc.rs` blanks `//` and `/* */` comments to spaces
 (preserving offsets) before `serde_json`. `load.rs` resolves the path and
 turns any parse failure into a `Diagnostic` plus defaults — the app always gets
-a usable `Settings`.
+a usable `Settings`. `edit.rs` sets or removes one top-level key in the
+settings.json *text*, preserving every comment and hand-formatted value, and
+persists via temp-file + rename (an unreadable or non-object file refuses the
+write); the app's Settings surface writes through it, so the file stays the
+single source of truth. `watch.rs` polls the file's mtime on a background
+thread for live reload. `keys.rs` is the chord→action `Keymap`: compiled
+defaults layered with the user's `keybindings` entries (`chord=action`;
+`chord=` unbinds), consumed by the app's `menus::rebind`.
 
 ### `agent`
 `registry.rs` is the static catalog of CLI agents and the `Delivery` vocabulary

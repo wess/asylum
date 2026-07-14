@@ -96,6 +96,7 @@ impl Render for Root {
 
         // Ensure the shared inputs exist.
         self.ensure_palettes(cx);
+        crate::settings::ensure_inputs(self, cx);
         if self.compose.is_none() {
             self.compose = Some(cx.new(|cx| {
                 guise::TextInput::new(cx).placeholder("Describe a task… e.g. Add a dark-mode toggle")
@@ -104,6 +105,10 @@ impl Render for Root {
         if self.review_note.is_none() {
             self.review_note =
                 Some(cx.new(|cx| guise::TextInput::new(cx).placeholder("Add a review comment…")));
+        }
+        if self.design_note.is_none() {
+            self.design_note =
+                Some(cx.new(|cx| guise::TextInput::new(cx).placeholder("What should change here?")));
         }
         let palette = self.palette.clone().unwrap();
         let quickopen = self.quickopen.clone().unwrap();
@@ -242,6 +247,7 @@ fn view_for_key(key: crate::workspace::TabKey) -> View {
         K::Accounts => View::Accounts,
         K::Inbox => View::Notifications,
         K::Plugins => View::Plugins,
+        K::Settings => View::Settings,
         K::Terminal => View::Terminal,
         K::Editor => View::Editor,
         K::Browser => View::Browser,
@@ -401,6 +407,7 @@ impl Root {
                 self.review_diff(),
                 self.check_results.clone(),
                 self.review_annotations(),
+                self.review_target.clone(),
                 self.branches(),
                 review_note.clone(),
                 handle,
@@ -435,48 +442,32 @@ impl Root {
                 crate::plugins::plugins_view(self.plugins(), self.plugins_dir(), window, cx)
                     .into_any_element()
             }
+            TabKind::Settings => match self.settings_inputs.clone() {
+                Some(inputs) => crate::settings::settings_view(
+                    self.settings.clone(),
+                    self.settings_diagnostics.clone(),
+                    inputs,
+                    handle,
+                    window,
+                    cx,
+                )
+                .into_any_element(),
+                None => Text::new("Settings loading…").dimmed().into_any_element(),
+            },
             TabKind::Terminal(e) => e.clone().into_any_element(),
             TabKind::Editor(e, _) => e.clone().into_any_element(),
-            TabKind::Browser(e) => {
-                let mut toolbar = div()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .gap_2()
-                    .p(px(6.0))
-                    .child(
-                        Text::new("Design mode — click an element to capture it")
-                            .size(Size::Xs)
-                            .dimmed(),
-                    );
-                if let Some(capture) = &self.last_capture {
-                    let send = handle.clone();
-                    toolbar = toolbar
-                        .child(
-                            Text::new(SharedString::from(capture.selector.clone()))
-                                .size(Size::Xs),
-                        )
-                        .child(
-                            Button::new("send-capture", "Send to agent")
-                                .size(Size::Xs)
-                                .variant(Variant::Filled)
-                                .on_click(move |_, _, cx| {
-                                    send.update(cx, |root, cx| {
-                                        root.send_capture_to_agent();
-                                        cx.notify();
-                                    });
-                                }),
-                        );
-                }
-                div()
-                    .flex()
-                    .flex_col()
-                    .size_full()
-                    .child(toolbar)
-                    .child(div().flex_1().child(e.clone()))
-                    .into_any_element()
-            }
-            TabKind::Preview(e) => e.clone().into_any_element(),
+            TabKind::Browser(e) | TabKind::Preview(e) => match self.design_note.clone() {
+                Some(note) => crate::browser::design_surface(
+                    e.clone(),
+                    self.design_enabled.contains(&e.entity_id()),
+                    self.pending_capture.clone(),
+                    self.design_annotations.clone(),
+                    note,
+                    handle,
+                )
+                .into_any_element(),
+                None => e.clone().into_any_element(),
+            },
         }
     }
 
@@ -522,6 +513,16 @@ impl Root {
                         root.run_checks();
                         cx.notify();
                     });
+                });
+                let h = handle.clone();
+                s = s.item("Open Settings", move |window, cx| {
+                    h.update(cx, |root, cx| {
+                        root.open_view(View::Settings, window, cx);
+                        cx.notify();
+                    });
+                });
+                s = s.item("Open settings.json", move |_, cx| {
+                    crate::menus::open_settings_file(cx);
                 });
                 s.item("Toggle theme", move |_, cx| crate::theme::toggle(cx))
             });

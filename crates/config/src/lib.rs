@@ -10,17 +10,22 @@
 //! - [`model`] - the typed [`Settings`] schema (serde defaults).
 //! - [`jsonc`] - strip comments so `serde_json` can parse the file.
 //! - [`load`] - path resolution and file loading.
+//! - [`edit`] - comment-preserving writes back to settings.json.
+//! - [`watch`] - live reload: poll the file's mtime, fire on change.
 
+pub mod edit;
 mod jsonc;
 pub mod keys;
 pub mod load;
 pub mod model;
 pub mod project;
+pub mod watch;
 
 pub use keys::{Keymap, DEFAULTS as KEY_DEFAULTS};
 pub use load::{default_path, load, load_str, Loaded};
 pub use model::{AgentPrefs, CustomAgent, EditorPrefs, Settings};
 pub use project::{load_project, parse_project, ProjectConfig, PROJECT_FILE};
+pub use watch::{watch, WatchHandle};
 
 /// A non-fatal problem found while loading settings: a JSON parse failure or a
 /// value that could not be understood. The load continues with defaults.
