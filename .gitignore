@@ -42,7 +42,9 @@ lcov.info
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
 .apdisk
-Icon?
+# Finder custom-folder-icon file, literally named "Icon\r". The old `Icon?`
+# pattern also matched the `icons` directory on case-insensitive filesystems.
+Icon
 
 # ---------------------------------------------------------------------------
 # Linux
