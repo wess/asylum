@@ -79,7 +79,19 @@ implemented with real, tested logic and a working UI (or CLI) surface.
 | Feature | Logic | UI |
 |---|---|---|
 | Cross-worktree content search (rg/git grep) | ✅ | ✅ |
+| Unified notes/tasks/runs/transcript search | ✅ | ✅ |
 | Command palette (fuzzy) | ✅ | ✅ |
+
+## Project memory
+| Feature | Logic | UI |
+|---|---|---|
+| Private or repository-backed Markdown vault | ✅ | ✅ |
+| YAML properties, tags, wiki links, backlinks | ✅ | ✅ |
+| Note create/rename/delete + rename relinking | ✅ | ✅ |
+| Task/decision/investigation/retrospective templates | ✅ | ✅ |
+| Wiki-link autocomplete + navigable preview | ✅ | ✅ |
+| Create task, attach to run, send exact selection | ✅ | ✅ |
+| Prompt context + automatic task/run/check/PR links | ✅ | ✅ |
 
 ## Notifications & state
 | Feature | Logic | UI |
@@ -101,6 +113,7 @@ implemented with real, tested logic and a working UI (or CLI) surface.
 |---|---|---|
 | Pinned workspaces, recent repos | ✅ | ✅ |
 | Multi-surface layout (activity switcher) | ✅ | ✅ |
+| Collapsible icon-only activity rail | ✅ | ✅ |
 | Project config (asylum.toml) + keybindings | ✅ | ✅ |
 | Plugin system (manifest + process runtime) | ✅ | ✅ |
 | WASM plugin runtime (wasmi, capability-gated) | ✅ | ✅ |

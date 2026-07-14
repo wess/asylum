@@ -21,10 +21,45 @@ fn parses_porcelain_v2() {
 #[test]
 fn summarize_buckets() {
     let entries = vec![
-        Entry { path: "a".into(), kind: StatusKind::Added, staged: true },
-        Entry { path: "b".into(), kind: StatusKind::Modified, staged: false },
-        Entry { path: "c".into(), kind: StatusKind::Deleted, staged: false },
-        Entry { path: "d".into(), kind: StatusKind::Untracked, staged: false },
+        Entry {
+            path: "a".into(),
+            kind: StatusKind::Added,
+            staged: true,
+        },
+        Entry {
+            path: "b".into(),
+            kind: StatusKind::Modified,
+            staged: false,
+        },
+        Entry {
+            path: "c".into(),
+            kind: StatusKind::Deleted,
+            staged: false,
+        },
+        Entry {
+            path: "d".into(),
+            kind: StatusKind::Untracked,
+            staged: false,
+        },
     ];
     assert_eq!(summarize(&entries), (2, 1, 1));
+}
+
+#[test]
+fn managed_worktree_paths_are_excluded() {
+    let entries = vec![
+        Entry {
+            path: ".asylum/worktrees/run/".into(),
+            kind: StatusKind::Untracked,
+            staged: false,
+        },
+        Entry {
+            path: "src/main.rs".into(),
+            kind: StatusKind::Modified,
+            staged: false,
+        },
+    ];
+    let remaining = excluding_prefix(entries, Path::new(".asylum/worktrees"));
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].path, "src/main.rs");
 }

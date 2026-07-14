@@ -1,52 +1,42 @@
 # Roadmap
 
-What's built vs. planned.
-
 ## Built
 
-- **Cargo workspace** — gpui (pinned rev), guise-ui, libsinclair, SQLite — with
-  the crates.io→git `gpui` patch so one gpui resolves
-  across the tree.
-- **`git`** — create / list / remove worktrees; porcelain-v2 status; unified
-  diff parsing into a reviewable `DiffFile`/`DiffHunk`/`DiffLine` model.
-- **`store`** — SQLite (rusqlite) projects / tasks / runs with migrations.
-- **`config`** — layered `settings.json` (JSONC) with non-fatal diagnostics,
-  comment-preserving key writes (`edit`), and mtime-poll live reload (`watch`).
-- **`agent`** — registry of 6 CLI agents, command building with prompt delivery
-  modes, and fan-out planning (one prompt → N branches + worktrees).
-- **`plugin` / `pluginrt`** — manifest parsing (commands, panels, webviews,
-  triggers, tools, capabilities) and a process runtime speaking JSON over stdio.
-- **`app`** — the gpui ADE shell: project/task navbar, per-agent run-card board,
-  status footer, theme toggle, native menu.
-- **Diff annotations** — click any diff line to anchor a comment; comments
-  render inline (resolve / delete) and ship back to the agent as a follow-up
-  task.
-- **Design mode** — in the Browser (and Preview) surface: toggle design mode,
-  click an element, attach a note, collect numbered pins, and send the batch
-  (selector + HTML + computed CSS + note per element) to an agent.
+- Durable SQLite projects, tasks, runs, terminal output, errors, attempts,
+  review comments, and per-run check results.
+- One prompt fanned across selected agents, with one branch and absolute
+  worktree path per run.
+- Background worktree setup, bounded parallel launches, queued/running status,
+  cancellation, retry, timeout, and interrupted-run recovery.
+- Live run terminals plus persisted output after exit or restart.
+- Side-by-side run cards with status, elapsed time, changed-file counts,
+  terminal output, and verification state.
+- Selected-run diff review, inline comments, same-worktree continuation, and
+  automatic type-check/lint/test execution.
+- Merge preflight, failed-check blocking, dirty-base protection, conflict
+  detection, PR creation, and clean-worktree cleanup.
+- First-run repository flow with explicit git initialization consent, agent
+  executable configuration, installed-versus-verified state, and a setup
+  doctor for Git, branches, worktrees, agents, Bun, and Cargo.
+- Task templates, per-task agent selection, workflow stages, actionable empty
+  states, command palette actions, and keyboard shortcuts.
+- Editor, terminal, preview, browser/design mode, search, integrations,
+  plugins, accounts, inbox, settings, CLI, and companion server surfaces.
+- Project Markdown vaults with private/repository storage, YAML properties,
+  wiki links, backlinks, tags, templates, autocomplete, note/task/run context,
+  unified search, and automatic task/run/check/PR links.
+- Process and capability-gated WASM plugin runtimes.
 
-## In progress / next
+## Next
 
-- **Run execution** — take a `SpawnSpec` and launch the agent on a pty inside a
-  `libsinclair` terminal pane; stream output into the run card; update run
-  status from the process exit.
-- **Fan-out action** — wire the "Run fan-out" button: `agent::plan::fanout` →
-  `git::worktree::create` per plan → `store::create_run` → launch.
-- **Diff review surface** — richer review: side-by-side view, syntax
-  highlighting, per-hunk staging.
-- **Trigger dispatch** — fire `run_finished` / `worktree_created` / … plugin
-  triggers from the app; wire `pluginrt` panels and webviews into the UI.
-- **Persistent store on disk** — open `Db` at a real path; project onboarding
-  (add an existing repo) instead of the seeded demo.
+- Side-by-side file diffs with syntax highlighting and per-hunk staging.
+- Background/cancellable project setup commands with per-command output.
+- Provider-specific sign-in probes where a CLI exposes a stable status command.
+- Plugin trigger dispatch and plugin-contributed app panels.
+- Release packaging, signing, update delivery, and fresh-install testing.
 
 ## Later
 
-- **WASM plugin runtime** — execute the `wasm` runtime tier (wasmtime component
-  model + capability-gated host imports).
-- **Design mode screenshots** — include a cropped screenshot of the annotated
-  element alongside its HTML/CSS in the agent prompt; a browser surface per
-  worktree.
-- **GitHub / Linear integration** — browse PRs, issues, boards.
-- **SSH worktrees** — remote execution.
-- **Mobile companion** — monitor runs, send follow-ups.
-- **Release packaging** — bundle `Asylum.app` / Linux packages, self-update.
+- Remote run execution over SSH.
+- Per-worktree browser sessions and design-mode screenshots.
+- Native mobile shells around the companion API.

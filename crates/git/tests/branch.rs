@@ -10,7 +10,11 @@ fn git_ok() -> bool {
 }
 
 fn run(dir: &Path, args: &[&str]) {
-    Command::new("git").current_dir(dir).args(args).output().unwrap();
+    Command::new("git")
+        .current_dir(dir)
+        .args(args)
+        .output()
+        .unwrap();
 }
 
 fn tmp_repo() -> PathBuf {
@@ -46,12 +50,20 @@ fn create_list_delete() {
     }
     let repo = tmp_repo();
     create(&repo, "feature", None).unwrap();
-    let names: Vec<String> = branches(&repo).unwrap().into_iter().map(|b| b.name).collect();
+    let names: Vec<String> = branches(&repo)
+        .unwrap()
+        .into_iter()
+        .map(|b| b.name)
+        .collect();
     assert!(names.contains(&"feature".to_string()));
     assert!(names.contains(&"main".to_string()));
 
     delete(&repo, "feature", true).unwrap();
-    let names: Vec<String> = branches(&repo).unwrap().into_iter().map(|b| b.name).collect();
+    let names: Vec<String> = branches(&repo)
+        .unwrap()
+        .into_iter()
+        .map(|b| b.name)
+        .collect();
     assert!(!names.contains(&"feature".to_string()));
     let _ = std::fs::remove_dir_all(&repo);
 }
@@ -72,7 +84,10 @@ fn clean_merge_fast_forwards() {
     // No conflict expected.
     assert!(would_conflict(&repo, "main", "feature").unwrap().is_empty());
     let outcome = merge(&repo, "feature").unwrap();
-    assert!(matches!(outcome, MergeOutcome::FastForward | MergeOutcome::Merged));
+    assert!(matches!(
+        outcome,
+        MergeOutcome::FastForward | MergeOutcome::Merged
+    ));
     let _ = std::fs::remove_dir_all(&repo);
 }
 
@@ -92,15 +107,34 @@ fn conflicting_merge_is_detected_and_reported() {
     run(&repo, &["commit", "-qam", "main edit"]);
 
     let conflicts = would_conflict(&repo, "main", "feature").unwrap();
-    assert!(conflicts.iter().any(|p| p.contains("f.txt")), "conflicts: {conflicts:?}");
+    assert!(
+        conflicts.iter().any(|p| p.contains("f.txt")),
+        "conflicts: {conflicts:?}"
+    );
 
     match merge(&repo, "feature").unwrap() {
         MergeOutcome::Conflicts(paths) => {
-            assert!(paths.iter().any(|p| p.contains("f.txt")), "paths: {paths:?}");
+            assert!(
+                paths.iter().any(|p| p.contains("f.txt")),
+                "paths: {paths:?}"
+            );
         }
         other => panic!("expected conflicts, got {other:?}"),
     }
     abort_merge(&repo).unwrap();
+    let _ = std::fs::remove_dir_all(&repo);
+}
+
+#[test]
+fn commit_all_captures_uncommitted_run_changes() {
+    if !git_ok() {
+        return;
+    }
+    let repo = tmp_repo();
+    std::fs::write(repo.join("new.txt"), "result\n").unwrap();
+    assert!(commit_all(&repo, "Complete task").unwrap());
+    assert!(crate::status::status(&repo).unwrap().is_empty());
+    assert!(!commit_all(&repo, "Nothing to do").unwrap());
     let _ = std::fs::remove_dir_all(&repo);
 }
 

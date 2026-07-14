@@ -6,6 +6,7 @@
 
 mod accounts;
 mod browser;
+mod control;
 mod diff;
 mod fleet;
 mod icons;
@@ -13,11 +14,16 @@ mod integrations;
 mod menu;
 mod menus;
 mod notifications;
+mod note;
 mod plugins;
 mod reload;
 mod root;
+mod run;
 mod search;
+#[cfg(feature = "sitecapture")]
+mod sitecapture;
 mod settings;
+mod setup;
 mod sidebar;
 mod state;
 mod theme;
@@ -32,6 +38,12 @@ fn main() {
     // Settings drive the initial theme; a missing file is fine (defaults).
     // Diagnostics are reported when the load is applied (see `reload`).
     let loaded = config::load(&config::default_path());
+
+    #[cfg(feature = "sitecapture")]
+    if let Some(path) = std::env::var_os("ASYLUM_SITE_CAPTURE") {
+        sitecapture::run(&loaded.settings, path.into()).expect("capture Asylum window");
+        return;
+    }
 
     // Launch the mobile companion server on a background thread, serving the
     // same on-disk store the app uses.

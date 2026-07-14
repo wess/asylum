@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Asylum is an Agent Development Environment for running, comparing, and merging isolated coding-agent work."
+    />
+    <meta name="theme-color" content="#05070b" />
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <title>Asylum — Agent Development Environment</title>
+  </head>
+  <body data-page="home">
+    <a class="skiplink" href="#main">Skip to content</a>
+    <header class="siteheader" data-header>
+      <a class="brand" href="./" aria-label="Asylum home">
+        <span class="brandmark" aria-hidden="true"></span>
+        <span>ASYLUM</span>
+      </a>
+      <nav class="primarynav" aria-label="Primary navigation" data-nav>
+        <a class="active" href="./">Overview</a>
+        <a href="./docs/">Docs</a>
+        <a href="./tutorials/">Tutorials</a>
+        <a href="https://github.com/wess/asylum" target="_blank" rel="noreferrer">
+          GitHub
+          <i data-lucide="arrow-up-right" aria-hidden="true"></i>
+        </a>
+      </nav>
+      <button class="navtoggle" type="button" aria-label="Open navigation" aria-expanded="false" data-navtoggle>
+        <i data-lucide="menu" aria-hidden="true"></i>
+      </button>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="herotitle">
+        <canvas id="agentgrid" class="agentgrid" aria-hidden="true"></canvas>
+        <div class="herocontent shell">
+          <p class="eyebrow"><span class="livepulse"></span> Agent development environment</p>
+          <h1 id="herotitle">ASYLUM</h1>
+          <p class="herocopy">
+            Dispatch one task to a fleet of coding agents. Keep every attempt isolated. Compare the evidence. Merge the winner.
+          </p>
+          <div class="heroactions">
+            <a class="button primary" href="./docs/#install">
+              Build from source
+              <i data-lucide="arrow-right" aria-hidden="true"></i>
+            </a>
+            <a class="button quiet" href="./tutorials/">
+              Start a tutorial
+              <i data-lucide="graduation-cap" aria-hidden="true"></i>
+            </a>
+          </div>
+          <dl class="herostats" aria-label="Asylum runtime model">
+            <div><dt>Isolation</dt><dd>Git worktrees</dd></div>
+            <div><dt>Execution</dt><dd>Real PTYs</dd></div>
+            <div><dt>Memory</dt><dd>Plain Markdown</dd></div>
+          </dl>
+        </div>
+        <div class="telemetry" aria-hidden="true">
+          <span class="telemetrytitle">Live topology</span>
+          <span><b class="cyan"></b> dispatch</span>
+          <span><b class="amber"></b> review</span>
+          <span><b class="mint"></b> merge</span>
+        </div>
+        <a class="scrollcue" href="#flow" aria-label="Explore the Asylum workflow">
+          <span>Trace the run</span>
+          <i data-lucide="arrow-down" aria-hidden="true"></i>
+        </a>
+      </section>
+
+      <section id="flow" class="flowband" aria-labelledby="flowtitle">
+        <div class="shell">
+          <div class="sectionhead compact">
+            <p class="eyebrow">One task, independent evidence</p>
+            <h2 id="flowtitle">The orchestration path</h2>
+          </div>
+          <ol class="flowline">
+            <li data-stage="task"><span>01</span><strong>Task</strong><small>Define the outcome</small></li>
+            <li data-stage="fanout"><span>02</span><strong>Fan out</strong><small>Isolate each agent</small></li>
+            <li data-stage="checks"><span>03</span><strong>Verify</strong><small>Run project checks</small></li>
+            <li data-stage="review"><span>04</span><strong>Review</strong><small>Compare diffs and output</small></li>
+            <li data-stage="merge"><span>05</span><strong>Merge</strong><small>Ship the selected run</small></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="productsection" aria-labelledby="producttitle">
+        <div class="shell productintro">
+          <div class="sectionhead">
+            <p class="eyebrow">The whole loop, visible</p>
+            <h2 id="producttitle">Operate the fleet from one native workspace.</h2>
+          </div>
+          <p>
+            Terminals, diffs, checks, project memory, browser inspection, and merge controls share one stateful workflow. You can see what each run changed and why it should win.
+          </p>
+        </div>
+        <div class="productframe shellwide">
+          <img
+            src="./product.png"
+            alt="Asylum desktop app showing the Notes workspace with a collapsible activity rail, Markdown editor, properties, and task context"
+            width="1200"
+            height="820"
+            loading="lazy"
+          />
+          <div class="productcallout one"><span>01</span> Every surface stays in one workspace</div>
+          <div class="productcallout two"><span>02</span> Notes become durable run context</div>
+        </div>
+      </section>
+
+      <section class="capabilities" aria-labelledby="capabilitytitle">
+        <div class="shell">
+          <div class="sectionhead splithead">
+            <div>
+              <p class="eyebrow">Built around decisions</p>
+              <h2 id="capabilitytitle">Less terminal juggling. Better evidence.</h2>
+            </div>
+            <p>Asylum keeps advanced controls available without making the first task hard to understand.</p>
+          </div>
+          <div class="capabilitylist">
+            <article>
+              <span class="capabilityindex">A</span>
+              <i data-lucide="git-fork" aria-hidden="true"></i>
+              <h3>Parallel by construction</h3>
+              <p>Each agent receives its own branch and worktree. Attempts never overwrite each other.</p>
+              <small>agent · git · runner</small>
+            </article>
+            <article>
+              <span class="capabilityindex">B</span>
+              <i data-lucide="scan-search" aria-hidden="true"></i>
+              <h3>Review the proof</h3>
+              <p>Compare changed files, terminal transcripts, annotations, and project checks before selecting a run.</p>
+              <small>diff · checks · store</small>
+            </article>
+            <article>
+              <span class="capabilityindex">C</span>
+              <i data-lucide="notebook-tabs" aria-hidden="true"></i>
+              <h3>Memory that stays yours</h3>
+              <p>Use Markdown vaults, wiki links, properties, backlinks, and templates without a proprietary format.</p>
+              <small>notes · search · preview</small>
+            </article>
+            <article>
+              <span class="capabilityindex">D</span>
+              <i data-lucide="mouse-pointer-click" aria-hidden="true"></i>
+              <h3>Point at the problem</h3>
+              <p>Inspect a page, pin visual feedback, and send exact element context back to an agent.</p>
+              <small>browser · designmode</small>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="learnsection" aria-labelledby="learntitle">
+        <div class="shell">
+          <div class="sectionhead splithead">
+            <div>
+              <p class="eyebrow">Choose your depth</p>
+              <h2 id="learntitle">Start clear. Go as deep as needed.</h2>
+            </div>
+            <p>Reference material for operators and guided paths for people running their first agent fleet.</p>
+          </div>
+          <div class="learnroutes">
+            <a href="./docs/" class="learnroute">
+              <span class="routeicon"><i data-lucide="book-open-text" aria-hidden="true"></i></span>
+              <span class="routelabel">Reference</span>
+              <strong>Read the docs</strong>
+              <p>Install, configure, operate, extend, and troubleshoot Asylum.</p>
+              <span class="routelink">Open documentation <i data-lucide="arrow-right" aria-hidden="true"></i></span>
+            </a>
+            <a href="./tutorials/" class="learnroute accent">
+              <span class="routeicon"><i data-lucide="graduation-cap" aria-hidden="true"></i></span>
+              <span class="routelabel">Guided learning</span>
+              <strong>Follow a tutorial</strong>
+              <p>Beginner, intermediate, and advanced tracks with real project workflows.</p>
+              <span class="routelink">Choose your level <i data-lucide="arrow-right" aria-hidden="true"></i></span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section class="finalcta" aria-labelledby="ctatitle">
+        <div class="shell">
+          <p class="eyebrow">Route your first task</p>
+          <h2 id="ctatitle">Build in parallel. Decide with evidence.</h2>
+          <div class="heroactions">
+            <a class="button primary" href="./docs/#install">Install Asylum <i data-lucide="terminal" aria-hidden="true"></i></a>
+            <a class="button quiet" href="https://github.com/wess/asylum">View source <i data-lucide="github" aria-hidden="true"></i></a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="sitefooter">
+      <div class="shell">
+        <a class="brand" href="./"><span class="brandmark" aria-hidden="true"></span><span>ASYLUM</span></a>
+        <p>Agent Development Environment. Native Rust, durable state, isolated work.</p>
+        <nav aria-label="Footer navigation">
+          <a href="./docs/">Docs</a>
+          <a href="./tutorials/">Tutorials</a>
+          <a href="https://github.com/wess/asylum">GitHub</a>
+        </nav>
+      </div>
+    </footer>
+    <script type="module" src="/src/home.ts"></script>
+  </body>
+</html>

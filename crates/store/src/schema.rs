@@ -79,6 +79,42 @@ const MIGRATIONS: &[&str] = &[
     );
     ALTER TABLE projects ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE projects ADD COLUMN last_opened_at INTEGER NOT NULL DEFAULT 0;",
+    // 3 - durable run diagnostics and terminal output. Output stays on the run
+    // so a finished or interrupted session remains reviewable after restart.
+    "ALTER TABLE runs ADD COLUMN output TEXT NOT NULL DEFAULT '';
+    ALTER TABLE runs ADD COLUMN error TEXT;
+    ALTER TABLE runs ADD COLUMN attempt INTEGER NOT NULL DEFAULT 1;",
+    // 4 - verification results belong to one run/worktree, not the task UI.
+    "CREATE TABLE runchecks (
+        run_id      INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+        id          TEXT NOT NULL,
+        status      TEXT NOT NULL,
+        summary     TEXT NOT NULL DEFAULT '',
+        duration_ms INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (run_id, id)
+    );",
+    // 5 - queued review continuations must survive an app restart.
+    "ALTER TABLE runs ADD COLUMN prompt TEXT;",
+    // 6 - Markdown vault placement and durable note context links.
+    "CREATE TABLE notevaults (
+        project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+        mode       TEXT NOT NULL,
+        path       TEXT NOT NULL
+    );
+    CREATE TABLE noteattachments (
+        id         INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        note_path  TEXT NOT NULL,
+        task_id    INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+        run_id     INTEGER REFERENCES runs(id) ON DELETE CASCADE,
+        created_at INTEGER NOT NULL,
+        CHECK ((task_id IS NULL) != (run_id IS NULL)),
+        UNIQUE (note_path, task_id),
+        UNIQUE (note_path, run_id)
+    );
+    CREATE INDEX idx_noteattachments_project ON noteattachments(project_id);
+    CREATE INDEX idx_noteattachments_task ON noteattachments(task_id);
+    CREATE INDEX idx_noteattachments_run ON noteattachments(run_id);",
 ];
 
 /// Apply pragmas and any pending migrations.

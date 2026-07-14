@@ -85,9 +85,9 @@ The app speaks newline-delimited JSON to a `[runtime]` process. Each request is
 not JSON objects (a runtime's stray logging) are ignored. `pluginrt` provides
 `invoke_once` for one-shot calls and `Session` for a warm persistent runtime.
 
-## WASM tier (planned)
+## WASM tier
 
-A `type = "wasm"` runtime is parsed and validated today but not yet executed —
-`pluginrt` returns `Unsupported`. The plan: a wasmtime
-component-model host with capability-gated host imports, so a guest can only
-reach the interfaces whose capability it declared and was granted.
+`pluginrt::invoke_wasm` loads `type = "wasm"` runtimes under `wasmi`. Guests use
+a linear-memory string ABI and export `alloc` and `invoke`. The host links only
+the functions allowed by the manifest's capabilities, so an undeclared host
+function cannot be imported.

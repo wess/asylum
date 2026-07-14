@@ -9,7 +9,9 @@ fn db() -> Db {
 fn project_create_is_idempotent_by_path() {
     let db = db();
     let a = db.create_project("Repo", "/tmp/repo", "main", 100).unwrap();
-    let b = db.create_project("Repo again", "/tmp/repo", "main", 200).unwrap();
+    let b = db
+        .create_project("Repo again", "/tmp/repo", "main", 200)
+        .unwrap();
     assert_eq!(a.id, b.id);
     assert_eq!(db.projects().unwrap().len(), 1);
 }
@@ -18,7 +20,9 @@ fn project_create_is_idempotent_by_path() {
 fn task_lifecycle() {
     let db = db();
     let p = db.create_project("R", "/tmp/r", "main", 1).unwrap();
-    let t = db.create_task(p.id, "Add feature", "do the thing", 10).unwrap();
+    let t = db
+        .create_task(p.id, "Add feature", "do the thing", 10)
+        .unwrap();
     assert_eq!(t.status, TaskStatus::Draft);
 
     db.set_task_status(t.id, TaskStatus::Review, 20).unwrap();
@@ -35,13 +39,16 @@ fn run_fanout_and_finish() {
     let p = db.create_project("R", "/tmp/r2", "main", 1).unwrap();
     let t = db.create_task(p.id, "T", "prompt", 1).unwrap();
 
-    let r1 = db.create_run(t.id, "claude-code", "/wt/1", "task-1a").unwrap();
+    let r1 = db
+        .create_run(t.id, "claude-code", "/wt/1", "task-1a")
+        .unwrap();
     let r2 = db.create_run(t.id, "codex", "/wt/2", "task-1b").unwrap();
     assert_eq!(db.runs(t.id).unwrap().len(), 2);
     assert_eq!(r1.status, RunStatus::Queued);
 
     db.start_run(r1.id, 5).unwrap();
     db.finish_run(r1.id, 0, 9).unwrap();
+    assert_eq!(db.successful_agents().unwrap(), vec!["claude-code"]);
     let r1 = db.run(r1.id).unwrap();
     assert_eq!(r1.status, RunStatus::Succeeded);
     assert_eq!(r1.started_at, Some(5));
@@ -51,6 +58,43 @@ fn run_fanout_and_finish() {
 
     db.finish_run(r2.id, 1, 12).unwrap();
     assert_eq!(db.run(r2.id).unwrap().status, RunStatus::Failed);
+}
+
+#[test]
+fn run_output_retry_queue_and_recovery() {
+    let db = Db::memory().unwrap();
+    let project = db.create_project("p", "/tmp/p", "main", 1).unwrap();
+    let task = db.create_task(project.id, "t", "prompt", 2).unwrap();
+    let run = db.create_run(task.id, "agent", "/tmp/w", "run/t").unwrap();
+
+    db.start_run(run.id, 3).unwrap();
+    db.save_run_output(run.id, "live output").unwrap();
+    assert_eq!(db.run(run.id).unwrap().output, "live output");
+    db.finish_run_with_output(run.id, 1, "failed output", 4)
+        .unwrap();
+    let finished = db.run(run.id).unwrap();
+    assert_eq!(finished.status, RunStatus::Failed);
+    assert_eq!(finished.output, "failed output");
+
+    db.queue_run(run.id).unwrap();
+    let queued = db.run(run.id).unwrap();
+    assert_eq!(queued.status, RunStatus::Queued);
+    assert_eq!(queued.attempt, 2);
+    assert!(queued.output.is_empty());
+    assert_eq!(db.queued_runs().unwrap().len(), 1);
+
+    db.queue_run_with_prompt(run.id, "address review").unwrap();
+    assert_eq!(
+        db.run(run.id).unwrap().prompt.as_deref(),
+        Some("address review")
+    );
+    db.start_run(run.id, 5).unwrap();
+    assert!(db.run(run.id).unwrap().prompt.is_none());
+    assert_eq!(db.running_count().unwrap(), 1);
+    assert_eq!(db.recover_interrupted_runs(6).unwrap(), 1);
+    let recovered = db.run(run.id).unwrap();
+    assert_eq!(recovered.status, RunStatus::Failed);
+    assert!(recovered.error.unwrap().contains("Retry"));
 }
 
 #[test]
@@ -72,8 +116,11 @@ fn annotations_batch_and_resolve() {
     let t = db.create_task(p.id, "T", "p", 1).unwrap();
     let r = db.create_run(t.id, "codex", "/wt/x", "b").unwrap();
 
-    db.add_annotation(r.id, "src/main.rs", 10, Side::New, "rename this", 5).unwrap();
-    let a2 = db.add_annotation(r.id, "src/main.rs", 3, Side::New, "extract fn", 6).unwrap();
+    db.add_annotation(r.id, "src/main.rs", 10, Side::New, "rename this", 5)
+        .unwrap();
+    let a2 = db
+        .add_annotation(r.id, "src/main.rs", 3, Side::New, "extract fn", 6)
+        .unwrap();
     // Ordered by file then line: line 3 comes before line 10.
     let anns = db.annotations(r.id).unwrap();
     assert_eq!(anns.len(), 2);
@@ -104,20 +151,24 @@ fn accounts_hot_swap_active() {
 fn usage_snapshot_and_fraction() {
     let db = db();
     let a = db.add_account("claude", "me", 1).unwrap();
-    db.record_usage(a.id, 250, Some(1000), Some(9999), 5).unwrap();
+    db.record_usage(a.id, 250, Some(1000), Some(9999), 5)
+        .unwrap();
     let u = db.latest_usage(a.id).unwrap().unwrap();
     assert_eq!(u.used, 250);
     assert_eq!(u.fraction(), Some(0.25));
 
     // Later snapshot wins.
-    db.record_usage(a.id, 900, Some(1000), Some(9999), 10).unwrap();
+    db.record_usage(a.id, 900, Some(1000), Some(9999), 10)
+        .unwrap();
     assert_eq!(db.latest_usage(a.id).unwrap().unwrap().used, 900);
 }
 
 #[test]
 fn notifications_unread_flow() {
     let db = db();
-    let n1 = db.notify("run_finished", "Codex done", "", None, 1).unwrap();
+    let n1 = db
+        .notify("run_finished", "Codex done", "", None, 1)
+        .unwrap();
     db.notify("attention", "Needs input", "", None, 2).unwrap();
     assert_eq!(db.unread_count().unwrap(), 2);
     assert_eq!(db.notifications(true).unwrap().len(), 2);
@@ -146,7 +197,12 @@ fn pinned_and_recent_ordering() {
     assert_eq!(order, vec!["C", "B", "A"]);
 
     // Recents excludes never-opened C, newest first.
-    let recent: Vec<String> = db.recent_projects(10).unwrap().into_iter().map(|p| p.name).collect();
+    let recent: Vec<String> = db
+        .recent_projects(10)
+        .unwrap()
+        .into_iter()
+        .map(|p| p.name)
+        .collect();
     assert_eq!(recent, vec!["B", "A"]);
 }
 
@@ -155,5 +211,64 @@ fn missing_lookups_report_not_found() {
     let db = db();
     assert!(matches!(db.task(999), Err(Error::NotFound)));
     assert!(matches!(db.run(999), Err(Error::NotFound)));
-    assert!(matches!(db.set_task_status(999, TaskStatus::Merged, 1), Err(Error::NotFound)));
+    assert!(matches!(
+        db.set_task_status(999, TaskStatus::Merged, 1),
+        Err(Error::NotFound)
+    ));
+}
+
+#[test]
+fn note_vault_attachments_and_rename_are_durable() {
+    let db = db();
+    let project = db.create_project("Notes", "/tmp/notes", "main", 1).unwrap();
+    let task = db
+        .create_task(project.id, "Fix cache", "cache prompt", 2)
+        .unwrap();
+    let run = db
+        .create_run(task.id, "agent", "/tmp/wt", "task/cache")
+        .unwrap();
+
+    db.set_note_vault(project.id, NoteVaultMode::Repository, "/tmp/notes/notes")
+        .unwrap();
+    assert_eq!(
+        db.note_vault(project.id).unwrap().unwrap().mode,
+        NoteVaultMode::Repository
+    );
+    db.attach_note_to_task(project.id, "cache.md", task.id, 3)
+        .unwrap();
+    db.attach_note_to_run(project.id, "cache.md", run.id, 4)
+        .unwrap();
+    assert_eq!(db.task_note_paths(task.id).unwrap(), vec!["cache.md"]);
+    assert_eq!(db.run_note_paths(run.id).unwrap(), vec!["cache.md"]);
+    assert_eq!(
+        db.note_attachments(project.id, "cache.md").unwrap().len(),
+        2
+    );
+
+    db.rename_note_attachments(project.id, "cache.md", "caching.md")
+        .unwrap();
+    assert_eq!(db.run_note_paths(run.id).unwrap(), vec!["caching.md"]);
+    db.delete_note_attachments(project.id, "caching.md")
+        .unwrap();
+    assert!(db.run_note_paths(run.id).unwrap().is_empty());
+}
+
+#[test]
+fn unified_store_search_finds_tasks_and_transcripts() {
+    let db = db();
+    let project = db
+        .create_project("Search", "/tmp/search", "main", 1)
+        .unwrap();
+    let task = db
+        .create_task(project.id, "Fix cache", "Investigate stale cache keys", 2)
+        .unwrap();
+    let run = db
+        .create_run(task.id, "agent", "/tmp/wt", "task/cache")
+        .unwrap();
+    db.save_run_output(run.id, "cache invalidation repaired")
+        .unwrap();
+    let records = db.search_project(project.id, "cache", 20).unwrap();
+    assert_eq!(records.len(), 2);
+    assert!(records.iter().any(|record| record.kind == SearchKind::Task));
+    assert!(records.iter().any(|record| record.kind == SearchKind::Run));
 }

@@ -8,6 +8,7 @@ app  ─────────────────────────
  │
  ├── agent ── config                 registry, command build, fan-out plan
  ├── plugin ── pluginrt              manifests + process runtime
+ ├── notes                           Markdown vault + knowledge index
  ├── store                           SQLite: projects / tasks / runs
  └── git                             worktrees, status, diff
 ```
@@ -27,13 +28,22 @@ onto the crates like this:
 4. **Launch.** `agent::command::build(def, prefs, prompt, cwd)` produces a
    `SpawnSpec` (program, args, cwd, optional stdin). The app runs it on a pty
    inside a `libsinclair` terminal pane. `store::Db::start_run` marks it running.
-5. **Track.** The process exit drives `store::Db::finish_run` (0 → succeeded,
-   non-zero → failed). The fleet board reflects each run's status live.
-6. **Review & merge.** `git::diff::since_fork(worktree, base_branch)` yields the
-   reviewable diff; the winning run's branch merges back to the project's base.
+5. **Track.** Pty events snapshot terminal output into SQLite. Exit updates the
+   durable status, commits a successful run's worktree changes, and starts that
+   worktree's detected checks. The queue launches another run when capacity
+   opens.
+6. **Review.** `git::diff::since_fork(worktree, base_branch)` yields the selected
+   run's diff. Review comments queue another attempt in the same worktree and
+   survive app restarts.
+7. **Merge or open a PR.** The app blocks failed checks, checks the base
+   worktree, runs a non-destructive conflict preflight, then asks for explicit
+   confirmation. Cleanup removes clean finished worktrees and keeps branches.
 
-Steps 1–3 and 6's diff model are built and tested; 4–5's live execution and the
-review UI are the next wiring (see `docs/roadmap.md`).
+Project memory crosses this loop without replacing it. `notes` indexes plain
+Markdown and Obsidian-style metadata; `store` remembers the selected vault and
+note attachments. Task attachments are inherited by every generated run, their
+Markdown is appended to the launch prompt, and run/check/PR links are written
+back to the attached notes.
 
 ## Crate detail
 
@@ -50,6 +60,14 @@ the gpui app has no tokio. `schema.rs` runs ordered migrations guarded by
 `PRAGMA user_version`. `model.rs` holds the row types and their status enums
 (round-tripped through lowercase tokens). `project.rs` / `task.rs` / `run.rs`
 are the CRUD, implemented as inherent methods on `Db`.
+
+### `notes`
+Plain Markdown is the source of truth. `vault.rs` performs path-safe recursive
+CRUD and updates incoming wiki links on rename. `parse.rs` reads YAML
+frontmatter, `[[target|alias]]` links, tags, and completion fragments.
+`search.rs` ranks note title/path/body hits, and `template.rs` supplies task,
+decision, investigation, and retrospective structures. The crate never imports
+gpui or SQLite.
 
 ### `config`
 `model.rs` is the typed `Settings` schema with serde defaults so a partial file
@@ -81,13 +99,16 @@ shapes then validates/lowers them, turning unknown tokens into error strings.
 ### `pluginrt`
 The runtime host. `invoke_once` spawns a runtime process, sends one JSON
 `Request`, and reads one `Response`; `Session` keeps a `persistent` runtime warm
-across many `call`s. Non-JSON lines from a chatty runtime are skipped. The
-`wasm` tier returns `Error::Unsupported` until the execution engine lands.
+across many `call`s. Non-JSON lines from a chatty runtime are skipped.
+`invoke_wasm` runs a module under `wasmi` and links only the host functions
+allowed by the manifest's declared capabilities.
 
 ### `app`
 `main.rs` loads settings, installs the guise theme, wires the native menu, and
-opens the window. `state.rs` is the single `Root` entity — it owns the
-`store::Db` and the current project/task selection and exposes render snapshots.
-`root.rs` composes guise's `AppShell` (header / navbar / main / footer).
-`sidebar.rs` builds the project + task nav; `fleet.rs` builds the fan-out board
-of run cards; `theme.rs` bridges settings to the guise theme.
+opens the window. `state.rs` owns the `Root` entity, SQLite connection,
+selection, live terminals, notices, and view snapshots. `run.rs` coordinates
+fan-out, queue capacity, pty lifecycle, checks, continuation, merge, and cleanup.
+`root.rs` composes guise's `AppShell`, including the collapsible activity rail;
+`fleet.rs`, `diff.rs`, and `setup.rs` render the main task workflow. `note/` owns the native project-memory surface
+and its task/run context actions; project-wide search combines source hits with
+notes and SQLite task/run/transcript records.

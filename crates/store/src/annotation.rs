@@ -41,7 +41,11 @@ impl Db {
     /// Fetch one annotation.
     pub fn annotation(&self, id: i64) -> Result<Annotation> {
         self.conn()
-            .query_row("SELECT * FROM annotations WHERE id = ?1", params![id], from_row)
+            .query_row(
+                "SELECT * FROM annotations WHERE id = ?1",
+                params![id],
+                from_row,
+            )
             .map_err(|e| match e {
                 rusqlite::Error::QueryReturnedNoRows => Error::NotFound,
                 other => other.into(),
@@ -52,9 +56,8 @@ impl Db {
     /// the agent as review feedback.
     pub fn annotations(&self, run_id: i64) -> Result<Vec<Annotation>> {
         let conn = self.conn();
-        let mut stmt = conn.prepare(
-            "SELECT * FROM annotations WHERE run_id = ?1 ORDER BY file, line, id",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT * FROM annotations WHERE run_id = ?1 ORDER BY file, line, id")?;
         let rows = stmt.query_map(params![run_id], from_row)?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }

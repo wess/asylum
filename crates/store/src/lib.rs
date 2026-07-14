@@ -20,13 +20,17 @@ pub mod account;
 pub mod annotation;
 pub mod model;
 pub mod notification;
+pub mod note;
 pub mod project;
 pub mod run;
+pub mod runcheck;
 mod schema;
+pub mod search;
 pub mod task;
 
 pub use model::{
-    Account, Annotation, Notification, Project, Run, RunStatus, Side, Task, TaskStatus, Usage,
+    Account, Annotation, NoteAttachment, NoteVault, NoteVaultMode, Notification, Project, Run,
+    RunCheck, RunStatus, SearchKind, SearchRecord, Side, Task, TaskStatus, Usage,
 };
 
 /// A store error: either the SQLite layer failed or a lookup found nothing.

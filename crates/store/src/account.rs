@@ -51,7 +51,11 @@ impl Db {
     /// Fetch one account.
     pub fn account(&self, id: i64) -> Result<Account> {
         self.conn()
-            .query_row("SELECT * FROM accounts WHERE id = ?1", params![id], account_row)
+            .query_row(
+                "SELECT * FROM accounts WHERE id = ?1",
+                params![id],
+                account_row,
+            )
             .map_err(|e| match e {
                 rusqlite::Error::QueryReturnedNoRows => Error::NotFound,
                 other => other.into(),
@@ -63,14 +67,14 @@ impl Db {
         let conn = self.conn();
         match provider {
             Some(p) => {
-                let mut stmt = conn.prepare(
-                    "SELECT * FROM accounts WHERE provider = ?1 ORDER BY created_at",
-                )?;
+                let mut stmt =
+                    conn.prepare("SELECT * FROM accounts WHERE provider = ?1 ORDER BY created_at")?;
                 let rows = stmt.query_map(params![p], account_row)?;
                 Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
             }
             None => {
-                let mut stmt = conn.prepare("SELECT * FROM accounts ORDER BY provider, created_at")?;
+                let mut stmt =
+                    conn.prepare("SELECT * FROM accounts ORDER BY provider, created_at")?;
                 let rows = stmt.query_map([], account_row)?;
                 Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
             }

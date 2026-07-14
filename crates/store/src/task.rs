@@ -48,9 +48,8 @@ impl Db {
     /// All tasks for a project, newest first.
     pub fn tasks(&self, project_id: i64) -> Result<Vec<Task>> {
         let conn = self.conn();
-        let mut stmt = conn.prepare(
-            "SELECT * FROM tasks WHERE project_id = ?1 ORDER BY created_at DESC",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT * FROM tasks WHERE project_id = ?1 ORDER BY created_at DESC")?;
         let rows = stmt.query_map(params![project_id], from_row)?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }

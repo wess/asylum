@@ -66,6 +66,79 @@ pub struct Run {
     pub ended_at: Option<i64>,
     /// Process exit code once the agent finished.
     pub exit_code: Option<i32>,
+    /// Persisted terminal transcript, available after the pty is gone.
+    pub output: String,
+    /// Actionable launch/runtime failure, separate from ordinary non-zero output.
+    pub error: Option<String>,
+    /// Number of times this worktree has been launched for the task.
+    pub attempt: u32,
+    /// One-shot prompt override for the next queued attempt.
+    pub prompt: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunCheck {
+    pub run_id: i64,
+    pub id: String,
+    pub status: String,
+    pub summary: String,
+    pub duration_ms: u64,
+}
+
+/// Where one project's plain Markdown vault lives.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoteVault {
+    pub project_id: i64,
+    pub mode: NoteVaultMode,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoteVaultMode {
+    Private,
+    Repository,
+}
+
+impl NoteVaultMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Private => "private",
+            Self::Repository => "repository",
+        }
+    }
+
+    pub fn parse(value: &str) -> Self {
+        match value {
+            "repository" => Self::Repository,
+            _ => Self::Private,
+        }
+    }
+}
+
+/// A note attached to a task or run. The Markdown remains the source of truth;
+/// this row makes context injection durable across restarts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoteAttachment {
+    pub id: i64,
+    pub project_id: i64,
+    pub note_path: String,
+    pub task_id: Option<i64>,
+    pub run_id: Option<i64>,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SearchKind {
+    Task,
+    Run,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchRecord {
+    pub kind: SearchKind,
+    pub id: i64,
+    pub title: String,
+    pub detail: String,
 }
 
 /// The lifecycle of a [`Run`].
@@ -147,7 +220,9 @@ pub struct Usage {
 impl Usage {
     /// Fraction of the limit consumed in 0..=1, or `None` when no limit is set.
     pub fn fraction(&self) -> Option<f32> {
-        self.limit.filter(|l| *l > 0).map(|l| (self.used as f32 / l as f32).min(1.0))
+        self.limit
+            .filter(|l| *l > 0)
+            .map(|l| (self.used as f32 / l as f32).min(1.0))
     }
 }
 

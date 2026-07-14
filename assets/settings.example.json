@@ -10,11 +10,13 @@
     "worktree_dir": ".asylum/worktrees",
 
     // Agents fanned out by default when a task is dispatched. Ids come from the
-    // built-in registry (claude-code, codex, opencode, gemini, aider, cursor-agent).
+    // built-in registry (for example: claude-code, opencode, gemini, aider).
     "default_agents": ["claude-code", "codex"],
 
-    // Cap on concurrent agent runs across all tasks (0 = unlimited).
+    // Cap on concurrent agent runs across all tasks (0 = unlimited), and stop
+    // runs that exceed the timeout in minutes (0 = no timeout).
     "max_parallel_runs": 4,
+    "run_timeout_minutes": 60,
 
     // Per-agent overrides.
     "agents": {

@@ -31,10 +31,7 @@ pub struct Entry {
 
 /// Collect the changed paths in the worktree rooted at (or under) `dir`.
 pub fn status(dir: &Path) -> Result<Vec<Entry>, Error> {
-    let out = git(
-        dir,
-        &["status", "--porcelain=v2", "--untracked-files=all"],
-    )?;
+    let out = git(dir, &["status", "--porcelain=v2", "--untracked-files=all"])?;
     Ok(parse(&out))
 }
 
@@ -51,6 +48,18 @@ pub fn summarize(entries: &[Entry]) -> (usize, usize, usize) {
         }
     }
     (added, modified, deleted)
+}
+
+/// Remove entries owned by a managed directory such as the app's nested
+/// worktree root. Absolute managed paths cannot appear in repository status.
+pub fn excluding_prefix(entries: Vec<Entry>, prefix: &Path) -> Vec<Entry> {
+    if prefix.is_absolute() {
+        return entries;
+    }
+    entries
+        .into_iter()
+        .filter(|entry| !Path::new(&entry.path).starts_with(prefix))
+        .collect()
 }
 
 fn parse(out: &str) -> Vec<Entry> {

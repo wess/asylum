@@ -6,6 +6,7 @@ use gpui::prelude::*;
 use gpui::{div, px, App, Entity, IntoElement, SharedString, Window};
 use guise::prelude::*;
 
+use crate::control::Button;
 use crate::state::Root;
 use github::{Issue, PullRequest};
 
@@ -42,15 +43,18 @@ pub fn integrations_view(
 
     if let Some(err) = error {
         col = col.child(
-            Alert::new(SharedString::from(format!("GitHub: {err}")))
-                .color(ColorName::Yellow),
+            Alert::new(SharedString::from(format!("GitHub: {err}"))).color(ColorName::Yellow),
         );
     }
 
     // Pull requests.
     col = col.child(Title::new("Pull requests").order(4));
     if prs.is_empty() {
-        col = col.child(Text::new("No open pull requests loaded.").size(Size::Sm).dimmed());
+        col = col.child(
+            Text::new("No open pull requests loaded.")
+                .size(Size::Sm)
+                .dimmed(),
+        );
     } else {
         let mut list = div().flex().flex_col().gap_2();
         for pr in prs {
@@ -84,9 +88,13 @@ pub fn integrations_view(
 
 fn pr_row(pr: PullRequest) -> impl IntoElement {
     let badge = if pr.draft {
-        Badge::new("draft").color(ColorName::Gray).variant(Variant::Light)
+        Badge::new("draft")
+            .color(ColorName::Gray)
+            .variant(Variant::Light)
     } else {
-        Badge::new("open").color(ColorName::Green).variant(Variant::Light)
+        Badge::new("open")
+            .color(ColorName::Green)
+            .variant(Variant::Light)
     };
     Card::new().padding(Size::Sm).child(
         div()
@@ -97,7 +105,11 @@ fn pr_row(pr: PullRequest) -> impl IntoElement {
             .child(Text::new(SharedString::from(format!("#{}", pr.number))).dimmed())
             .child(Text::new(SharedString::from(pr.title.clone())).bold())
             .child(badge)
-            .child(Text::new(SharedString::from(format!("{} → {}", pr.head, pr.base))).size(Size::Xs).dimmed()),
+            .child(
+                Text::new(SharedString::from(format!("{} → {}", pr.head, pr.base)))
+                    .size(Size::Xs)
+                    .dimmed(),
+            ),
     )
 }
 
@@ -112,7 +124,11 @@ fn issue_row(issue: Issue, handle: Entity<Root>) -> impl IntoElement {
             .gap_2()
             .child(Text::new(SharedString::from(format!("#{}", issue.number))).dimmed())
             .child(Text::new(SharedString::from(issue.title.clone())).bold())
-            .child(Text::new(SharedString::from(format!("→ {branch}"))).size(Size::Xs).dimmed())
+            .child(
+                Text::new(SharedString::from(format!("→ {branch}")))
+                    .size(Size::Xs)
+                    .dimmed(),
+            )
             .child(
                 Button::new(
                     SharedString::from(format!("issue-wt-{}", issue.number)),

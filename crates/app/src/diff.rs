@@ -7,7 +7,9 @@ use gpui::prelude::*;
 use gpui::{div, px, rgba, App, Entity, IntoElement, SharedString, Window};
 use guise::prelude::*;
 
+use crate::control::Button;
 use crate::state::Root;
+use crate::state::RunRow;
 use checks::{CheckResult, Status};
 use git::{DiffFile, LineKind};
 use store::{Annotation, Side};
@@ -20,23 +22,34 @@ pub type Target = Option<(String, u32, Side)>;
 pub fn review(
     files: Vec<DiffFile>,
     check_results: Vec<CheckResult>,
+    checking: bool,
     annotations: Vec<Annotation>,
     target: Target,
     branches: Vec<git::Branch>,
+    runs: Vec<RunRow>,
     note: Entity<guise::TextInput>,
     handle: Entity<Root>,
     _window: &mut Window,
     _cx: &mut App,
 ) -> impl IntoElement {
-    let mut col = div().flex().flex_col().w_full().gap_4().p(px(20.0));
+    let mut col = div()
+        .id("diff-scroll")
+        .flex()
+        .flex_col()
+        .size_full()
+        .gap_4()
+        .p(px(20.0))
+        .overflow_y_scroll();
     col = col.child(
         div()
             .flex()
             .flex_row()
+            .flex_wrap()
             .items_center()
+            .gap_2()
             .justify_between()
             .child(Title::new("Review changes").order(2))
-            .child(checks_bar(check_results, handle.clone())),
+            .child(checks_bar(check_results, checking, handle.clone())),
     );
 
     if !branches.is_empty() {
@@ -48,15 +61,62 @@ pub fn review(
             .gap_1()
             .child(Text::new("Branches:").size(Size::Xs).dimmed());
         for b in branches.into_iter().take(12) {
-            let color = if b.head { ColorName::Green } else { ColorName::Gray };
+            let color = if b.head {
+                ColorName::Green
+            } else {
+                ColorName::Gray
+            };
             chips = chips.child(
-                Badge::new(SharedString::from(b.name)).color(color).variant(Variant::Light),
+                Badge::new(SharedString::from(b.name))
+                    .color(color)
+                    .variant(Variant::Light),
             );
         }
         col = col.child(chips);
     }
 
-    col = col.child(comment_panel(&annotations, target.clone(), note, handle.clone()));
+    if !runs.is_empty() {
+        let mut row = div()
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .items_center()
+            .gap_1()
+            .child(Text::new("Compare:").size(Size::Xs).dimmed());
+        for run in runs {
+            let select = handle.clone();
+            let id = run.id;
+            let name = agent::find(&run.agent)
+                .map(|agent| agent.name)
+                .unwrap_or(run.agent.as_str());
+            row = row.child(
+                Button::new(
+                    SharedString::from(format!("diff-run-{id}")),
+                    SharedString::from(format!("{}{}", if run.selected { "* " } else { "" }, name)),
+                )
+                .size(Size::Xs)
+                .variant(if run.selected {
+                    Variant::Filled
+                } else {
+                    Variant::Light
+                })
+                .on_click(move |_, _, cx| {
+                    select.update(cx, |root, cx| {
+                        root.select_run(id);
+                        cx.notify();
+                    });
+                }),
+            );
+        }
+        col = col.child(row);
+    }
+
+    col = col.child(comment_panel(
+        &annotations,
+        target.clone(),
+        note,
+        handle.clone(),
+    ));
 
     if files.is_empty() {
         return col.child(
@@ -87,12 +147,11 @@ fn comment_panel(
         Some((file, line, _)) => format!("Commenting on {file}:{line}"),
         None => "Click a diff line to anchor your comment.".to_string(),
     };
-    let mut status = div()
-        .flex()
-        .flex_row()
-        .items_center()
-        .gap_2()
-        .child(Text::new(SharedString::from(anchor)).size(Size::Xs).dimmed());
+    let mut status = div().flex().flex_row().items_center().gap_2().child(
+        Text::new(SharedString::from(anchor))
+            .size(Size::Xs)
+            .dimmed(),
+    );
     if open > 0 {
         let send = handle.clone();
         status = status
@@ -105,9 +164,9 @@ fn comment_panel(
                 Button::new("send-review", "Send review to agent")
                     .size(Size::Xs)
                     .variant(Variant::Filled)
-                    .on_click(move |_, _, cx| {
+                    .on_click(move |_, window, cx| {
                         send.update(cx, |root, cx| {
-                            root.send_review_to_agent();
+                            root.send_review_to_agent(window, cx);
                             cx.notify();
                         });
                     }),
@@ -143,7 +202,7 @@ fn comment_panel(
 }
 
 /// The checks bar: a Run button plus a PASS/FAIL badge per check.
-fn checks_bar(results: Vec<CheckResult>, handle: Entity<Root>) -> impl IntoElement {
+fn checks_bar(results: Vec<CheckResult>, checking: bool, handle: Entity<Root>) -> impl IntoElement {
     let mut row = div().flex().flex_row().items_center().gap_2();
     for r in &results {
         let (color, label) = match r.status {
@@ -158,15 +217,23 @@ fn checks_bar(results: Vec<CheckResult>, handle: Entity<Root>) -> impl IntoEleme
         );
     }
     row = row.child(
-        Button::new("run-checks", "Run checks")
-            .size(Size::Xs)
-            .variant(Variant::Filled)
-            .on_click(move |_, _, cx| {
-                handle.update(cx, |root, cx| {
-                    root.run_checks();
-                    cx.notify();
-                });
-            }),
+        Button::new(
+            "run-checks",
+            if checking {
+                "Checks running"
+            } else {
+                "Run checks"
+            },
+        )
+        .size(Size::Xs)
+        .variant(Variant::Filled)
+        .disabled(checking)
+        .on_click(move |_, _, cx| {
+            handle.update(cx, |root, cx| {
+                root.run_checks(cx);
+                cx.notify();
+            });
+        }),
     );
     row
 }
@@ -184,8 +251,16 @@ fn file_block(
         .items_center()
         .gap_2()
         .child(Text::new(SharedString::from(file.path.clone())).bold())
-        .child(Badge::new(format!("+{added}")).color(ColorName::Green).variant(Variant::Light))
-        .child(Badge::new(format!("-{removed}")).color(ColorName::Red).variant(Variant::Light));
+        .child(
+            Badge::new(format!("+{added}"))
+                .color(ColorName::Green)
+                .variant(Variant::Light),
+        )
+        .child(
+            Badge::new(format!("-{removed}"))
+                .color(ColorName::Red)
+                .variant(Variant::Light),
+        );
 
     let mut body = div()
         .flex()
@@ -196,15 +271,13 @@ fn file_block(
 
     for (hi, hunk) in file.hunks.iter().enumerate() {
         body = body.child(
-            div()
-                .px(px(8.0))
-                .py(px(2.0))
-                .text_size(px(11.0))
-                .child(Text::new(SharedString::from(format!(
+            div().px(px(8.0)).py(px(2.0)).text_size(px(11.0)).child(
+                Text::new(SharedString::from(format!(
                     "@@ -{} +{} @@ {}",
                     hunk.old_start, hunk.new_start, hunk.header
                 )))
-                .dimmed()),
+                .dimmed(),
+            ),
         );
         for (li, line) in hunk.lines.iter().enumerate() {
             let (line_no, side) = anchor_of(line);
@@ -222,9 +295,10 @@ fn file_block(
                 handle.clone(),
             ));
             if let Some(n) = line_no {
-                for a in annotations.iter().filter(|a| {
-                    a.file == file.path && a.line == n && a.side == side
-                }) {
+                for a in annotations
+                    .iter()
+                    .filter(|a| a.file == file.path && a.line == n && a.side == side)
+                {
                     body = body.child(annotation_row(a, handle.clone()));
                 }
             }
@@ -278,23 +352,31 @@ fn diff_line(
         .bg(if targeted { rgba(0x3b82f633) } else { bg })
         .cursor_pointer()
         .child(
-            div()
-                .px(px(6.0))
-                .child(Text::new(SharedString::from(format!(
+            div().px(px(6.0)).child(
+                Text::new(SharedString::from(format!(
                     "{} {} ",
                     gutter(line.old_no),
                     gutter(line.new_no)
                 )))
-                .dimmed()),
+                .dimmed(),
+            ),
         )
-        .child(Text::new(SharedString::from(format!("{sign} {}", line.content))));
+        .child(Text::new(SharedString::from(format!(
+            "{sign} {}",
+            line.content
+        ))));
     if let Some(n) = line_no {
-        row = row.on_click(move |_, _, cx| {
-            handle.update(cx, |root, cx| {
-                root.target_review_line(&file, n, side);
-                cx.notify();
+        row = row
+            .tab_index(0)
+            .role(gpui::accesskit::Role::Button)
+            .aria_label(SharedString::from(format!("Comment on {file} line {n}")))
+            .focus_visible(|style| style.border_1().border_color(gpui::rgb(0x3b82f6)))
+            .on_click(move |_, _, cx| {
+                handle.update(cx, |root, cx| {
+                    root.target_review_line(&file, n, side);
+                    cx.notify();
+                });
             });
-        });
     }
     row
 }
@@ -303,7 +385,9 @@ fn diff_line(
 fn annotation_row(a: &Annotation, handle: Entity<Root>) -> impl IntoElement {
     let (id, resolved) = (a.id, a.resolved);
     let body = if resolved {
-        Text::new(SharedString::from(format!("💬 {}", a.body))).size(Size::Xs).dimmed()
+        Text::new(SharedString::from(format!("💬 {}", a.body)))
+            .size(Size::Xs)
+            .dimmed()
     } else {
         Text::new(SharedString::from(format!("💬 {}", a.body))).size(Size::Xs)
     };
@@ -324,6 +408,14 @@ fn annotation_row(a: &Annotation, handle: Entity<Root>) -> impl IntoElement {
                 .id(SharedString::from(format!("ann-res-{id}")))
                 .px(px(4.0))
                 .cursor_pointer()
+                .tab_index(0)
+                .role(gpui::accesskit::Role::Button)
+                .aria_label(if resolved {
+                    "Reopen comment"
+                } else {
+                    "Resolve comment"
+                })
+                .focus_visible(|style| style.border_1().border_color(gpui::rgb(0x3b82f6)))
                 .child(
                     Text::new(if resolved { "↺" } else { "✓" })
                         .size(Size::Xs)
@@ -341,6 +433,10 @@ fn annotation_row(a: &Annotation, handle: Entity<Root>) -> impl IntoElement {
                 .id(SharedString::from(format!("ann-del-{id}")))
                 .px(px(4.0))
                 .cursor_pointer()
+                .tab_index(0)
+                .role(gpui::accesskit::Role::Button)
+                .aria_label("Delete comment")
+                .focus_visible(|style| style.border_1().border_color(gpui::rgb(0x3b82f6)))
                 .child(Text::new("×").size(Size::Xs).dimmed())
                 .on_click(move |_, _, cx| {
                     del.update(cx, |root, cx| {

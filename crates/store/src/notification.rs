@@ -35,7 +35,11 @@ impl Db {
         )?;
         let id = self.conn().last_insert_rowid();
         self.conn()
-            .query_row("SELECT * FROM notifications WHERE id = ?1", params![id], from_row)
+            .query_row(
+                "SELECT * FROM notifications WHERE id = ?1",
+                params![id],
+                from_row,
+            )
             .map_err(Into::into)
     }
 

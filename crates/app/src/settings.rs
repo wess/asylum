@@ -9,9 +9,10 @@
 use gpui::prelude::*;
 use gpui::{div, px, App, Context, Entity, IntoElement, SharedString, Window};
 use guise::prelude::*;
-use guise::{Kbd, Switch, TextInputEvent};
+use guise::{Kbd, TextInputEvent};
 use serde_json::json;
 
+use crate::control::{Button, Switch};
 use crate::state::Root;
 
 /// The surface's text inputs, built lazily and kept in sync with the file.
@@ -19,6 +20,7 @@ use crate::state::Root;
 pub struct Inputs {
     pub worktree: Entity<guise::TextInput>,
     pub font: Entity<guise::TextInput>,
+    pub programs: std::collections::BTreeMap<String, Entity<guise::TextInput>>,
 }
 
 /// Make sure the text inputs exist; submitting one writes its key.
@@ -26,24 +28,66 @@ pub fn ensure_inputs(root: &mut Root, cx: &mut Context<Root>) {
     if root.settings_inputs.is_some() {
         return;
     }
-    let worktree = text_input(cx, &root.settings.worktree_dir, "worktree_dir", |root, text, cx| {
-        let text = text.trim();
-        if text.is_empty() || text == config::Settings::default().worktree_dir {
-            reset(root, "worktree_dir", cx);
-        } else {
-            write(root, "worktree_dir", json!(text), cx);
-        }
+    let worktree = text_input(
+        cx,
+        &root.settings.worktree_dir,
+        "worktree_dir",
+        |root, text, cx| {
+            let text = text.trim();
+            if text.is_empty() || text == config::Settings::default().worktree_dir {
+                reset(root, "worktree_dir", cx);
+            } else {
+                write(root, "worktree_dir", json!(text), cx);
+            }
+        },
+    );
+    let font = text_input(
+        cx,
+        &root.settings.editor.font_family,
+        "font_family",
+        |root, text, cx| {
+            let mut editor = root.settings.editor.clone();
+            editor.font_family = if text.trim().is_empty() {
+                config::EditorPrefs::default().font_family
+            } else {
+                text.trim().to_string()
+            };
+            write_editor(root, editor, cx);
+        },
+    );
+    let mut programs = std::collections::BTreeMap::new();
+    for agent in agent::registry::catalog(&root.settings.custom_agents) {
+        let id = agent.id.clone();
+        let default_program = agent.program.clone();
+        let value = root
+            .settings
+            .agents
+            .get(&id)
+            .and_then(|prefs| prefs.program.clone())
+            .unwrap_or_else(|| default_program.clone());
+        let input = text_input(cx, &value, "executable", move |root, text, cx| {
+            let mut agents = root.settings.agents.clone();
+            let mut prefs = agents.get(&id).cloned().unwrap_or_default();
+            let value = text.trim();
+            prefs.program = if value.is_empty() || value == default_program {
+                None
+            } else {
+                Some(value.to_string())
+            };
+            if prefs == config::AgentPrefs::default() {
+                agents.remove(&id);
+            } else {
+                agents.insert(id.clone(), prefs);
+            }
+            write_agents(root, agents, cx);
+        });
+        programs.insert(agent.id, input);
+    }
+    root.settings_inputs = Some(Inputs {
+        worktree,
+        font,
+        programs,
     });
-    let font = text_input(cx, &root.settings.editor.font_family, "font_family", |root, text, cx| {
-        let mut editor = root.settings.editor.clone();
-        editor.font_family = if text.trim().is_empty() {
-            config::EditorPrefs::default().font_family
-        } else {
-            text.trim().to_string()
-        };
-        write_editor(root, editor, cx);
-    });
-    root.settings_inputs = Some(Inputs { worktree, font });
 }
 
 /// A text input seeded with `value` whose Submit runs `commit` on the root.
@@ -82,6 +126,22 @@ pub fn sync_inputs(root: &mut Root, settings: &config::Settings, cx: &mut Contex
             }
         });
     }
+    let catalog = agent::registry::catalog(&settings.custom_agents);
+    for agent in catalog {
+        let Some(input) = inputs.programs.get(&agent.id) else {
+            continue;
+        };
+        let value = settings
+            .agents
+            .get(&agent.id)
+            .and_then(|prefs| prefs.program.clone())
+            .unwrap_or(agent.program);
+        input.update(cx, |input, cx| {
+            if input.text() != value {
+                input.set_text(&value, cx);
+            }
+        });
+    }
 }
 
 // ── Writing back ────────────────────────────────────────────────────────────
@@ -89,7 +149,8 @@ pub fn sync_inputs(root: &mut Root, settings: &config::Settings, cx: &mut Contex
 /// Set one top-level settings.json key and apply the result immediately.
 fn write(root: &mut Root, key: &str, value: serde_json::Value, cx: &mut Context<Root>) {
     if let Err(e) = config::edit::set_key(&config::default_path(), key, &value.to_string()) {
-        eprintln!("settings: {e}");
+        root.push_error("Could not save settings", e.to_string());
+        return;
     }
     crate::reload::reload(root, cx);
 }
@@ -97,9 +158,22 @@ fn write(root: &mut Root, key: &str, value: serde_json::Value, cx: &mut Context<
 /// Remove one top-level key (back to the built-in default) and apply.
 fn reset(root: &mut Root, key: &str, cx: &mut Context<Root>) {
     if let Err(e) = config::edit::remove_key(&config::default_path(), key) {
-        eprintln!("settings: {e}");
+        root.push_error("Could not reset setting", e.to_string());
+        return;
     }
     crate::reload::reload(root, cx);
+}
+
+fn write_agents(
+    root: &mut Root,
+    agents: std::collections::BTreeMap<String, config::AgentPrefs>,
+    cx: &mut Context<Root>,
+) {
+    if agents.is_empty() {
+        reset(root, "agents", cx);
+    } else {
+        write(root, "agents", json!(agents), cx);
+    }
 }
 
 /// Persist editor prefs: the whole `editor` object, or nothing when it's all
@@ -117,6 +191,7 @@ fn write_editor(root: &mut Root, editor: config::EditorPrefs, cx: &mut Context<R
 pub fn settings_view(
     settings: config::Settings,
     diagnostics: Vec<config::Diagnostic>,
+    reports: Vec<(agent::registry::Agent, agent::doctor::Report)>,
     inputs: Inputs,
     handle: Entity<Root>,
     _window: &mut Window,
@@ -139,6 +214,7 @@ pub fn settings_view(
         .pb(px(40.0));
 
     // Header: title + the escape hatch to the raw file.
+    let raw = handle.clone();
     col = col.child(
         div()
             .flex()
@@ -150,10 +226,13 @@ pub fn settings_view(
                 Button::new("settings-open-file", "Edit in settings.json")
                     .variant(Variant::Default)
                     .size(Size::Xs)
-                    .on_click(|_, _, cx| {
+                    .on_click(move |_, _, cx| {
                         let path = config::default_path();
                         if let Err(e) = config::edit::ensure_file(&path) {
-                            eprintln!("settings: {e}");
+                            raw.update(cx, |root, cx| {
+                                root.push_error("Could not open settings", e.to_string());
+                                cx.notify();
+                            });
                             return;
                         }
                         cx.open_with_system(&path);
@@ -200,7 +279,11 @@ pub fn settings_view(
         "Where per-task worktrees are created, relative to a project root. Press enter to apply.",
         settings.worktree_dir != defaults.worktree_dir,
         Some(reset_btn("reset-worktree", "worktree_dir", &handle)),
-        div().w(px(280.0)).flex_none().child(inputs.worktree.clone()).into_any_element(),
+        div()
+            .w(px(280.0))
+            .flex_none()
+            .child(inputs.worktree.clone())
+            .into_any_element(),
         border,
     ));
     {
@@ -215,9 +298,43 @@ pub fn settings_view(
             "Concurrent agent runs across all tasks; 0 means unlimited.",
             settings.max_parallel_runs != defaults.max_parallel_runs,
             Some(reset_btn("reset-parallel", "max_parallel_runs", &handle)),
-            stepper("parallel", value, (0, 32), display, border, &handle, |root, v, cx| {
-                write(root, "max_parallel_runs", json!(v), cx);
-            }),
+            stepper(
+                "parallel",
+                value,
+                (0, 32),
+                display,
+                border,
+                &handle,
+                |root, v, cx| {
+                    write(root, "max_parallel_runs", json!(v), cx);
+                },
+            ),
+            border,
+        ));
+    }
+    {
+        let display = if settings.run_timeout_minutes == 0 {
+            "off".to_string()
+        } else {
+            format!("{} min", settings.run_timeout_minutes)
+        };
+        let value = settings.run_timeout_minutes as i64;
+        col = col.child(row(
+            "Run timeout",
+            "Stop an agent that exceeds this duration; 0 disables the timeout.",
+            settings.run_timeout_minutes != defaults.run_timeout_minutes,
+            Some(reset_btn("reset-timeout", "run_timeout_minutes", &handle)),
+            stepper(
+                "timeout",
+                value,
+                (0, 240),
+                display,
+                border,
+                &handle,
+                |root, v, cx| {
+                    write(root, "run_timeout_minutes", json!(v), cx);
+                },
+            ),
             border,
         ));
     }
@@ -235,13 +352,32 @@ pub fn settings_view(
         let id = agent.id.clone();
         let h = handle.clone();
         let current = selected.clone();
-        col = col.child(row(
-            SharedString::from(agent.name.clone()),
-            SharedString::from(format!("id: {}", agent.id)),
-            false,
-            None,
+        let report = reports
+            .iter()
+            .find(|(candidate, _)| candidate.id == agent.id);
+        let (status, color) = match report {
+            Some((_, report)) if report.verified() => ("verified", ColorName::Green),
+            Some((_, report)) if report.ready() => ("installed", ColorName::Orange),
+            _ => ("not found", ColorName::Red),
+        };
+        let program = inputs.programs.get(&agent.id).cloned();
+        let mut controls = div().flex().flex_row().items_center().gap_2();
+        controls = controls.child(Badge::new(status).color(color).variant(Variant::Light));
+        if let Some(program) = program {
+            controls = controls.child(
+                div()
+                    .id(SharedString::from(format!("program-tip-{}", agent.id)))
+                    .w(px(190.0))
+                    .tooltip(guise::tooltip(
+                        "Executable name or absolute path. Press enter to apply.",
+                    ))
+                    .child(program),
+            );
+        }
+        controls = controls.child(
             Switch::new(SharedString::from(format!("agent-{}", agent.id)))
                 .checked(on)
+                .aria_label(SharedString::from(format!("Use {} by default", agent.name)))
                 .size(Size::Sm)
                 .on_change(move |_, _, cx| {
                     let mut next = current.clone();
@@ -258,8 +394,14 @@ pub fn settings_view(
                         }
                         root.fanout = next.clone();
                     });
-                })
-                .into_any_element(),
+                }),
+        );
+        col = col.child(row(
+            SharedString::from(agent.name.clone()),
+            SharedString::from(format!("id: {} · executable", agent.id)),
+            false,
+            None,
+            controls.into_any_element(),
             border,
         ));
     }
@@ -271,7 +413,11 @@ pub fn settings_view(
         "Editor font; press enter to apply.",
         ed.font_family != ed_defaults.font_family,
         None,
-        div().w(px(280.0)).flex_none().child(inputs.font.clone()).into_any_element(),
+        div()
+            .w(px(280.0))
+            .flex_none()
+            .child(inputs.font.clone())
+            .into_any_element(),
         border,
     ));
     col = col.child(row(
@@ -324,6 +470,7 @@ pub fn settings_view(
             None,
             Switch::new("editor-autosave")
                 .checked(autosave)
+                .aria_label("Autosave editor buffers")
                 .size(Size::Sm)
                 .on_change(move |_, _, cx| {
                     h.update(cx, |root, cx| {
@@ -365,7 +512,11 @@ pub fn settings_view(
     }
     col = col.child(keys);
 
-    div().id("settings-scroll").size_full().overflow_y_scroll().child(col)
+    div()
+        .id("settings-scroll")
+        .size_full()
+        .overflow_y_scroll()
+        .child(col)
 }
 
 /// A group label with its underline divider.
@@ -407,7 +558,11 @@ fn row(
                 .gap_2()
                 .child(Text::new(label.into()).size(Size::Sm))
                 .when(modified, |d| {
-                    d.child(Badge::new("modified").color(ColorName::Blue).variant(Variant::Light))
+                    d.child(
+                        Badge::new("modified")
+                            .color(ColorName::Blue)
+                            .variant(Variant::Light),
+                    )
                 }),
         )
         .child(Text::new(desc.into()).size(Size::Xs).dimmed());
@@ -421,6 +576,7 @@ fn row(
     div()
         .flex()
         .flex_row()
+        .flex_wrap()
         .items_center()
         .justify_between()
         .gap_3()
@@ -452,7 +608,11 @@ fn theme_control(current: &str, handle: &Entity<Root>) -> gpui::AnyElement {
         group = group.child(
             Button::new(SharedString::from(format!("theme-{name}")), name)
                 .size(Size::Xs)
-                .variant(if active { Variant::Filled } else { Variant::Default })
+                .variant(if active {
+                    Variant::Filled
+                } else {
+                    Variant::Default
+                })
                 .on_click(move |_, _, cx| {
                     h.update(cx, |root, cx| write(root, "theme", json!(name), cx));
                 }),
@@ -475,10 +635,19 @@ fn stepper(
         let h = handle.clone();
         let set = on_set.clone();
         let next = (value + delta).clamp(range.0, range.1);
+        let label = if delta < 0 {
+            "Decrease value"
+        } else {
+            "Increase value"
+        };
         div()
             .id(SharedString::from(format!("{id}-{glyph}")))
             .px(px(6.0))
             .cursor_pointer()
+            .tab_index(0)
+            .role(gpui::accesskit::Role::Button)
+            .aria_label(label)
+            .focus_visible(move |style| style.border_1().border_color(border))
             .child(SharedString::from(glyph))
             .on_click(move |_, _, cx| {
                 if next == value {

@@ -5,6 +5,7 @@ use gpui::prelude::*;
 use gpui::{div, px, App, Entity, IntoElement, SharedString, Window};
 use guise::prelude::*;
 
+use crate::control::Button;
 use crate::state::Root;
 use store::Notification;
 
@@ -30,7 +31,9 @@ pub fn inbox_view(
                     .variant(Variant::Subtle)
                     .on_click(move |_, _, cx| {
                         clear.update(cx, |root, cx| {
-                            let _ = root.db.mark_all_read();
+                            if let Err(error) = root.db.mark_all_read() {
+                                root.push_error("Could not update inbox", error.to_string());
+                            }
                             cx.notify();
                         });
                     }),
@@ -49,6 +52,7 @@ pub fn inbox_view(
 
 fn notification_row(n: Notification, handle: Entity<Root>) -> impl IntoElement {
     let id = n.id;
+    let label = format!("Mark {} as read", n.title);
     let color = match n.kind.as_str() {
         "check_failed" | "run_failed" => ColorName::Red,
         "attention" => ColorName::Orange,
@@ -58,9 +62,16 @@ fn notification_row(n: Notification, handle: Entity<Root>) -> impl IntoElement {
 
     div()
         .id(SharedString::from(format!("notif-{id}")))
+        .cursor_pointer()
+        .tab_index(0)
+        .role(gpui::accesskit::Role::Button)
+        .aria_label(SharedString::from(label))
+        .focus_visible(|style| style.border_1().border_color(gpui::rgb(0x3b82f6)))
         .on_click(move |_, _, cx| {
             handle.update(cx, |root, cx| {
-                let _ = root.db.mark_read(id, true);
+                if let Err(error) = root.db.mark_read(id, true) {
+                    root.push_error("Could not update notification", error.to_string());
+                }
                 cx.notify();
             });
         })
@@ -72,13 +83,21 @@ fn notification_row(n: Notification, handle: Entity<Root>) -> impl IntoElement {
                     .items_center()
                     .gap_2()
                     .child(Text::new(SharedString::from(dot)))
-                    .child(Badge::new(SharedString::from(n.kind.clone())).color(color).variant(Variant::Light))
+                    .child(
+                        Badge::new(SharedString::from(n.kind.clone()))
+                            .color(color)
+                            .variant(Variant::Light),
+                    )
                     .child(
                         div()
                             .flex()
                             .flex_col()
                             .child(Text::new(SharedString::from(n.title.clone())).bold())
-                            .child(Text::new(SharedString::from(n.body.clone())).size(Size::Xs).dimmed()),
+                            .child(
+                                Text::new(SharedString::from(n.body.clone()))
+                                    .size(Size::Xs)
+                                    .dimmed(),
+                            ),
                     ),
             ),
         )

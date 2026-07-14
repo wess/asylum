@@ -17,10 +17,11 @@ use guise::prelude::*;
 use libsinclair::terminal::SessionOptions;
 use libsinclair::termview::{TermOptions, TermView};
 
-use crate::icons::icon;
+use crate::control::Button;
+use crate::icons::{icon, icon_button};
 use crate::state::{Root, View};
 use crate::workspace::TabKind;
-use crate::{accounts, diff, fleet, integrations, notifications, search, sidebar, theme};
+use crate::{accounts, diff, fleet, integrations, note, notifications, search, sidebar, theme};
 
 /// Open the native folder picker and add the chosen git repo as a project.
 pub fn open_project(handle: Entity<Root>, cx: &mut App) {
@@ -34,8 +35,8 @@ pub fn open_project(handle: Entity<Root>, cx: &mut App) {
         if let Ok(Ok(Some(paths))) = rx.await {
             if let Some(path) = paths.into_iter().next() {
                 handle.update(cx, |root, cx| {
-                    if let Err(e) = root.add_project_from_path(path) {
-                        eprintln!("open project: {e}");
+                    if let Err(error) = root.consider_project_path(path) {
+                        root.push_error("Could not open folder", error);
                     }
                     cx.notify();
                 });
@@ -46,60 +47,301 @@ pub fn open_project(handle: Entity<Root>, cx: &mut App) {
 }
 
 /// The first-run / no-projects onboarding screen.
-fn onboarding(handle: Entity<Root>) -> impl IntoElement {
-    div()
+fn onboarding(
+    handle: Entity<Root>,
+    pending: Option<std::path::PathBuf>,
+    reports: Vec<(agent::registry::Agent, agent::doctor::Report)>,
+    notices: Vec<crate::run::Notice>,
+) -> impl IntoElement {
+    let installed = reports.iter().filter(|(_, report)| report.ready()).count();
+    let verified = reports
+        .iter()
+        .filter(|(_, report)| report.verified())
+        .count();
+    let mut body = div()
         .flex()
         .flex_col()
         .items_center()
         .justify_center()
         .size_full()
-        .gap_3()
-        .child(icon("git-branch", 40.0).text_color(gpui::rgb(0x3b82f6)))
+        .gap_3();
+    for notice in notices {
+        let color = match notice.tone {
+            crate::run::NoticeTone::Error => ColorName::Red,
+            crate::run::NoticeTone::Warning => ColorName::Orange,
+            crate::run::NoticeTone::Success => ColorName::Green,
+            crate::run::NoticeTone::Info => ColorName::Blue,
+        };
+        body = body.child(
+            div().w(px(560.0)).child(
+                Alert::new(SharedString::from(notice.message))
+                    .title(SharedString::from(notice.title))
+                    .color(color),
+            ),
+        );
+    }
+    if let Some(path) = pending {
+        let initialize = handle.clone();
+        let cancel = handle;
+        return body
+            .child(icon("git-branch", 40.0).text_color(gpui::rgb(0x3b82f6)))
+            .child(Title::new("Initialize git?").order(1))
+            .child(Text::new(SharedString::from(path.display().to_string())).size(Size::Sm))
+            .child(
+                Text::new("Asylum needs git worktrees. It will create a repository and an empty initial commit; existing files are not committed.")
+                    .size(Size::Xs)
+                    .dimmed(),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .gap_2()
+                    .child(
+                        Button::new("cancel-project", "Choose another folder")
+                            .variant(Variant::Subtle)
+                            .size(Size::Sm)
+                            .on_click(move |_, _, cx| {
+                                cancel.update(cx, |root, cx| {
+                                    root.pending_project = None;
+                                    cx.notify();
+                                });
+                            }),
+                    )
+                    .child(
+                        Button::new("initialize-project", "Initialize and open")
+                            .variant(Variant::Filled)
+                            .size(Size::Sm)
+                            .on_click(move |_, _, cx| {
+                                initialize.update(cx, |root, cx| {
+                                    if let Err(error) = root.initialize_pending_project() {
+                                        root.push_error("Could not initialize folder", error);
+                                    }
+                                    cx.notify();
+                                });
+                            }),
+                    ),
+            );
+    }
+    let configure = handle.clone();
+    body.child(icon("git-branch", 40.0).text_color(gpui::rgb(0x3b82f6)))
         .child(Title::new("Welcome to Asylum").order(1))
         .child(
-            Text::new("Run a fleet of agents in isolated git worktrees.")
+            Text::new("Open a repository to create your first isolated agent run.")
                 .size(Size::Sm)
                 .dimmed(),
         )
         .child(
-            Text::new("Open a git repo, or any folder — we'll set up git for you.")
-                .size(Size::Xs)
-                .dimmed(),
+            Badge::new(SharedString::from(format!(
+                "{verified} verified, {installed} installed"
+            )))
+            .color(if verified > 0 {
+                ColorName::Green
+            } else {
+                ColorName::Orange
+            })
+            .variant(Variant::Light),
         )
         .child(
-            Button::new("open-project", "Open a folder…")
+            div()
+                .flex()
+                .flex_row()
+                .gap_2()
+                .child(
+                    Button::new("open-project", "Open a folder…")
+                        .variant(Variant::Filled)
+                        .size(Size::Md)
+                        .on_click(move |_, _, cx| open_project(handle.clone(), cx)),
+                )
+                .child(
+                    Button::new("configure-agents", "Configure agents")
+                        .variant(Variant::Subtle)
+                        .size(Size::Md)
+                        .on_click(move |_, _, cx| {
+                            configure.update(cx, |root, cx| {
+                                root.onboarding_settings = true;
+                                cx.notify();
+                            });
+                        }),
+                ),
+        )
+}
+
+fn onboarding_settings(
+    settings: config::Settings,
+    diagnostics: Vec<config::Diagnostic>,
+    reports: Vec<(agent::registry::Agent, agent::doctor::Report)>,
+    inputs: crate::settings::Inputs,
+    handle: Entity<Root>,
+    window: &mut Window,
+    cx: &mut App,
+) -> gpui::AnyElement {
+    let back = handle.clone();
+    div()
+        .id("onboarding-settings")
+        .flex()
+        .flex_col()
+        .size_full()
+        .overflow_y_scroll()
+        .child(
+            div().p_3().child(
+                Button::new("settings-back", "Back to setup")
+                    .size(Size::Sm)
+                    .variant(Variant::Subtle)
+                    .on_click(move |_, _, cx| {
+                        back.update(cx, |root, cx| {
+                            root.onboarding_settings = false;
+                            cx.notify();
+                        });
+                    }),
+            ),
+        )
+        .child(crate::settings::settings_view(
+            settings,
+            diagnostics,
+            reports,
+            inputs,
+            handle,
+            window,
+            cx,
+        ))
+        .into_any_element()
+}
+
+fn notice_stack(notices: Vec<crate::run::Notice>, handle: Entity<Root>) -> impl IntoElement {
+    let mut stack = div()
+        .absolute()
+        .top(px(48.0))
+        .right(px(12.0))
+        .w(px(420.0))
+        .flex()
+        .flex_col()
+        .gap_2();
+    for notice in notices {
+        let close = handle.clone();
+        let id = notice.id;
+        let color = match notice.tone {
+            crate::run::NoticeTone::Info => ColorName::Blue,
+            crate::run::NoticeTone::Success => ColorName::Green,
+            crate::run::NoticeTone::Warning => ColorName::Orange,
+            crate::run::NoticeTone::Error => ColorName::Red,
+        };
+        stack = stack.child(
+            Alert::new(SharedString::from(notice.message))
+                .title(SharedString::from(notice.title))
+                .color(color)
+                .on_close(move |_, _, cx| {
+                    close.update(cx, |root, cx| {
+                        root.dismiss_notice(id);
+                        cx.notify();
+                    });
+                }),
+        );
+    }
+    stack
+}
+
+fn confirm_bar(action: crate::run::ConfirmAction, handle: Entity<Root>) -> impl IntoElement {
+    let confirm = handle.clone();
+    let cancel = handle;
+    div()
+        .absolute()
+        .bottom(px(38.0))
+        .left(px(300.0))
+        .right(px(12.0))
+        .p_3()
+        .border_1()
+        .rounded(px(6.0))
+        .bg(gpui::rgb(0x1f2937))
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap_3()
+        .child(
+            div()
+                .flex_1()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .child(Text::new(action.title()).bold())
+                .child(Text::new(action.message()).size(Size::Xs).dimmed()),
+        )
+        .child(
+            Button::new("confirm-cancel", "Cancel")
+                .size(Size::Sm)
+                .variant(Variant::Subtle)
+                .on_click(move |_, _, cx| {
+                    cancel.update(cx, |root, cx| {
+                        root.confirm = None;
+                        cx.notify();
+                    });
+                }),
+        )
+        .child(
+            Button::new("confirm-action", "Confirm")
+                .size(Size::Sm)
                 .variant(Variant::Filled)
-                .size(Size::Md)
-                .on_click(move |_, _, cx| open_project(handle.clone(), cx)),
+                .on_click(move |_, _, cx| {
+                    confirm.update(cx, |root, cx| {
+                        root.confirm_action(cx);
+                        cx.notify();
+                    });
+                }),
         )
 }
 
 impl Render for Root {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.launch_needed {
+            cx.defer_in(window, |root, window, cx| root.launch_queued(window, cx));
+        }
         let project_id = self.project_id;
         let task_id = self.task_id;
         let handle = cx.entity();
 
         // No projects yet → onboarding.
         if self.is_empty() {
-            return onboarding(handle).into_any_element();
+            crate::settings::ensure_inputs(self, cx);
+            if self.onboarding_settings {
+                return onboarding_settings(
+                    self.settings.clone(),
+                    self.settings_diagnostics.clone(),
+                    self.agent_reports(),
+                    self.settings_inputs.clone().expect("settings inputs"),
+                    handle,
+                    window,
+                    cx,
+                );
+            }
+            return onboarding(
+                handle,
+                self.pending_project.clone(),
+                self.agent_reports(),
+                self.notices.clone(),
+            )
+            .into_any_element();
         }
 
         let unread = self.unread();
         let tree = self.tree();
         let counts = (
             tree.len(),
-            tree.iter().find(|p| Some(p.id) == project_id).map(|p| p.tasks.len()).unwrap_or(0),
+            tree.iter()
+                .find(|p| Some(p.id) == project_id)
+                .map(|p| p.tasks.len())
+                .unwrap_or(0),
             self.runs().len(),
         );
         let active_view = self.workspace.active_key().map(view_for_key);
+        self.sync_webview_visibility(window, cx);
 
         // Ensure the shared inputs exist.
         self.ensure_palettes(cx);
         crate::settings::ensure_inputs(self, cx);
         if self.compose.is_none() {
             self.compose = Some(cx.new(|cx| {
-                guise::TextInput::new(cx).placeholder("Describe a task… e.g. Add a dark-mode toggle")
+                guise::TextInput::new(cx)
+                    .placeholder("Describe a task… e.g. Add a dark-mode toggle")
             }));
         }
         if self.review_note.is_none() {
@@ -107,9 +349,12 @@ impl Render for Root {
                 Some(cx.new(|cx| guise::TextInput::new(cx).placeholder("Add a review comment…")));
         }
         if self.design_note.is_none() {
-            self.design_note =
-                Some(cx.new(|cx| guise::TextInput::new(cx).placeholder("What should change here?")));
+            self.design_note = Some(
+                cx.new(|cx| guise::TextInput::new(cx).placeholder("What should change here?")),
+            );
         }
+        self.ensure_notes(cx);
+        crate::search::ensure_input(self, cx);
         let palette = self.palette.clone().unwrap();
         let quickopen = self.quickopen.clone().unwrap();
         let compose = self.compose.clone().unwrap();
@@ -164,11 +409,17 @@ impl Render for Root {
                 let quickopen = quickopen.clone();
                 let h = handle.clone();
                 move |_window, cx| {
-                    header(palette.clone(), quickopen.clone(), h.clone(), Colors::from(cx))
+                    header(
+                        palette.clone(),
+                        quickopen.clone(),
+                        h.clone(),
+                        Colors::from(cx),
+                    )
                 }
             })
-            .navbar(280.0, {
+            .navbar(if self.sidebar_collapsed { 52.0 } else { 280.0 }, {
                 let handle = handle.clone();
+                let collapsed = self.sidebar_collapsed;
                 move |window, cx| {
                     sidebar::navbar(
                         active_view,
@@ -176,6 +427,7 @@ impl Render for Root {
                         tree.clone(),
                         project_id,
                         task_id,
+                        collapsed,
                         handle.clone(),
                         window,
                         cx,
@@ -188,7 +440,13 @@ impl Render for Root {
             .child(quickopen);
 
         // Wrap so the context menu can overlay the whole window.
-        let mut root = div().size_full().child(shell);
+        let mut root = div().relative().size_full().child(shell);
+        if !self.notices.is_empty() {
+            root = root.child(notice_stack(self.notices.clone(), handle.clone()));
+        }
+        if let Some(action) = self.confirm.clone() {
+            root = root.child(confirm_bar(action, handle.clone()));
+        }
         if let Some(menu) = self.context_menu.clone() {
             root = root.child(menu);
         }
@@ -243,12 +501,14 @@ fn view_for_key(key: crate::workspace::TabKey) -> View {
         K::Tasks => View::Tasks,
         K::Diff => View::Diff,
         K::Search => View::Search,
+        K::Notes => View::Notes,
         K::Integrations => View::Integrations,
         K::Accounts => View::Accounts,
         K::Inbox => View::Notifications,
         K::Plugins => View::Plugins,
         K::Settings => View::Settings,
         K::Terminal => View::Terminal,
+        K::Run => View::Tasks,
         K::Editor => View::Editor,
         K::Browser => View::Browser,
         K::Preview => View::Preview,
@@ -291,8 +551,16 @@ fn tab_bar(snap: &PaneSnap, handle: Entity<Root>, colors: &Colors) -> impl IntoE
 
     for tab in &snap.tabs {
         let ti = tab.index;
-        let icon_color = if tab.active { colors.primary } else { colors.dimmed };
-        let text_color = if tab.active { colors.text } else { colors.dimmed };
+        let icon_color = if tab.active {
+            colors.primary
+        } else {
+            colors.dimmed
+        };
+        let text_color = if tab.active {
+            colors.text
+        } else {
+            colors.dimmed
+        };
         let activate = handle.clone();
         let close = handle.clone();
 
@@ -317,6 +585,11 @@ fn tab_bar(snap: &PaneSnap, handle: Entity<Root>, colors: &Colors) -> impl IntoE
                     .flex_row()
                     .items_center()
                     .gap(px(6.0))
+                    .tab_index(0)
+                    .role(gpui::accesskit::Role::Tab)
+                    .aria_label(SharedString::from(tab.title.clone()))
+                    .aria_selected(tab.active)
+                    .focus_visible(move |style| style.border_1().border_color(colors.primary))
                     .child(icon(tab.icon, 13.0).text_color(icon_color))
                     .child(
                         div()
@@ -331,48 +604,66 @@ fn tab_bar(snap: &PaneSnap, handle: Entity<Root>, colors: &Colors) -> impl IntoE
                         });
                     }),
             )
-            .child(
-                div()
-                    .id(SharedString::from(format!("tabx-{}", tab.id)))
-                    .px(px(3.0))
-                    .rounded(px(4.0))
-                    .text_color(colors.dimmed)
-                    .text_size(px(12.0))
-                    .cursor_pointer()
-                    .child("×")
-                    .on_click(move |_, _, cx| {
-                        close.update(cx, |root, cx| {
-                            root.workspace.close(pane, ti);
-                            cx.notify();
-                        });
-                    }),
-            ),
+            .child(icon_button(
+                SharedString::from(format!("tabx-{}", tab.id)),
+                "circle-x",
+                SharedString::from(format!("Close {}", tab.title)),
+                colors.dimmed,
+                colors.hover,
+                move |_, cx| {
+                    close.update(cx, |root, cx| {
+                        root.workspace.close(pane, ti);
+                        cx.notify();
+                    });
+                },
+            )),
         );
     }
 
     // Split button: opens a terminal in a new pane to the right.
     let split = handle.clone();
-    bar = bar.child(
-        div()
-            .id(SharedString::from(format!("split-{pane}")))
-            .ml_auto()
-            .px(px(5.0))
-            .py(px(2.0))
-            .rounded(px(5.0))
-            .cursor_pointer()
-            .child(icon("plus", 14.0).text_color(colors.dimmed))
-            .on_click(move |_, window, cx| {
-                split.update(cx, |root, cx| {
-                    root.workspace.active_pane = pane;
-                    root.split_terminal_pane(window, cx);
-                    cx.notify();
-                });
-            }),
-    );
+    bar = bar.child(div().ml_auto().child(icon_button(
+        SharedString::from(format!("split-{pane}")),
+        "plus",
+        "Split terminal right",
+        colors.dimmed,
+        colors.hover,
+        move |window, cx| {
+            split.update(cx, |root, cx| {
+                root.workspace.active_pane = pane;
+                root.split_terminal_pane(window, cx);
+                cx.notify();
+            });
+        },
+    )));
     bar
 }
 
 impl Root {
+    fn sync_webview_visibility(&self, window: &Window, cx: &mut App) {
+        let mut notes_visible = false;
+        for pane in &self.workspace.panes {
+            for (index, tab) in pane.tabs.iter().enumerate() {
+                let visible = index == pane.active;
+                match &tab.kind {
+                    TabKind::Browser(webview) | TabKind::Preview(webview) => {
+                        webview.update(cx, |webview, _cx| webview.set_visible(visible));
+                    }
+                    TabKind::Notes if visible => notes_visible = true,
+                    _ => {}
+                }
+            }
+        }
+
+        let compact = window.viewport_size().width < px(1050.0);
+        let note_preview_visible = notes_visible
+            && self.note.view != note::Mode::Edit
+            && (!compact || self.note.panel == note::Panel::Write);
+        if let Some(preview) = self.note.preview.clone() {
+            preview.update(cx, |preview, _cx| preview.set_visible(note_preview_visible));
+        }
+    }
+
     /// The selected project's name, for the compose box header.
     fn project_name(&self) -> String {
         self.project_id
@@ -395,8 +686,16 @@ impl Root {
             TabKind::Tasks => fleet::main_content(
                 self.project_name(),
                 self.task_title(),
+                self.task_status(),
+                self.task_id,
                 self.runs(),
                 self.fanout.clone(),
+                self.agent_reports(),
+                self.composer_advanced,
+                self.show_all_agents,
+                self.fanout_in_progress,
+                self.setup_checks.clone(),
+                self.setup_open,
                 compose.clone(),
                 handle,
                 window,
@@ -405,10 +704,15 @@ impl Root {
             .into_any_element(),
             TabKind::Diff => diff::review(
                 self.review_diff(),
-                self.check_results.clone(),
+                self.current_run_id()
+                    .map(|id| self.run_check_results(id))
+                    .unwrap_or_default(),
+                self.current_run_id()
+                    .is_some_and(|id| self.checking_runs.contains(&id)),
                 self.review_annotations(),
                 self.review_target.clone(),
                 self.branches(),
+                self.runs(),
                 review_note.clone(),
                 handle,
                 window,
@@ -418,11 +722,13 @@ impl Root {
             TabKind::Search => search::search_view(
                 self.search_query.clone(),
                 self.search_results.clone(),
+                self.search_input.clone().expect("search input"),
                 handle,
                 window,
                 cx,
             )
             .into_any_element(),
+            TabKind::Notes => note::surface(self, handle, window, cx).into_any_element(),
             TabKind::Integrations => integrations::integrations_view(
                 self.prs.clone(),
                 self.issues.clone(),
@@ -435,9 +741,8 @@ impl Root {
             TabKind::Accounts => {
                 accounts::accounts_view(self.accounts(), handle, window, cx).into_any_element()
             }
-            TabKind::Inbox => {
-                notifications::inbox_view(self.notifications(), handle, window, cx).into_any_element()
-            }
+            TabKind::Inbox => notifications::inbox_view(self.notifications(), handle, window, cx)
+                .into_any_element(),
             TabKind::Plugins => {
                 crate::plugins::plugins_view(self.plugins(), self.plugins_dir(), window, cx)
                     .into_any_element()
@@ -446,6 +751,7 @@ impl Root {
                 Some(inputs) => crate::settings::settings_view(
                     self.settings.clone(),
                     self.settings_diagnostics.clone(),
+                    self.agent_reports(),
                     inputs,
                     handle,
                     window,
@@ -455,6 +761,9 @@ impl Root {
                 None => Text::new("Settings loading…").dimmed().into_any_element(),
             },
             TabKind::Terminal(e) => e.clone().into_any_element(),
+            TabKind::Run(id) => {
+                crate::fleet::run_terminal(*id, self, handle, window, cx).into_any_element()
+            }
             TabKind::Editor(e, _) => e.clone().into_any_element(),
             TabKind::Browser(e) | TabKind::Preview(e) => match self.design_note.clone() {
                 Some(note) => crate::browser::design_surface(
@@ -501,17 +810,61 @@ impl Root {
                     });
                 }
                 let h = handle.clone();
-                s = s.item("Run fan-out", move |_, cx| {
+                s = s.item("Run fan-out", move |window, cx| {
                     h.update(cx, |root, cx| {
-                        root.run_fanout();
+                        root.run_fanout(window, cx);
                         cx.notify();
                     });
                 });
                 let h = handle.clone();
                 s = s.item("Run checks", move |_, cx| {
                     h.update(cx, |root, cx| {
-                        root.run_checks();
+                        root.run_checks(cx);
                         cx.notify();
+                    });
+                });
+                let h = handle.clone();
+                s = s.item("Open selected run terminal", move |_, cx| {
+                    h.update(cx, |root, cx| {
+                        if let Some(id) = root.current_run_id() {
+                            root.open_run_terminal(id);
+                            cx.notify();
+                        } else {
+                            root.push_error("No run selected", "Select a run first.");
+                        }
+                    });
+                });
+                let h = handle.clone();
+                s = s.item("Cancel selected run", move |_, cx| {
+                    h.update(cx, |root, cx| {
+                        if let Some(id) = root.current_run_id() {
+                            root.cancel_run(id, cx);
+                            cx.notify();
+                        } else {
+                            root.push_error("No run selected", "Select a run first.");
+                        }
+                    });
+                });
+                let h = handle.clone();
+                s = s.item("Retry selected run", move |window, cx| {
+                    h.update(cx, |root, cx| {
+                        if let Some(id) = root.current_run_id() {
+                            root.retry_run(id, window, cx);
+                            cx.notify();
+                        } else {
+                            root.push_error("No run selected", "Select a run first.");
+                        }
+                    });
+                });
+                let h = handle.clone();
+                s = s.item("Merge selected run", move |_, cx| {
+                    h.update(cx, |root, cx| {
+                        if let Some(id) = root.current_run_id() {
+                            root.request_merge(id);
+                            cx.notify();
+                        } else {
+                            root.push_error("No run selected", "Select a run first.");
+                        }
                     });
                 });
                 let h = handle.clone();
@@ -521,8 +874,14 @@ impl Root {
                         cx.notify();
                     });
                 });
+                let h = handle.clone();
                 s = s.item("Open settings.json", move |_, cx| {
-                    crate::menus::open_settings_file(cx);
+                    if let Err(error) = crate::menus::open_settings_file(cx) {
+                        h.update(cx, |root, cx| {
+                            root.push_error("Could not open settings", error);
+                            cx.notify();
+                        });
+                    }
                 });
                 s.item("Toggle theme", move |_, cx| crate::theme::toggle(cx))
             });
@@ -550,7 +909,6 @@ impl Root {
             self.quickopen = Some(quickopen);
         }
     }
-
 }
 
 /// The titlebar. With a transparent native titlebar, this *is* the window's top
@@ -563,26 +921,38 @@ fn header(
     handle: Entity<Root>,
     colors: Colors,
 ) -> impl IntoElement {
-    // A compact icon button for the titlebar's right cluster.
-    let text = colors.text;
-    let hover = colors.hover;
-    let icon_btn = move |id: &'static str, name: &'static str| {
-        div()
-            .id(SharedString::from(id))
-            .flex()
-            .items_center()
-            .justify_center()
-            .w(px(28.0))
-            .h(px(24.0))
-            .rounded(px(6.0))
-            .cursor_pointer()
-            .hover(move |s| s.bg(hover))
-            .child(icon(name, 15.0).text_color(text))
-    };
-    let palette_btn = icon_btn("tb-palette", "command");
-    let search_btn = icon_btn("tb-quickopen", "search");
-    let open_btn = icon_btn("tb-open", "folder");
-    let theme_btn = icon_btn("tb-theme", "sun");
+    let palette_btn = icon_button(
+        "tb-palette",
+        "command",
+        "Command palette",
+        colors.text,
+        colors.hover,
+        move |window, cx| palette.update(cx, |spotlight, cx| spotlight.open(window, cx)),
+    );
+    let search_btn = icon_button(
+        "tb-quickopen",
+        "search",
+        "Quick open",
+        colors.text,
+        colors.hover,
+        move |window, cx| quickopen.update(cx, |spotlight, cx| spotlight.open(window, cx)),
+    );
+    let open_btn = icon_button(
+        "tb-open",
+        "folder",
+        "Open repository",
+        colors.text,
+        colors.hover,
+        move |_, cx| open_project(handle.clone(), cx),
+    );
+    let theme_btn = icon_button(
+        "tb-theme",
+        "sun",
+        "Toggle theme",
+        colors.text,
+        colors.hover,
+        move |_, cx| theme::toggle(cx),
+    );
 
     div()
         .id("titlebar")
@@ -615,14 +985,10 @@ fn header(
                 .flex_row()
                 .items_center()
                 .gap_1()
-                .child(palette_btn.on_click(move |_, window, cx| {
-                    palette.update(cx, |sp, cx| sp.open(window, cx));
-                }))
-                .child(search_btn.on_click(move |_, window, cx| {
-                    quickopen.update(cx, |sp, cx| sp.open(window, cx));
-                }))
-                .child(open_btn.on_click(move |_, _, cx| open_project(handle.clone(), cx)))
-                .child(theme_btn.on_click(|_, _, cx: &mut App| theme::toggle(cx))),
+                .child(palette_btn)
+                .child(search_btn)
+                .child(open_btn)
+                .child(theme_btn),
         )
 }
 

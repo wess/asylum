@@ -5,9 +5,9 @@ use gpui::prelude::*;
 use gpui::{div, px, App, Entity, Hsla, IntoElement, MouseButton, SharedString, Window};
 use guise::prelude::*;
 
-use crate::icons::icon;
-use crate::state::{Root, TreeProject, TreeRun, TreeTask, View};
+use crate::icons::{icon, icon_button};
 use crate::menu;
+use crate::state::{Root, TreeProject, TreeRun, TreeTask, View};
 use store::{RunStatus, TaskStatus};
 
 /// Palette pulled from the active guise theme (adapts to light/dark).
@@ -38,24 +38,75 @@ pub fn navbar(
     tree: Vec<TreeProject>,
     project_id: Option<i64>,
     task_id: Option<i64>,
+    collapsed: bool,
     handle: Entity<Root>,
     _window: &mut Window,
     cx: &mut App,
 ) -> impl IntoElement {
     let p = palette(cx);
-    div()
+    let mut nav = div()
         .flex()
         .flex_col()
         .w_full()
         .h_full()
-        .child(nav_menu(active_view, unread, handle.clone(), &p))
-        .child(div().w_full().h(px(1.0)).bg(p.border))
-        .child(workspace_tree(tree, project_id, task_id, handle, &p))
+        .child(collapse_control(collapsed, handle.clone(), &p))
+        .child(nav_menu(active_view, unread, collapsed, handle.clone(), &p));
+    if !collapsed {
+        nav = nav
+            .child(div().w_full().h(px(1.0)).bg(p.border))
+            .child(workspace_tree(tree, project_id, task_id, handle, &p));
+    }
+    nav
+}
+
+fn collapse_control(collapsed: bool, handle: Entity<Root>, p: &Palette) -> impl IntoElement {
+    let label = if collapsed {
+        "Expand sidebar"
+    } else {
+        "Collapse sidebar"
+    };
+    div()
+        .flex()
+        .items_center()
+        .h(px(36.0))
+        .px(px(8.0))
+        .border_b_1()
+        .border_color(p.border)
+        .when(collapsed, |element| element.justify_center())
+        .when(!collapsed, |element| element.justify_end())
+        .child(icon_button(
+            "sidebar-toggle",
+            if collapsed {
+                "panelleftopen"
+            } else {
+                "panelleftclose"
+            },
+            label,
+            p.dimmed,
+            p.hover,
+            move |_, cx| {
+                handle.update(cx, |root, cx| {
+                    root.sidebar_collapsed = !root.sidebar_collapsed;
+                    cx.notify();
+                });
+            },
+        ))
 }
 
 /// The vertical view switcher. Clicking an item opens (or focuses) its tab.
-fn nav_menu(active_view: Option<View>, unread: usize, handle: Entity<Root>, p: &Palette) -> impl IntoElement {
-    let mut col = div().flex().flex_col().gap_1().p(px(8.0));
+fn nav_menu(
+    active_view: Option<View>,
+    unread: usize,
+    collapsed: bool,
+    handle: Entity<Root>,
+    p: &Palette,
+) -> impl IntoElement {
+    let mut col = div()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .when(collapsed, |element| element.p(px(6.0)))
+        .when(!collapsed, |element| element.p(px(8.0)));
     for (v, _glyph, _label) in View::BAR {
         let v = *v;
         let active = Some(v) == active_view;
@@ -73,14 +124,25 @@ fn nav_menu(active_view: Option<View>, unread: usize, handle: Entity<Root>, p: &
             .py(px(7.0))
             .rounded(px(7.0))
             .cursor_pointer()
-            .child(icon(v.icon(), 16.0).text_color(icon_color))
-            .child(
+            .tab_index(0)
+            .role(gpui::accesskit::Role::Button)
+            .aria_label(v.label())
+            .aria_selected(active)
+            .tooltip(guise::tooltip(v.label()))
+            .focus_visible(move |style| style.border_1().border_color(p.primary))
+            .when(collapsed, |element| {
+                element.justify_center().gap(px(4.0)).px(px(4.0))
+            })
+            .child(icon(v.icon(), 16.0).text_color(icon_color));
+        if !collapsed {
+            row = row.child(
                 div()
                     .flex_1()
                     .text_color(text_color)
                     .text_size(px(13.0))
                     .child(SharedString::from(v.label())),
             );
+        }
         if active {
             row = row.bg(p.hover);
         }
@@ -149,7 +211,11 @@ fn project_row(
 ) -> impl IntoElement {
     let id = proj.id;
     let selected = Some(id) == project_id;
-    let chevron = if proj.expanded { "chevron-down" } else { "chevron-right" };
+    let chevron = if proj.expanded {
+        "chevron-down"
+    } else {
+        "chevron-right"
+    };
 
     let toggle = handle.clone();
     let select = handle.clone();
@@ -166,6 +232,10 @@ fn project_row(
         .py(px(5.0))
         .rounded(px(6.0))
         .cursor_pointer()
+        .role(gpui::accesskit::Role::TreeItem)
+        .aria_label(SharedString::from(proj.name.clone()))
+        .aria_selected(selected)
+        .aria_expanded(proj.expanded)
         .on_mouse_down(MouseButton::Right, move |ev, window, cx| {
             menu::project(ctx.clone(), id, ev.position, window, cx);
         });
@@ -177,6 +247,15 @@ fn project_row(
         div()
             .id(SharedString::from(format!("chev-p-{id}")))
             .p(px(2.0))
+            .cursor_pointer()
+            .tab_index(0)
+            .role(gpui::accesskit::Role::Button)
+            .aria_label(if proj.expanded {
+                "Collapse project"
+            } else {
+                "Expand project"
+            })
+            .focus_visible(move |style| style.border_1().border_color(p.primary))
             .child(icon(chevron, 14.0).text_color(p.dimmed))
             .on_click(move |_, _, cx| {
                 toggle.update(cx, |root, cx| {
@@ -193,6 +272,10 @@ fn project_row(
             .flex_1()
             .text_color(p.text)
             .text_size(px(13.0))
+            .tab_index(0)
+            .role(gpui::accesskit::Role::Button)
+            .aria_label(SharedString::from(format!("Open project {}", proj.name)))
+            .focus_visible(move |style| style.border_1().border_color(p.primary))
             .child(SharedString::from(proj.name.clone()))
             .on_click(move |_, window, cx| {
                 select.update(cx, |root, cx| {
@@ -207,6 +290,15 @@ fn project_row(
         div()
             .id(SharedString::from(format!("pin-p-{id}")))
             .p(px(2.0))
+            .cursor_pointer()
+            .tab_index(0)
+            .role(gpui::accesskit::Role::Button)
+            .aria_label(if proj.pinned {
+                "Unpin project"
+            } else {
+                "Pin project"
+            })
+            .focus_visible(move |style| style.border_1().border_color(p.primary))
             .child(icon("star", 13.0).text_color(if proj.pinned { p.primary } else { p.dimmed }))
             .on_click(move |_, _, cx| {
                 pin.update(cx, |root, cx| {
@@ -225,7 +317,11 @@ fn task_row(
 ) -> impl IntoElement {
     let id = task.id;
     let selected = Some(id) == task_id;
-    let chevron = if task.expanded { "chevron-down" } else { "chevron-right" };
+    let chevron = if task.expanded {
+        "chevron-down"
+    } else {
+        "chevron-right"
+    };
     let (status_icon, status_color) = task_status_icon(task.status, p);
 
     let toggle = handle.clone();
@@ -243,6 +339,10 @@ fn task_row(
         .py(px(4.0))
         .rounded(px(6.0))
         .cursor_pointer()
+        .role(gpui::accesskit::Role::TreeItem)
+        .aria_label(SharedString::from(task.title.clone()))
+        .aria_selected(selected)
+        .aria_expanded(task.expanded)
         .on_mouse_down(MouseButton::Right, move |ev, window, cx| {
             menu::task(ctx.clone(), id, ev.position, window, cx);
         });
@@ -253,6 +353,15 @@ fn task_row(
         div()
             .id(SharedString::from(format!("chev-t-{id}")))
             .p(px(2.0))
+            .cursor_pointer()
+            .tab_index(0)
+            .role(gpui::accesskit::Role::Button)
+            .aria_label(if task.expanded {
+                "Collapse task"
+            } else {
+                "Expand task"
+            })
+            .focus_visible(move |style| style.border_1().border_color(p.primary))
             .child(icon(chevron, 13.0).text_color(p.dimmed))
             .on_click(move |_, _, cx| {
                 toggle.update(cx, |root, cx| {
@@ -268,10 +377,19 @@ fn task_row(
             .flex_1()
             .text_color(if selected { p.text } else { p.dimmed })
             .text_size(px(12.5))
+            .tab_index(0)
+            .role(gpui::accesskit::Role::Button)
+            .aria_label(SharedString::from(format!("Open task {}", task.title)))
+            .focus_visible(move |style| style.border_1().border_color(p.primary))
             .child(SharedString::from(task.title.clone()))
             .on_click(move |_, window, cx| {
                 select.update(cx, |root, cx| {
                     root.task_id = Some(id);
+                    root.selected_run_id = root
+                        .db
+                        .runs(id)
+                        .ok()
+                        .and_then(|runs| runs.first().map(|run| run.id));
                     root.open_view(View::Tasks, window, cx);
                     cx.notify();
                 });
@@ -281,8 +399,11 @@ fn task_row(
 
 fn run_row(run: &TreeRun, handle: Entity<Root>, p: &Palette) -> impl IntoElement {
     let (status_icon, status_color) = run_status_icon(run.status, p);
-    let name = agent::find(&run.agent).map(|a| a.name).unwrap_or(run.agent.as_str());
+    let name = agent::find(&run.agent)
+        .map(|a| a.name)
+        .unwrap_or(run.agent.as_str());
     let id = run.id;
+    let select = handle.clone();
     div()
         .id(SharedString::from(format!("tree-run-{}", run.id)))
         .flex()
@@ -292,8 +413,19 @@ fn run_row(run: &TreeRun, handle: Entity<Root>, p: &Palette) -> impl IntoElement
         .pl(px(40.0))
         .py(px(3.0))
         .cursor_pointer()
+        .tab_index(0)
+        .role(gpui::accesskit::Role::Button)
+        .aria_label(SharedString::from(format!("Open {name} run")))
+        .focus_visible(move |style| style.border_1().border_color(p.primary))
         .on_mouse_down(MouseButton::Right, move |ev, window, cx| {
             menu::run(handle.clone(), id, ev.position, window, cx);
+        })
+        .on_click(move |_, window, cx| {
+            select.update(cx, |root, cx| {
+                root.select_run(id);
+                root.open_view(View::Tasks, window, cx);
+                cx.notify();
+            });
         })
         .child(icon(status_icon, 12.0).text_color(status_color))
         .child(

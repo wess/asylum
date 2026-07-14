@@ -28,7 +28,14 @@ fn resolve(base: &Path, path: &str) -> PathBuf {
     if p.is_absolute() {
         p
     } else {
-        base.join(p)
+        let absolute_base = if base.is_absolute() {
+            base.to_path_buf()
+        } else {
+            std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join(base)
+        };
+        absolute_base.join(p)
     }
 }
 

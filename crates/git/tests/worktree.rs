@@ -1,4 +1,11 @@
 use super::*;
+
+#[test]
+fn relative_repository_still_resolves_an_absolute_worktree() {
+    let path = resolve(Path::new("repository"), ".asylum/worktrees/run");
+    assert!(path.is_absolute());
+    assert!(path.ends_with("repository/.asylum/worktrees/run"));
+}
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicU32, Ordering};

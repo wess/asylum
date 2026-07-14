@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Asylum tutorials for beginners, intermediate operators, and advanced plugin and automation builders." />
+    <meta name="theme-color" content="#05070b" />
+    <link rel="icon" type="image/png" href="../favicon.png" />
+    <title>Tutorials — Asylum</title>
+  </head>
+  <body data-page="tutorials">
+    <a class="skiplink" href="#tutorials">Skip to tutorials</a>
+    <header class="siteheader solid" data-header>
+      <a class="brand" href="../" aria-label="Asylum home"><span class="brandmark" aria-hidden="true"></span><span>ASYLUM</span></a>
+      <nav class="primarynav" aria-label="Primary navigation" data-nav>
+        <a href="../">Overview</a>
+        <a href="../docs/">Docs</a>
+        <a class="active" href="./">Tutorials</a>
+        <a href="https://github.com/wess/asylum" target="_blank" rel="noreferrer">GitHub <i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+      </nav>
+      <button class="navtoggle" type="button" aria-label="Open navigation" aria-expanded="false" data-navtoggle><i data-lucide="menu" aria-hidden="true"></i></button>
+    </header>
+
+    <main id="tutorials">
+      <section class="tutorialintro shell">
+        <div>
+          <p class="eyebrow">Guided operations</p>
+          <h1>Learn Asylum by running real workflows.</h1>
+          <p>Start with one isolated task, then move through comparative review, durable project memory, visual feedback, plugins, and automation.</p>
+        </div>
+        <dl>
+          <div><dt>3</dt><dd>learning levels</dd></div>
+          <div><dt>9</dt><dd>complete tutorials</dd></div>
+          <div><dt>0</dt><dd>demo-only steps</dd></div>
+        </dl>
+      </section>
+
+      <section class="tutorialcatalog shell" aria-labelledby="catalogtitle">
+        <div class="cataloghead">
+          <div>
+            <p class="eyebrow">Pick a starting point</p>
+            <h2 id="catalogtitle">Tutorial tracks</h2>
+          </div>
+          <div class="levelpicker" role="group" aria-label="Filter tutorials by level">
+            <button type="button" class="active" data-level="all" aria-pressed="true">All levels</button>
+            <button type="button" data-level="beginner" aria-pressed="false">Beginner</button>
+            <button type="button" data-level="intermediate" aria-pressed="false">Intermediate</button>
+            <button type="button" data-level="advanced" aria-pressed="false">Advanced</button>
+          </div>
+        </div>
+        <div class="tutorialgrid" data-tutorialgrid>
+          <a href="#firsttask" class="tutorialcard" data-tutorial="beginner">
+            <span class="level beginner">Beginner</span><span class="duration">15 min</span>
+            <i data-lucide="play" aria-hidden="true"></i>
+            <strong>Your first isolated task</strong>
+            <p>Open a repository, verify one agent, run a task, and inspect the result.</p>
+            <small>No previous Asylum experience</small>
+          </a>
+          <a href="#compare" class="tutorialcard" data-tutorial="beginner">
+            <span class="level beginner">Beginner</span><span class="duration">25 min</span>
+            <i data-lucide="git-compare-arrows" aria-hidden="true"></i>
+            <strong>Compare two agent attempts</strong>
+            <p>Fan out one outcome, read both diffs, and choose with evidence.</p>
+            <small>Complete “Your first isolated task”</small>
+          </a>
+          <a href="#memory" class="tutorialcard" data-tutorial="beginner">
+            <span class="level beginner">Beginner</span><span class="duration">20 min</span>
+            <i data-lucide="notebook-tabs" aria-hidden="true"></i>
+            <strong>Build project memory</strong>
+            <p>Create linked Markdown notes and turn one into agent context.</p>
+            <small>Basic Markdown</small>
+          </a>
+          <a href="#reviewloop" class="tutorialcard" data-tutorial="intermediate">
+            <span class="level intermediate">Intermediate</span><span class="duration">30 min</span>
+            <i data-lucide="messages-square" aria-hidden="true"></i>
+            <strong>Run a review loop</strong>
+            <p>Annotate exact diff lines and continue the same worktree.</p>
+            <small>One completed run</small>
+          </a>
+          <a href="#projectsetup" class="tutorialcard" data-tutorial="intermediate">
+            <span class="level intermediate">Intermediate</span><span class="duration">25 min</span>
+            <i data-lucide="list-checks" aria-hidden="true"></i>
+            <strong>Make worktrees reproducible</strong>
+            <p>Add shared setup, environment, defaults, and automatic checks.</p>
+            <small>Project maintainer access</small>
+          </a>
+          <a href="#designmode" class="tutorialcard" data-tutorial="intermediate">
+            <span class="level intermediate">Intermediate</span><span class="duration">25 min</span>
+            <i data-lucide="mouse-pointer-click" aria-hidden="true"></i>
+            <strong>Send visual feedback</strong>
+            <p>Capture browser elements, pin notes, and ship exact context.</p>
+            <small>A locally running web app</small>
+          </a>
+          <a href="#plugin" class="tutorialcard" data-tutorial="advanced">
+            <span class="level advanced">Advanced</span><span class="duration">45 min</span>
+            <i data-lucide="blocks" aria-hidden="true"></i>
+            <strong>Create a safe plugin</strong>
+            <p>Build a Bun process plugin with one declared capability.</p>
+            <small>TypeScript and JSON</small>
+          </a>
+          <a href="#strategy" class="tutorialcard" data-tutorial="advanced">
+            <span class="level advanced">Advanced</span><span class="duration">35 min</span>
+            <i data-lucide="workflow" aria-hidden="true"></i>
+            <strong>Design a fan-out strategy</strong>
+            <p>Control parallel cost, agent diversity, checks, and selection criteria.</p>
+            <small>Several completed fan-outs</small>
+          </a>
+          <a href="#automation" class="tutorialcard" data-tutorial="advanced">
+            <span class="level advanced">Advanced</span><span class="duration">30 min</span>
+            <i data-lucide="terminal-square" aria-hidden="true"></i>
+            <strong>Automate with the CLI</strong>
+            <p>Run headless work, search results, and computer-use commands.</p>
+            <small>Shell scripting</small>
+          </a>
+        </div>
+        <p class="emptyfilter" data-emptyfilter hidden>No tutorials match this level.</p>
+      </section>
+
+      <section class="lessonindex shell" aria-labelledby="lessonstitle">
+        <p class="eyebrow">Step-by-step lessons</p>
+        <h2 id="lessonstitle">Work through the complete path.</h2>
+      </section>
+
+      <article id="firsttask" class="lesson" data-lesson="beginner">
+        <div class="shell lessonlayout">
+          <header class="lessonmeta">
+            <span class="level beginner">Beginner</span><span>15 minutes</span>
+            <h2>Your first isolated task</h2>
+            <p>Complete the full Asylum loop with one agent and a low-risk repository task.</p>
+            <div><strong>You will learn</strong><span>Setup doctor</span><span>Agent verification</span><span>Run lifecycle</span><span>Review</span></div>
+          </header>
+          <div class="lessonbody">
+            <h3>Before you start</h3>
+            <p>Choose an existing Git repository with a clean base branch. Sign in to one supported agent CLI in your shell.</p>
+            <ol class="lessonsteps">
+              <li><div><span>1</span><h3>Open the repository</h3></div><p>Launch Asylum, select <strong>Open repository</strong>, and choose the project root. Keep initialization off unless the folder is intentionally not a Git repository.</p></li>
+              <li><div><span>2</span><h3>Clear Setup doctor</h3></div><p>Read every row. Fix blocked Git, repository, base branch, worktree, agent, and toolchain checks before dispatching work.</p></li>
+              <li><div><span>3</span><h3>Verify one agent</h3></div><p>Open Agent settings and run the setup test. Continue only after the agent changes from installed to verified.</p></li>
+              <li><div><span>4</span><h3>Write a bounded task</h3></div><p>Use: “Add a health endpoint returning JSON, include one test, and document the route.” Select only the verified agent.</p></li>
+              <li><div><span>5</span><h3>Create and run</h3></div><p>Watch the run move from queued to running. Open its terminal if you need the complete live interaction.</p></li>
+              <li><div><span>6</span><h3>Review the evidence</h3></div><p>Open Review. Read the changed files, terminal output, and detected checks. Do not merge unless the code and checks match the requested outcome.</p></li>
+            </ol>
+            <div class="checkpoint"><i data-lucide="circle-check" aria-hidden="true"></i><div><strong>Checkpoint</strong><p>You should have one finished run with a preserved branch, worktree, transcript, diff, and check result.</p></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article id="compare" class="lesson" data-lesson="beginner">
+        <div class="shell lessonlayout">
+          <header class="lessonmeta">
+            <span class="level beginner">Beginner</span><span>25 minutes</span>
+            <h2>Compare two agent attempts</h2>
+            <p>Use fan-out when two independent implementations can expose tradeoffs.</p>
+            <div><strong>You will learn</strong><span>Agent selection</span><span>Parallel runs</span><span>Diff comparison</span><span>Winner selection</span></div>
+          </header>
+          <div class="lessonbody">
+            <ol class="lessonsteps">
+              <li><div><span>1</span><h3>Choose a comparison task</h3></div><p>Pick work with more than one valid implementation, such as “Add request caching with tests and document invalidation behavior.”</p></li>
+              <li><div><span>2</span><h3>Select two verified agents</h3></div><p>Prefer agents with different strengths. Asylum will create one branch and worktree for each.</p></li>
+              <li><div><span>3</span><h3>Dispatch once</h3></div><p>Create the task and launch both runs. Do not edit either generated worktree while agents are active.</p></li>
+              <li><div><span>4</span><h3>Read outcomes in the same order</h3></div><p>For each run, compare scope, changed files, tests, terminal reasoning, and check status. Use the same criteria for both.</p></li>
+              <li><div><span>5</span><h3>Select, then preflight</h3></div><p>Select the stronger run. Asylum checks failed verification, dirty base work, and merge conflicts before enabling the final action.</p></li>
+            </ol>
+            <div class="checkpoint amber"><i data-lucide="scale" aria-hidden="true"></i><div><strong>Decision rule</strong><p>Choose the implementation that best satisfies the task with the lowest maintenance cost, not the run with the most changed files.</p></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article id="memory" class="lesson" data-lesson="beginner">
+        <div class="shell lessonlayout">
+          <header class="lessonmeta">
+            <span class="level beginner">Beginner</span><span>20 minutes</span>
+            <h2>Build project memory</h2>
+            <p>Create knowledge that humans and agents can both use without leaving Markdown.</p>
+            <div><strong>You will learn</strong><span>Vault modes</span><span>Templates</span><span>Wiki links</span><span>Task context</span></div>
+          </header>
+          <div class="lessonbody">
+            <ol class="lessonsteps">
+              <li><div><span>1</span><h3>Choose storage</h3></div><p>Use Private for personal notes. Switch to Repository when the team should review and version notes under <code>notes/</code>.</p></li>
+              <li><div><span>2</span><h3>Create an investigation</h3></div><p>Use the Investigation template. Add YAML properties for owner and status, then add inline tags such as <code>#active</code>.</p></li>
+              <li><div><span>3</span><h3>Link a decision</h3></div><p>Create a Decision note. In the investigation, type <code>[[</code> and select the decision from autocomplete. Confirm both outgoing links and backlinks.</p></li>
+              <li><div><span>4</span><h3>Create a task from the note</h3></div><p>Select the investigation and choose <strong>Create task</strong>. The note becomes durable task context and receives a task link.</p></li>
+              <li><div><span>5</span><h3>Inspect automatic references</h3></div><p>Run the task. The generated run and later checks or pull request append links back into the Markdown.</p></li>
+            </ol>
+            <div class="checkpoint"><i data-lucide="link" aria-hidden="true"></i><div><strong>Checkpoint</strong><p>Search for a phrase from the note and confirm results include the note, generated task, and attached run.</p></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article id="reviewloop" class="lesson" data-lesson="intermediate">
+        <div class="shell lessonlayout">
+          <header class="lessonmeta">
+            <span class="level intermediate">Intermediate</span><span>30 minutes</span>
+            <h2>Run a review loop</h2>
+            <p>Convert exact code concerns into one structured continuation in the same worktree.</p>
+            <div><strong>You will learn</strong><span>Line annotations</span><span>Batch feedback</span><span>Same-worktree retry</span><span>Resolution</span></div>
+          </header>
+          <div class="lessonbody">
+            <ol class="lessonsteps">
+              <li><div><span>1</span><h3>Select a finished run</h3></div><p>Open Review and verify you are looking at the intended branch and worktree.</p></li>
+              <li><div><span>2</span><h3>Annotate exact lines</h3></div><p>Click a changed line and write an actionable comment: name the problem, expected behavior, and evidence needed.</p></li>
+              <li><div><span>3</span><h3>Review the comment batch</h3></div><p>Add all related comments before sending. Keep unrelated changes in a separate continuation.</p></li>
+              <li><div><span>4</span><h3>Send review to agent</h3></div><p>Asylum creates another attempt in the same worktree. Comments resolve only after the continuation is queued successfully.</p></li>
+              <li><div><span>5</span><h3>Re-run verification</h3></div><p>Inspect the new diff and check results. Confirm the fix did not expand scope or regress previous behavior.</p></li>
+            </ol>
+            <div class="checkpoint amber"><i data-lucide="message-square-warning" aria-hidden="true"></i><div><strong>Strong review comment</strong><p>“This error path drops the original cause. Preserve it in the returned message and add a test for a missing executable.”</p></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article id="projectsetup" class="lesson" data-lesson="intermediate">
+        <div class="shell lessonlayout">
+          <header class="lessonmeta">
+            <span class="level intermediate">Intermediate</span><span>25 minutes</span>
+            <h2>Make worktrees reproducible</h2>
+            <p>Commit the project defaults every agent needs before work begins.</p>
+            <div><strong>You will learn</strong><span>asylum.toml</span><span>Setup commands</span><span>Environment</span><span>Detected checks</span></div>
+          </header>
+          <div class="lessonbody">
+            <ol class="lessonsteps">
+              <li><div><span>1</span><h3>Add shared defaults</h3></div><p>Create <code>asylum.toml</code> with the real base branch and a conservative default agent list.</p></li>
+              <li><div><span>2</span><h3>Declare setup</h3></div><p>Add deterministic commands such as <code>bun install --frozen-lockfile</code>. Setup runs once in each new worktree.</p></li>
+              <li><div><span>3</span><h3>Expose required environment</h3></div><p>Add non-secret environment defaults. Keep credentials in the user environment, not project configuration.</p></li>
+              <li><div><span>4</span><h3>Declare package checks</h3></div><p>Add explicit <code>typecheck</code>, <code>lint</code>, and <code>test</code> scripts. Asylum does not guess missing JavaScript tooling.</p></li>
+              <li><div><span>5</span><h3>Test a fresh worktree</h3></div><p>Run a small task and confirm setup completes before the agent launches and all expected checks appear after success.</p></li>
+            </ol>
+            <div class="checkpoint"><i data-lucide="package-check" aria-hidden="true"></i><div><strong>Checkpoint</strong><p>A new run should need no manual dependency installation inside its generated worktree.</p></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article id="designmode" class="lesson" data-lesson="intermediate">
+        <div class="shell lessonlayout">
+          <header class="lessonmeta">
+            <span class="level intermediate">Intermediate</span><span>25 minutes</span>
+            <h2>Send visual feedback</h2>
+            <p>Turn a browser observation into element-level implementation context.</p>
+            <div><strong>You will learn</strong><span>Browser surface</span><span>Design mode</span><span>Pins</span><span>Agent feedback</span></div>
+          </header>
+          <div class="lessonbody">
+            <ol class="lessonsteps">
+              <li><div><span>1</span><h3>Open the local page</h3></div><p>Start the project’s development server and open its URL in Asylum’s Browser surface.</p></li>
+              <li><div><span>2</span><h3>Enable Design mode</h3></div><p>Toggle Design mode, then click the exact element that needs work. Asylum captures its selector, HTML, and computed CSS.</p></li>
+              <li><div><span>3</span><h3>Write outcome-focused feedback</h3></div><p>Describe the desired result, not a guessed CSS implementation. Save the note as a numbered pin.</p></li>
+              <li><div><span>4</span><h3>Capture related elements</h3></div><p>Add pins only when they belong to the same change. Keep unrelated visual work in another batch.</p></li>
+              <li><div><span>5</span><h3>Send the batch</h3></div><p>Choose the owning run and send all pins as one structured prompt. Verify the result in the same browser surface.</p></li>
+            </ol>
+            <div class="checkpoint amber"><i data-lucide="scan-search" aria-hidden="true"></i><div><strong>Useful note</strong><p>“On narrow screens this action row clips the final button. Keep all actions visible without horizontal scrolling.”</p></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article id="plugin" class="lesson" data-lesson="advanced">
+        <div class="shell lessonlayout">
+          <header class="lessonmeta">
+            <span class="level advanced">Advanced</span><span>45 minutes</span>
+            <h2>Create a safe plugin</h2>
+            <p>Expose a focused Bun command without granting capabilities it does not use.</p>
+            <div><strong>You will learn</strong><span>Manifest model</span><span>Process runtime</span><span>Capabilities</span><span>Commands</span></div>
+          </header>
+          <div class="lessonbody">
+            <ol class="lessonsteps">
+              <li><div><span>1</span><h3>Create the plugin directory</h3></div><p>Add <code>plugin.toml</code> and <code>index.ts</code>. Keep each command focused on one operation.</p></li>
+              <li><div><span>2</span><h3>Declare the runtime</h3></div><p>Use a process command such as <code>[\"bun\", \"run\", \"index.ts\"]</code>. Add only the capability required by the command.</p></li>
+              <li><div><span>3</span><h3>Read newline JSON</h3></div><p>Read one request per line from stdin and return one JSON response per line. Send logs on separate non-JSON lines.</p></li>
+              <li><div><span>4</span><h3>Register a palette command</h3></div><p>Add a manifest command with a stable ID and a title that describes its result.</p></li>
+              <li><div><span>5</span><h3>Test denied capability behavior</h3></div><p>Remove the declared capability and confirm the host rejects the corresponding operation.</p></li>
+            </ol>
+            <div class="codeblock">
+              <div><span>index.ts</span><button type="button" data-copy aria-label="Copy plugin example"><i data-lucide="copy" aria-hidden="true"></i></button></div>
+              <pre><code>for await (const line of console) {
+  const request = JSON.parse(line);
+  const response = { id: request.id, result: { ok: true } };
+  console.log(JSON.stringify(response));
+}</code></pre>
+            </div>
+            <div class="checkpoint"><i data-lucide="shield-check" aria-hidden="true"></i><div><strong>Checkpoint</strong><p>The plugin loads, its command appears in the palette, valid requests return JSON, and undeclared host access fails.</p></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article id="strategy" class="lesson" data-lesson="advanced">
+        <div class="shell lessonlayout">
+          <header class="lessonmeta">
+            <span class="level advanced">Advanced</span><span>35 minutes</span>
+            <h2>Design a fan-out strategy</h2>
+            <p>Use parallel agents where independent evidence is worth the execution cost.</p>
+            <div><strong>You will learn</strong><span>Selection criteria</span><span>Agent diversity</span><span>Queue limits</span><span>Decision records</span></div>
+          </header>
+          <div class="lessonbody">
+            <ol class="lessonsteps">
+              <li><div><span>1</span><h3>State the decision</h3></div><p>Write acceptance criteria and explicit comparison dimensions before launching runs.</p></li>
+              <li><div><span>2</span><h3>Select meaningful diversity</h3></div><p>Choose agents or prompts likely to produce independent approaches. Duplicate strategies add cost without information.</p></li>
+              <li><div><span>3</span><h3>Set a parallel limit</h3></div><p>Bound concurrent runs to the machine and provider limits. Remaining runs stay queued with durable state.</p></li>
+              <li><div><span>4</span><h3>Require the same verification</h3></div><p>Use one project configuration and the same detected checks for every candidate.</p></li>
+              <li><div><span>5</span><h3>Record the selection</h3></div><p>Create a Decision note that links the task, candidate runs, check outcomes, and selected pull request.</p></li>
+            </ol>
+            <div class="checkpoint amber"><i data-lucide="gauge" aria-hidden="true"></i><div><strong>Cost rule</strong><p>Fan out when the value of a better decision is higher than the cost of another independent run.</p></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article id="automation" class="lesson" data-lesson="advanced">
+        <div class="shell lessonlayout">
+          <header class="lessonmeta">
+            <span class="level advanced">Advanced</span><span>30 minutes</span>
+            <h2>Automate with the CLI</h2>
+            <p>Use the same core planning and execution logic outside the desktop workflow.</p>
+            <div><strong>You will learn</strong><span>Headless runs</span><span>Search</span><span>Worktree control</span><span>Computer use</span></div>
+          </header>
+          <div class="lessonbody">
+            <ol class="lessonsteps">
+              <li><div><span>1</span><h3>Inspect worktrees</h3></div><p>Run <code>asylum worktree list /path/to/repo</code> and confirm managed branches resolve to absolute paths.</p></li>
+              <li><div><span>2</span><h3>Launch a headless run</h3></div><p>Use <code>asylum run opencode \"Audit error handling\"</code>. Capture the process status in your shell automation.</p></li>
+              <li><div><span>3</span><h3>Search the result</h3></div><p>Use <code>asylum search</code> for a known symbol or phrase. Treat no matches as an empty result, not a command failure.</p></li>
+              <li><div><span>4</span><h3>Exercise computer-use commands</h3></div><p>Take a snapshot, then use click and fill only against deterministic coordinates and fields in a controlled environment.</p></li>
+              <li><div><span>5</span><h3>Add failure boundaries</h3></div><p>Stop automation when a run, worktree operation, or expected visual state fails. Preserve output for review.</p></li>
+            </ol>
+            <div class="checkpoint"><i data-lucide="terminal" aria-hidden="true"></i><div><strong>Checkpoint</strong><p>Your script should produce a durable run result and exit nonzero when a required step cannot complete.</p></div></div>
+          </div>
+        </div>
+      </article>
+
+      <section class="tutorialnext">
+        <div class="shell">
+          <p class="eyebrow">Keep the reference close</p>
+          <h2>Move from guided work to daily operation.</h2>
+          <a class="button primary" href="../docs/">Open documentation <i data-lucide="book-open-text" aria-hidden="true"></i></a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="sitefooter">
+      <div class="shell">
+        <a class="brand" href="../"><span class="brandmark" aria-hidden="true"></span><span>ASYLUM</span></a>
+        <p>Agent Development Environment. Native Rust, durable state, isolated work.</p>
+        <nav aria-label="Footer navigation"><a href="../docs/">Docs</a><a href="./">Tutorials</a><a href="https://github.com/wess/asylum">GitHub</a></nav>
+      </div>
+    </footer>
+    <script type="module" src="/src/tutorials.ts"></script>
+  </body>
+</html>

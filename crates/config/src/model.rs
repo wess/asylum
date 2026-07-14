@@ -19,6 +19,8 @@ pub struct Settings {
     pub default_agents: Vec<String>,
     /// How many agents may run concurrently across all tasks. 0 = unlimited.
     pub max_parallel_runs: u32,
+    /// Stop an agent after this many minutes. 0 = no timeout.
+    pub run_timeout_minutes: u32,
     /// Per-agent overrides keyed by agent id.
     pub agents: std::collections::BTreeMap<String, AgentPrefs>,
     /// Bring-your-own agents: definitions added on top of the built-in catalog.
@@ -36,6 +38,7 @@ impl Default for Settings {
             worktree_dir: ".asylum/worktrees".to_string(),
             default_agents: Vec::new(),
             max_parallel_runs: 4,
+            run_timeout_minutes: 60,
             agents: std::collections::BTreeMap::new(),
             custom_agents: Vec::new(),
             editor: EditorPrefs::default(),

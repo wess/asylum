@@ -17,6 +17,7 @@
 //! layer takes a [`SpawnSpec`] and runs it inside an embedded terminal pane.
 
 pub mod command;
+pub mod doctor;
 pub mod plan;
 pub mod registry;
 

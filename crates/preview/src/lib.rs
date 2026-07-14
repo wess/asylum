@@ -91,6 +91,22 @@ pub fn render_markdown(source: &str) -> String {
     out
 }
 
+/// Render Markdown into the self-contained document used by native web views.
+pub fn html_markdown(source: &str) -> String {
+    let body = render_markdown(source);
+    format!(
+        "<!doctype html><meta charset=\"utf-8\"><style>\
+         :root{{color-scheme:light dark}}\
+         body{{font:14px -apple-system,system-ui,sans-serif;padding:20px;max-width:760px;margin:auto;line-height:1.55}}\
+         h1,h2,h3{{line-height:1.25}}\
+         pre,code{{font:12px ui-monospace,monospace}}\
+         pre{{padding:12px;overflow:auto;border:1px solid color-mix(in srgb,currentColor 18%,transparent);border-radius:6px}}\
+         blockquote{{margin-left:0;padding-left:12px;border-left:3px solid #3b82f6}}\
+         a{{color:#2563eb}} table{{border-collapse:collapse}} td,th{{padding:5px 8px;border:1px solid #8886}}\
+         img{{max-width:100%;border-radius:6px}}</style>{body}"
+    )
+}
+
 /// Build a [`Preview`] for `path`, reading it as needed.
 pub fn preview(path: &Path) -> std::io::Result<Preview> {
     match classify(path) {

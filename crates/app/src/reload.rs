@@ -30,10 +30,15 @@ pub fn init(window: WindowHandle<Root>, loaded: config::Loaded, cx: &mut App) {
             root.fanout = loaded.settings.default_agents.clone();
         }
         apply(root, loaded, cx);
+        root.choose_recommended_agent();
+        root.launch_needed = true;
     });
     cx.spawn(async move |cx| {
         while rx.next().await.is_some() {
-            if window.update(cx, |root, _window, cx| reload(root, cx)).is_err() {
+            if window
+                .update(cx, |root, _window, cx| reload(root, cx))
+                .is_err()
+            {
                 break;
             }
         }
@@ -49,10 +54,8 @@ pub fn reload(root: &mut Root, cx: &mut Context<Root>) {
 /// Make `loaded` the app's live configuration: theme, keybindings, menus,
 /// input mirrors, and the settings held on [`Root`] for every surface to read.
 fn apply(root: &mut Root, loaded: config::Loaded, cx: &mut Context<Root>) {
-    for d in &loaded.diagnostics {
-        eprintln!("settings: {} {}", d.key, d.message);
-    }
     let settings = loaded.settings;
+    let old_parallel = root.settings.max_parallel_runs;
 
     if theme::current_name(cx) != settings.theme {
         theme::install(&settings, cx);
@@ -61,7 +64,23 @@ fn apply(root: &mut Root, loaded: config::Loaded, cx: &mut Context<Root>) {
     crate::settings::sync_inputs(root, &settings, cx);
 
     root.settings = settings;
+    if !root.settings.default_agents.is_empty() {
+        root.fanout = root.settings.default_agents.clone();
+    }
+    if old_parallel != root.settings.max_parallel_runs {
+        root.launch_needed = true;
+    }
     root.settings_diagnostics = loaded.diagnostics;
+    if !root.settings_diagnostics.is_empty() {
+        root.push_error(
+            "Settings need attention",
+            format!(
+                "{} setting value(s) were ignored. Open Settings for details.",
+                root.settings_diagnostics.len()
+            ),
+        );
+    }
+    root.refresh_setup();
     cx.refresh_windows();
     cx.notify();
 }

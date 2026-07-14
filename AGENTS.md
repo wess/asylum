@@ -41,7 +41,7 @@ mod tests;
 ```
 
 Every crate sets `autotests = false`. The pure-logic crates (`git`, `store`,
-`config`, `agent`, `plugin`, `pluginrt`) carry the coverage — prefer adding
+`config`, `agent`, `notes`, `plugin`, `pluginrt`) carry the coverage — prefer adding
 tests there; `app` is gpui glue.
 
 ## gpui / guise-ui / libsinclair dependency
@@ -106,6 +106,10 @@ and the gpui-free core crates never import gpui.
   `git grep`; parses the shared vimgrep format.
 - **`preview`** — rich file previews: markdown → HTML (`pulldown-cmark`) plus
   image / PDF / text / binary classification.
+- **`notes`** — plain Markdown project vaults. Path-safe recursive CRUD,
+  Obsidian-compatible YAML properties, `[[wiki links]]`, backlinks, tags,
+  templates, autocomplete, note search, rename relinking, and durable Markdown
+  references to Asylum tasks/runs/checks/PRs. Pure and gpui-free.
 - **`remote`** — SSH remote-worktree and port-forward command builders
   (ControlMaster passphrase caching, ServerAlive/autossh reconnect). Pure argv.
 - **`notify`** — desktop notifications (`osascript` / `notify-send`).
@@ -123,11 +127,13 @@ and the gpui-free core crates never import gpui.
   `search`, and computer-use `snapshot` / `click` / `fill`.
 - **`app`** — the gpui application. Owns the window, the guise theme bridge, and
   the ADE shell composed with guise's `AppShell`: a header (with the command
-  palette + quick-open overlays), an activity switcher + project/task navbar
-  (with pins), a status footer, and a routed main area with twelve surfaces —
+  palette + quick-open overlays), a collapsible activity switcher + project/task navbar
+  (with pins), a status footer, and a routed main area with thirteen surfaces —
   Tasks (fan-out board with drag-drop, merge, PR-create), Diff review (+ PASS/FAIL
   checks, branch chips, click-a-line inline annotations with resolve/delete,
-  shipped back to an agent), Search, Integrations (GitHub PRs/
+  shipped back to an agent), Search, Notes (private/repository Markdown vault,
+  editor/preview, properties, wiki links/backlinks/tags, templates, and
+  task/run context actions), Integrations (GitHub PRs/
   issues + issue→worktree + Linear), Terminal (`libsinclair::TermView`, splittable),
   Editor (+ file tree), Preview (markdown/image/PDF), Browser (embedded web view +
   design mode: toggle, click an element, attach a note, numbered pins, send the
@@ -147,6 +153,12 @@ the worktree, and `store::Db::create_run` records it. Each run's agent is
 launched from a `SpawnSpec` inside a terminal pane; its status
 (`queued`→`running`→`succeeded`/`failed`/`cancelled`) is tracked in the store.
 When a run wins, its branch merges back to the project's base branch.
+
+A project's **note vault** is private by default or repository-backed at
+`notes/`. Markdown stays the source of truth; SQLite stores only the vault
+choice and note attachments. A task attachment is inherited by generated runs,
+attached Markdown is appended to agent prompts, and generated task/run/check/PR
+links are written back to the note.
 
 ## Working in this repo
 

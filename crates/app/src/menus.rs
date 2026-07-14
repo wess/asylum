@@ -9,9 +9,7 @@
 //! under the user's `keybindings` in settings.json, re-applied on every
 //! settings reload (see [`rebind`]).
 
-use gpui::{
-    actions, App, Entity, KeyBinding, Keystroke, Menu, MenuItem, OsAction, WindowHandle,
-};
+use gpui::{actions, App, Entity, KeyBinding, Keystroke, Menu, MenuItem, OsAction, WindowHandle};
 
 use crate::root::open_project;
 use crate::state::{Root, View};
@@ -62,7 +60,12 @@ actions!(
 );
 
 /// Install the menu bar, keybindings, and action handlers.
-pub fn install(root: Entity<Root>, window: WindowHandle<Root>, settings: &config::Settings, cx: &mut App) {
+pub fn install(
+    root: Entity<Root>,
+    window: WindowHandle<Root>,
+    settings: &config::Settings,
+    cx: &mut App,
+) {
     register(root, window, cx);
     rebind(settings, cx);
 }
@@ -154,7 +157,10 @@ fn bindings(settings: &config::Settings) -> Vec<KeyBinding> {
     let keymap = config::Keymap::from_settings(&settings.keybindings);
     let mut out = Vec::new();
     for (chord, action) in keymap.bindings() {
-        if chord.split_whitespace().any(|part| Keystroke::parse(part).is_err()) {
+        if chord
+            .split_whitespace()
+            .any(|part| Keystroke::parse(part).is_err())
+        {
             eprintln!("settings: keybindings: cannot parse chord `{chord}`");
             continue;
         }
@@ -219,13 +225,14 @@ fn register(root: Entity<Root>, window: WindowHandle<Root>, cx: &mut App) {
 
     cx.on_action::<Documentation>(|_, _| open_url("https://github.com/wess/asylum"));
 
-    // Settings opens the in-app surface; with no project yet (the onboarding
-    // screen has no tabs), fall back to the raw file.
+    // Settings remains available during onboarding so executable paths can be
+    // corrected before the first repository is opened.
     cx.on_action::<OpenSettings>(move |_, cx| {
         window
             .update(cx, |root, w, cx| {
                 if root.is_empty() {
-                    open_settings_file(cx);
+                    root.onboarding_settings = true;
+                    cx.notify();
                 } else {
                     root.open_view(View::Settings, w, cx);
                     cx.notify();
@@ -234,12 +241,22 @@ fn register(root: Entity<Root>, window: WindowHandle<Root>, cx: &mut App) {
             .ok();
     });
 
-    cx.on_action::<OpenSettingsFile>(|_, cx| open_settings_file(cx));
+    {
+        let root = root.clone();
+        cx.on_action::<OpenSettingsFile>(move |_, cx| {
+            if let Err(error) = open_settings_file(cx) {
+                root.update(cx, |root, cx| {
+                    root.push_error("Could not open settings", error);
+                    cx.notify();
+                });
+            }
+        });
+    }
 
     cx.on_action::<RunFanout>(move |_, cx| {
         window
-            .update(cx, |root, _w, cx| {
-                root.run_fanout();
+            .update(cx, |root, w, cx| {
+                root.run_fanout(w, cx);
                 cx.notify();
             })
             .ok();
@@ -318,13 +335,11 @@ fn on_view<A: gpui::Action>(window: WindowHandle<Root>, view: View, cx: &mut App
 }
 
 /// Open settings.json in the system editor, seeding a starter file if needed.
-pub fn open_settings_file(cx: &mut App) {
+pub fn open_settings_file(cx: &mut App) -> Result<(), String> {
     let path = config::default_path();
-    if let Err(e) = config::edit::ensure_file(&path) {
-        eprintln!("settings: {e}");
-        return;
-    }
+    config::edit::ensure_file(&path).map_err(|error| error.to_string())?;
     cx.open_with_system(&path);
+    Ok(())
 }
 
 /// Open a URL in the system browser.

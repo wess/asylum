@@ -18,6 +18,8 @@ pub enum View {
     Diff,
     /// Cross-worktree content search.
     Search,
+    /// Project Markdown knowledge, links, and task/run context.
+    Notes,
     /// GitHub / Linear browsers.
     Integrations,
     /// Provider accounts + usage.
@@ -44,6 +46,7 @@ impl View {
         (View::Tasks, "◱", "Tasks"),
         (View::Diff, "⌥", "Diff"),
         (View::Search, "⌕", "Search"),
+        (View::Notes, "▤", "Notes"),
         (View::Integrations, "◈", "Integrations"),
         (View::Terminal, "▮", "Terminal"),
         (View::Editor, "✎", "Editor"),
@@ -60,6 +63,7 @@ impl View {
             View::Tasks => "list-todo",
             View::Diff => "git-compare",
             View::Search => "search",
+            View::Notes => "file-pen",
             View::Integrations => "github",
             View::Terminal => "terminal",
             View::Editor => "file-pen",
@@ -78,6 +82,7 @@ impl View {
             View::Tasks => "Tasks",
             View::Diff => "Diff",
             View::Search => "Search",
+            View::Notes => "Notes",
             View::Integrations => "Integrations",
             View::Terminal => "Terminal",
             View::Editor => "Editor",
@@ -106,11 +111,16 @@ pub struct Root {
     pub db: Db,
     pub project_id: Option<i64>,
     pub task_id: Option<i64>,
+    /// The run all review, terminal, and merge actions currently target.
+    pub selected_run_id: Option<i64>,
     /// Agent ids selected for the next fan-out.
     pub fanout: Vec<String>,
     /// Live search query and its results (Search view).
     pub search_query: String,
-    pub search_results: Vec<search::Match>,
+    pub search_results: Vec<SearchResult>,
+    pub search_input: Option<gpui::Entity<guise::TextInput>>,
+    /// Per-project Markdown vault and editor state.
+    pub note: crate::note::State,
     /// GitHub PRs/issues for the Integrations view (loaded on demand).
     pub prs: Vec<github::PullRequest>,
     pub issues: Vec<github::Issue>,
@@ -118,8 +128,8 @@ pub struct Root {
     pub integration_error: Option<String>,
     /// The file last opened in an editor tab (tracked so Preview can follow it).
     pub editor_file: Option<String>,
-    /// The latest check results (type-check / lint / test) for the review view.
-    pub check_results: Vec<checks::CheckResult>,
+    /// Run ids whose worktree checks are executing on the background executor.
+    pub checking_runs: std::collections::HashSet<i64>,
     /// The design-mode element capture awaiting a note (click → note → pin).
     pub pending_capture: Option<designmode::Capture>,
     /// Design annotations collected for the next "send to agent".
@@ -141,6 +151,32 @@ pub struct Root {
     pub context_menu: Option<gpui::Entity<guise::overlay::ContextMenu>>,
     /// The new-task prompt input on the Tasks board (built lazily).
     pub compose: Option<gpui::Entity<guise::TextInput>>,
+    /// Live pty views keyed by their durable run row.
+    pub run_terms: std::collections::HashMap<i64, gpui::Entity<TermView>>,
+    /// Last unix second a live terminal was snapshotted to SQLite.
+    pub run_saved_at: std::collections::HashMap<i64, i64>,
+    /// Prevent repeated transcript persistence errors from flooding notices.
+    pub run_save_failed: std::collections::HashSet<i64>,
+    /// An exit or settings change asks the next frame to fill queue capacity.
+    pub launch_needed: bool,
+    /// Worktrees and project setup commands are being prepared off the UI thread.
+    pub fanout_in_progress: bool,
+    /// Actionable messages shown above the current surface.
+    pub notices: Vec<crate::run::Notice>,
+    pub next_notice_id: u64,
+    /// Destructive actions wait here for explicit confirmation.
+    pub confirm: Option<crate::run::ConfirmAction>,
+    /// A non-git folder selected during onboarding, pending user consent.
+    pub pending_project: Option<std::path::PathBuf>,
+    /// Show in-app agent settings before the first repository is opened.
+    pub onboarding_settings: bool,
+    /// Progressive disclosure controls for the task composer.
+    pub composer_advanced: bool,
+    pub show_all_agents: bool,
+    /// Whether the left navigation is reduced to its icon rail.
+    pub sidebar_collapsed: bool,
+    pub setup_open: bool,
+    pub setup_checks: Vec<crate::setup::Check>,
     /// The tabbed, splittable main-area layout.
     pub workspace: crate::workspace::Workspace,
     /// Monotonic id source for tabs.
@@ -184,6 +220,14 @@ pub struct TreeRun {
     pub status: RunStatus,
 }
 
+/// One result in the project-wide search surface.
+#[derive(Clone)]
+pub enum SearchResult {
+    File(search::Match),
+    Note(notes::Hit),
+    Record(store::SearchRecord),
+}
+
 /// An account with its latest usage snapshot, for the Accounts view.
 #[derive(Clone)]
 pub struct AccountRow {
@@ -197,7 +241,22 @@ pub struct RunRow {
     pub id: i64,
     pub agent: String,
     pub branch: String,
+    pub worktree: String,
     pub status: RunStatus,
+    pub selected: bool,
+    pub attempt: u32,
+    pub started_at: Option<i64>,
+    pub ended_at: Option<i64>,
+    pub exit_code: Option<i32>,
+    pub output: String,
+    pub error: Option<String>,
+    pub files: usize,
+    pub added: usize,
+    pub removed: usize,
+    pub checks: usize,
+    pub check_status: Option<checks::Status>,
+    pub checking: bool,
+    pub terminal: Option<gpui::Entity<TermView>>,
 }
 
 impl Root {
@@ -207,7 +266,9 @@ impl Root {
         let base = std::env::var_os("XDG_DATA_HOME")
             .map(std::path::PathBuf::from)
             .filter(|p| !p.as_os_str().is_empty())
-            .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/share")))
+            .or_else(|| {
+                std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/share"))
+            })
             .unwrap_or_else(|| std::path::PathBuf::from(".local/share"));
         base.join("asylum").join("workspace.sqlite")
     }
@@ -219,23 +280,51 @@ impl Root {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let db = Db::open(&path).or_else(|_| Db::memory()).expect("open store");
+        let (db, boot_error) = match Db::open(&path) {
+            Ok(db) => (db, None),
+            Err(error) => (
+                Db::memory().expect("open fallback store"),
+                Some(format!(
+                    "Could not open {}: {error}. This session is temporary; fix the path before doing important work.",
+                    path.display()
+                )),
+            ),
+        };
+        let recovered = db.recover_interrupted_runs(now()).unwrap_or(0);
         let project_id = db.projects().ok().and_then(|p| p.first().map(|p| p.id));
         let task_id = project_id
             .and_then(|pid| db.tasks(pid).ok())
             .and_then(|t| t.first().map(|t| t.id));
-        Root {
+        let selected_run_id = task_id
+            .and_then(|tid| db.runs(tid).ok())
+            .and_then(|runs| runs.first().map(|run| run.id));
+        let mut notices = Vec::new();
+        if let Some(message) = boot_error {
+            notices.push(crate::run::Notice::error(1, "Store unavailable", message));
+        }
+        if recovered > 0 {
+            notices.push(crate::run::Notice::warning(
+                2,
+                "Interrupted runs recovered",
+                format!("{recovered} run(s) were marked failed. Retry them to continue in their existing worktrees."),
+            ));
+        }
+        let setup_open = db.successful_agents().unwrap_or_default().is_empty();
+        let mut root = Root {
             db,
             project_id,
             task_id,
-            fanout: vec!["claude-code".into(), "codex".into()],
+            selected_run_id,
+            fanout: Vec::new(),
             search_query: String::new(),
             search_results: Vec::new(),
+            search_input: None,
+            note: crate::note::State::default(),
             prs: Vec::new(),
             issues: Vec::new(),
             integration_error: None,
             editor_file: None,
-            check_results: Vec::new(),
+            checking_runs: std::collections::HashSet::new(),
             pending_capture: None,
             design_annotations: Vec::new(),
             design_note: None,
@@ -247,13 +336,30 @@ impl Root {
             expanded: std::collections::HashSet::new(),
             context_menu: None,
             compose: None,
+            run_terms: std::collections::HashMap::new(),
+            run_saved_at: std::collections::HashMap::new(),
+            run_save_failed: std::collections::HashSet::new(),
+            launch_needed: true,
+            fanout_in_progress: false,
+            next_notice_id: notices.len() as u64 + 1,
+            notices,
+            confirm: None,
+            pending_project: None,
+            onboarding_settings: false,
+            composer_advanced: false,
+            show_all_agents: false,
+            sidebar_collapsed: false,
+            setup_open,
+            setup_checks: Vec::new(),
             workspace: crate::workspace::Workspace::new(0),
             next_tab_id: 1,
             settings: config::Settings::default(),
             settings_diagnostics: Vec::new(),
             settings_watch: None,
             settings_inputs: None,
-        }
+        };
+        root.refresh_setup();
+        root
     }
 
     /// A fresh, monotonic tab id.
@@ -263,11 +369,39 @@ impl Root {
         id
     }
 
-    /// Add a project from any folder. A git repository is used as-is; a plain
-    /// folder is initialized as one (with an empty initial commit) so the ADE's
-    /// worktree flows work. Selects the new project.
-    pub fn add_project_from_path(&mut self, path: std::path::PathBuf) -> Result<i64, String> {
+    /// Inspect a selected folder without mutating it. Existing repositories
+    /// open immediately; plain folders wait for explicit initialization consent.
+    pub fn consider_project_path(
+        &mut self,
+        path: std::path::PathBuf,
+    ) -> Result<Option<i64>, String> {
+        if git::is_repo(&path) {
+            self.add_project_from_path(path, false).map(Some)
+        } else {
+            self.pending_project = Some(path);
+            Ok(None)
+        }
+    }
+
+    pub fn initialize_pending_project(&mut self) -> Result<i64, String> {
+        let path = self
+            .pending_project
+            .take()
+            .ok_or("no folder is waiting for initialization")?;
+        self.add_project_from_path(path, true)
+    }
+
+    /// Add an inspected project. Initializing a plain folder is only allowed
+    /// when the onboarding confirmation passed `initialize = true`.
+    pub fn add_project_from_path(
+        &mut self,
+        path: std::path::PathBuf,
+        initialize: bool,
+    ) -> Result<i64, String> {
         let initialized = if !git::is_repo(&path) {
+            if !initialize {
+                return Err("this folder is not a git repository".into());
+            }
             git::init_repo(&path).map_err(|e| e.to_string())?;
             true
         } else {
@@ -285,8 +419,11 @@ impl Root {
             .db
             .create_project(&name, &path_str, &base, now)
             .map_err(|e| e.to_string())?;
-        self.db.touch_project(project.id, now).ok();
+        self.db
+            .touch_project(project.id, now)
+            .map_err(|error| error.to_string())?;
         self.select_project(project.id);
+        self.pending_project = None;
         self.open_kind(TabKind::Tasks);
         if initialized {
             self.push_notification(
@@ -306,51 +443,207 @@ impl Root {
 
     /// Create a task in the selected project from a prompt, select it, and (when
     /// `fan_out`) immediately fan it out across the chosen agents.
-    pub fn create_task(&mut self, prompt: &str, fan_out: bool) {
+    pub fn create_task(
+        &mut self,
+        prompt: &str,
+        fan_out: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let prompt = prompt.trim();
         if prompt.is_empty() {
+            self.push_error(
+                "Task is empty",
+                "Describe the outcome before saving or running the task.",
+            );
             return;
         }
         let Some(pid) = self.project_id else {
+            self.push_error(
+                "No project selected",
+                "Open a repository before creating a task.",
+            );
             return;
         };
         // The title is the first line, trimmed to something readable.
-        let title: String = prompt.lines().next().unwrap_or(prompt).chars().take(60).collect();
-        if let Ok(task) = self.db.create_task(pid, &title, prompt, now()) {
-            self.task_id = Some(task.id);
-            self.expanded.insert(format!("project-{pid}"));
-            if fan_out {
-                self.run_fanout();
+        let title: String = prompt
+            .lines()
+            .next()
+            .unwrap_or(prompt)
+            .chars()
+            .take(60)
+            .collect();
+        match self.db.create_task(pid, &title, prompt, now()) {
+            Ok(task) => {
+                self.task_id = Some(task.id);
+                self.selected_run_id = None;
+                self.expanded.insert(format!("project-{pid}"));
+                if fan_out {
+                    self.run_fanout(window, cx);
+                }
             }
+            Err(error) => self.push_error("Could not create task", error.to_string()),
         }
     }
 
     /// Remove a project and everything under it.
     pub fn remove_project(&mut self, id: i64) {
-        let _ = self.db.delete_project(id);
+        let Ok(project) = self.db.project(id) else {
+            self.push_error("Could not remove project", "The project no longer exists.");
+            return;
+        };
+        let runs: Vec<store::Run> = self
+            .db
+            .tasks(id)
+            .unwrap_or_default()
+            .into_iter()
+            .flat_map(|task| self.db.runs(task.id).unwrap_or_default())
+            .collect();
+        if let Some(run) = runs
+            .iter()
+            .find(|run| matches!(run.status, RunStatus::Queued | RunStatus::Running))
+        {
+            self.push_error(
+                "Project has active runs",
+                format!("Cancel run {} before removing the project.", run.id),
+            );
+            return;
+        }
+        if let Some(run) = runs.iter().find(|run| {
+            std::path::Path::new(&run.worktree).exists()
+                && git::status::status(std::path::Path::new(&run.worktree))
+                    .map(|entries| !entries.is_empty())
+                    .unwrap_or(true)
+        }) {
+            self.push_error(
+                "Project has a dirty worktree",
+                format!(
+                    "Review or explicitly remove {} before deleting its history.",
+                    run.worktree
+                ),
+            );
+            return;
+        }
+        for run in &runs {
+            self.run_terms.remove(&run.id);
+            if std::path::Path::new(&run.worktree).exists() {
+                if let Err(error) = git::worktree::remove(
+                    std::path::Path::new(&project.path),
+                    std::path::Path::new(&run.worktree),
+                    false,
+                ) {
+                    self.push_error("Could not clean project worktree", error.to_string());
+                    return;
+                }
+            }
+        }
+        if let Err(error) = self.db.delete_project(id) {
+            self.push_error("Could not remove project", error.to_string());
+            return;
+        }
         if self.project_id == Some(id) {
-            self.project_id = self.db.projects().ok().and_then(|p| p.first().map(|p| p.id));
+            self.project_id = self
+                .db
+                .projects()
+                .ok()
+                .and_then(|p| p.first().map(|p| p.id));
             self.task_id = self
                 .project_id
                 .and_then(|pid| self.db.tasks(pid).ok())
                 .and_then(|t| t.first().map(|t| t.id));
+            self.selected_run_id = self
+                .task_id
+                .and_then(|task_id| self.db.runs(task_id).ok())
+                .and_then(|runs| runs.first().map(|run| run.id));
         }
     }
 
     /// Delete a task.
     pub fn delete_task(&mut self, id: i64) {
-        let _ = self.db.delete_task(id);
+        let Ok(task) = self.db.task(id) else {
+            self.push_error("Could not delete task", "The task no longer exists.");
+            return;
+        };
+        let Ok(project) = self.db.project(task.project_id) else {
+            self.push_error(
+                "Could not delete task",
+                "The task's project no longer exists.",
+            );
+            return;
+        };
+        let runs = self.db.runs(id).unwrap_or_default();
+        if let Some(run) = runs
+            .iter()
+            .find(|run| matches!(run.status, RunStatus::Queued | RunStatus::Running))
+        {
+            self.push_error(
+                "Task has an active run",
+                format!("Cancel run {} before deleting the task.", run.id),
+            );
+            return;
+        }
+        if let Some(run) = runs.iter().find(|run| {
+            std::path::Path::new(&run.worktree).exists()
+                && git::status::status(std::path::Path::new(&run.worktree))
+                    .map(|entries| !entries.is_empty())
+                    .unwrap_or(true)
+        }) {
+            self.push_error(
+                "Task has a dirty worktree",
+                format!(
+                    "Review or explicitly remove {} before deleting its history.",
+                    run.worktree
+                ),
+            );
+            return;
+        }
+        for run in runs {
+            self.run_terms.remove(&run.id);
+            if std::path::Path::new(&run.worktree).exists() {
+                if let Err(error) = git::worktree::remove(
+                    std::path::Path::new(&project.path),
+                    std::path::Path::new(&run.worktree),
+                    false,
+                ) {
+                    self.push_error("Could not clean task worktree", error.to_string());
+                    return;
+                }
+            }
+        }
+        if let Err(error) = self.db.delete_task(id) {
+            self.push_error("Could not delete task", error.to_string());
+            return;
+        }
         if self.task_id == Some(id) {
             self.task_id = self
                 .project_id
                 .and_then(|pid| self.db.tasks(pid).ok())
                 .and_then(|t| t.first().map(|t| t.id));
+            self.selected_run_id = self
+                .task_id
+                .and_then(|task_id| self.db.runs(task_id).ok())
+                .and_then(|runs| runs.first().map(|run| run.id));
         }
     }
 
     /// Archive a task (set aside without deleting).
     pub fn archive_task(&mut self, id: i64) {
-        let _ = self.db.set_task_status(id, TaskStatus::Archived, now());
+        if self
+            .db
+            .runs(id)
+            .unwrap_or_default()
+            .iter()
+            .any(|run| matches!(run.status, RunStatus::Queued | RunStatus::Running))
+        {
+            self.push_error(
+                "Task is active",
+                "Cancel its queued and running agents before archiving it.",
+            );
+            return;
+        }
+        if let Err(error) = self.db.set_task_status(id, TaskStatus::Archived, now()) {
+            self.push_error("Could not archive task", error.to_string());
+        }
     }
 
     /// The filesystem path of a project.
@@ -423,9 +716,21 @@ impl Root {
 
     /// The id of the run currently under review (the selected task's first run).
     pub fn current_run_id(&self) -> Option<i64> {
-        self.task_id
-            .and_then(|tid| self.db.runs(tid).ok())
-            .and_then(|runs| runs.first().map(|r| r.id))
+        let task_id = self.task_id?;
+        if let Some(id) = self.selected_run_id {
+            if self
+                .db
+                .run(id)
+                .ok()
+                .is_some_and(|run| run.task_id == task_id)
+            {
+                return Some(id);
+            }
+        }
+        self.db
+            .runs(task_id)
+            .ok()
+            .and_then(|runs| runs.first().map(|run| run.id))
     }
 
     /// Annotations on the run under review.
@@ -458,22 +763,29 @@ impl Root {
                 .unwrap_or_else(|| "(file)".to_string());
             (file, 1, store::Side::New)
         });
-        let _ = self.db.add_annotation(rid, &file, line, side, body, now());
+        if let Err(error) = self.db.add_annotation(rid, &file, line, side, body, now()) {
+            self.push_error("Could not add review comment", error.to_string());
+        }
     }
 
     /// Mark a review annotation resolved or reopen it.
     pub fn resolve_review_note(&mut self, id: i64, resolved: bool) {
-        let _ = self.db.resolve_annotation(id, resolved);
+        if let Err(error) = self.db.resolve_annotation(id, resolved) {
+            self.push_error("Could not update review comment", error.to_string());
+        }
     }
 
     /// Delete a review annotation.
     pub fn delete_review_note(&mut self, id: i64) {
-        let _ = self.db.delete_annotation(id);
+        if let Err(error) = self.db.delete_annotation(id) {
+            self.push_error("Could not delete review comment", error.to_string());
+        }
     }
 
-    /// Ship the open (unresolved) review annotations back to an agent as a
-    /// follow-up task, then mark them resolved.
-    pub fn send_review_to_agent(&mut self) {
+    /// Continue the selected run with its open review annotations. A live
+    /// agent receives them on stdin; a finished run starts another attempt in
+    /// the same worktree.
+    pub fn send_review_to_agent(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let annotations: Vec<store::Annotation> = self
             .review_annotations()
             .into_iter()
@@ -482,20 +794,26 @@ impl Root {
         if annotations.is_empty() {
             return;
         }
-        let Some(pid) = self.project_id else {
+        let Some(run_id) = self.current_run_id() else {
             return;
         };
         let mut prompt = String::from("Address these review comments:\n");
         for a in &annotations {
             prompt.push_str(&format!("- {}:{} — {}\n", a.file, a.line, a.body));
         }
-        if let Ok(task) = self.db.create_task(pid, "Address review comments", &prompt, now()) {
-            for a in &annotations {
-                let _ = self.db.resolve_annotation(a.id, true);
+        match self.send_followup(run_id, prompt, window, cx) {
+            Ok(()) => {
+                for annotation in &annotations {
+                    let _ = self.db.resolve_annotation(annotation.id, true);
+                }
+                self.open_kind(TabKind::Tasks);
+                self.push_notice(
+                    crate::run::NoticeTone::Info,
+                    "Review sent",
+                    "The selected agent is addressing the comments in the same worktree.",
+                );
             }
-            self.task_id = Some(task.id);
-            self.open_kind(TabKind::Tasks);
-            self.push_notification("run_started", "Review sent to agent", "", None);
+            Err(error) => self.push_error("Could not send review", error),
         }
     }
 
@@ -511,10 +829,21 @@ impl Root {
         let repo = std::path::PathBuf::from(&project.path);
         let branch = github::issue_branch(issue);
         let worktree = format!(".asylum/worktrees/{branch}");
-        let _ = git::worktree::create(&repo, &worktree, Some(&branch), None);
+        let absolute = match git::worktree::create(&repo, &worktree, Some(&branch), None) {
+            Ok(path) => path,
+            Err(error) => {
+                self.push_error("Could not open issue worktree", error.to_string());
+                return;
+            }
+        };
         let prompt = format!("Resolve GitHub issue #{}: {}", issue.number, issue.title);
         if let Ok(task) = self.db.create_task(pid, &issue.title, &prompt, now()) {
             self.task_id = Some(task.id);
+            self.push_notice(
+                crate::run::NoticeTone::Success,
+                "Issue worktree ready",
+                absolute.display().to_string(),
+            );
             self.open_kind(TabKind::Tasks);
         }
     }
@@ -522,18 +851,71 @@ impl Root {
     /// Open a pull request for a run's branch (open a PR from the IDE).
     pub fn create_pr_for_run(&mut self, run_id: i64) {
         let Ok(run) = self.db.run(run_id) else {
+            self.push_error("Run unavailable", "The selected run no longer exists.");
             return;
         };
         let Ok(task) = self.db.task(run.task_id) else {
+            self.push_error("Task unavailable", "The run's task no longer exists.");
             return;
         };
         let Ok(project) = self.db.project(task.project_id) else {
+            self.push_error(
+                "Project unavailable",
+                "The task's project no longer exists.",
+            );
             return;
         };
+        if run.status != RunStatus::Succeeded {
+            self.push_error(
+                "Run is not ready",
+                "Only a successful run can be opened as a pull request.",
+            );
+            return;
+        }
+        if self.checking_runs.contains(&run_id) {
+            self.push_error(
+                "Checks are still running",
+                "Wait for verification to finish before opening the pull request.",
+            );
+            return;
+        }
+        let results = self.run_check_results(run_id);
+        if results
+            .iter()
+            .any(|result| result.status == checks::Status::Fail)
+        {
+            self.push_error(
+                "Checks failed",
+                "Fix or rerun failed checks before opening the pull request.",
+            );
+            return;
+        }
+        if results.is_empty() || checks::overall(&results) == checks::Status::Skipped {
+            self.push_notice(
+                crate::run::NoticeTone::Warning,
+                "Run is not fully verified",
+                "No executable checks passed. Review the diff and terminal output carefully.",
+            );
+        }
         let repo = std::path::PathBuf::from(&project.path);
-        match github::create_pr(&repo, &task.title, &task.prompt, &project.base_branch, &run.branch) {
-            Ok(url) => self.push_notification("run_finished", "PR opened", &url, Some(run_id)),
-            Err(e) => self.push_notification("attention", "PR failed", &e.to_string(), Some(run_id)),
+        let base = config::load_project(&repo)
+            .0
+            .base_branch
+            .unwrap_or(project.base_branch);
+        match github::create_pr(&repo, &task.title, &task.prompt, &base, &run.branch) {
+            Ok(url) => {
+                self.reference_run_notes(run_id, &notes::Reference::pullrequest(&url));
+                self.push_notice(
+                    crate::run::NoticeTone::Success,
+                    "Pull request opened",
+                    url.clone(),
+                );
+                self.push_notification("run_finished", "PR opened", &url, Some(run_id));
+            }
+            Err(error) => {
+                self.push_error("Could not open pull request", error.to_string());
+                self.push_notification("attention", "PR failed", &error.to_string(), Some(run_id));
+            }
         }
     }
 
@@ -557,6 +939,7 @@ impl Root {
             View::Tasks => self.open_kind(TabKind::Tasks),
             View::Diff => self.open_kind(TabKind::Diff),
             View::Search => self.open_kind(TabKind::Search),
+            View::Notes => self.open_kind(TabKind::Notes),
             View::Integrations => self.open_kind(TabKind::Integrations),
             View::Accounts => self.open_kind(TabKind::Accounts),
             View::Notifications => self.open_kind(TabKind::Inbox),
@@ -573,7 +956,7 @@ impl Root {
         }
     }
 
-    fn open_kind(&mut self, kind: TabKind) {
+    pub(crate) fn open_kind(&mut self, kind: TabKind) {
         let id = self.next_tab_id();
         self.workspace.open(id, kind);
     }
@@ -605,7 +988,8 @@ impl Root {
             }
         });
         let id = self.next_tab_id();
-        self.workspace.open(id, TabKind::Editor(editor, file.to_string()));
+        self.workspace
+            .open(id, TabKind::Editor(editor, file.to_string()));
     }
 
     /// Open a browser tab with design mode on - click an element, attach a
@@ -640,24 +1024,27 @@ impl Root {
     /// annotation, and every page load re-asserts the design-mode toggle and
     /// redraws the pins (navigation wipes the page's state, not ours).
     fn watch_design_messages(&mut self, wv: &gpui::Entity<guise::WebView>, cx: &mut Context<Self>) {
-        cx.subscribe(wv, |root, wv, event: &guise::WebViewEvent, cx| match event {
-            guise::WebViewEvent::Message(payload) => {
-                if let Some(capture) = designmode::parse(payload) {
-                    root.pending_capture = Some(capture);
-                    cx.notify();
+        cx.subscribe(
+            wv,
+            |root, wv, event: &guise::WebViewEvent, cx| match event {
+                guise::WebViewEvent::Message(payload) => {
+                    if let Some(capture) = designmode::parse(payload) {
+                        root.pending_capture = Some(capture);
+                        cx.notify();
+                    }
                 }
-            }
-            guise::WebViewEvent::LoadFinished => {
-                if root.design_enabled.contains(&wv.entity_id()) {
-                    wv.read(cx).evaluate_script(designmode::ENABLE_JS);
+                guise::WebViewEvent::LoadFinished => {
+                    if root.design_enabled.contains(&wv.entity_id()) {
+                        wv.read(cx).evaluate_script(designmode::ENABLE_JS);
+                    }
+                    if !root.design_annotations.is_empty() {
+                        wv.read(cx)
+                            .evaluate_script(&designmode::pins_js(&root.design_annotations));
+                    }
                 }
-                if !root.design_annotations.is_empty() {
-                    wv.read(cx)
-                        .evaluate_script(&designmode::pins_js(&root.design_annotations));
-                }
-            }
-            _ => {}
-        })
+                _ => {}
+            },
+        )
         .detach();
     }
 
@@ -700,14 +1087,6 @@ impl Root {
             self.pending_capture = None;
             self.open_kind(TabKind::Tasks);
         }
-    }
-
-    /// Detect and run the selected project's checks (type-check / lint / test),
-    /// storing the PASS/FAIL results for the review surface.
-    pub fn run_checks(&mut self) {
-        let dir = std::path::PathBuf::from(self.project_path());
-        let detected = checks::detect(&dir);
-        self.check_results = checks::run_all(&dir, &detected);
     }
 
     /// Top-level files of the selected project worth opening in the editor
@@ -818,6 +1197,11 @@ impl Root {
         let Some(rid) = self.current_run_id() else {
             return Vec::new();
         };
+        self.diff_for_run(rid)
+    }
+
+    /// A run's worktree diffed from the configured project base.
+    pub fn diff_for_run(&self, rid: i64) -> Vec<git::DiffFile> {
         let Ok(run) = self.db.run(rid) else {
             return Vec::new();
         };
@@ -825,12 +1209,18 @@ impl Root {
         if !git::is_repo(&wt) {
             return Vec::new();
         }
-        let base = self
+        let project = self
             .db
             .task(run.task_id)
             .ok()
-            .and_then(|t| self.db.project(t.project_id).ok())
-            .map(|p| p.base_branch)
+            .and_then(|t| self.db.project(t.project_id).ok());
+        let base = project
+            .map(|project| {
+                config::load_project(std::path::Path::new(&project.path))
+                    .0
+                    .base_branch
+                    .unwrap_or(project.base_branch)
+            })
             .unwrap_or_else(|| "HEAD".to_string());
         git::diff::since_fork(&wt, &base)
             .or_else(|_| git::diff::against(&wt, "HEAD"))
@@ -846,17 +1236,40 @@ impl Root {
             .runs(tid)
             .unwrap_or_default()
             .into_iter()
-            .map(|r| RunRow {
-                id: r.id,
-                agent: r.agent,
-                branch: r.branch,
-                status: r.status,
+            .map(|run| {
+                let files = self.diff_for_run(run.id);
+                let check_results = self.run_check_results(run.id);
+                let (added, removed) = files
+                    .iter()
+                    .map(git::DiffFile::line_stats)
+                    .fold((0, 0), |(a, r), (next_a, next_r)| (a + next_a, r + next_r));
+                RunRow {
+                    id: run.id,
+                    agent: run.agent,
+                    branch: run.branch,
+                    worktree: run.worktree,
+                    status: run.status,
+                    selected: self.current_run_id() == Some(run.id),
+                    attempt: run.attempt,
+                    started_at: run.started_at,
+                    ended_at: run.ended_at,
+                    exit_code: run.exit_code,
+                    output: run.output,
+                    error: run.error,
+                    files: files.len(),
+                    added,
+                    removed,
+                    checks: check_results.len(),
+                    check_status: (!check_results.is_empty())
+                        .then(|| checks::overall(&check_results)),
+                    checking: self.checking_runs.contains(&run.id),
+                    terminal: self.run_terms.get(&run.id).cloned(),
+                }
             })
             .collect()
     }
 
-    /// Run the current search query against the selected project's directory.
-    /// An empty query defaults to `TODO` so the surface always demonstrates.
+    /// Search source files, notes, tasks, runs, and persisted transcripts.
     pub fn run_search(&mut self) {
         let Some(pid) = self.project_id else {
             return;
@@ -864,90 +1277,55 @@ impl Root {
         let Ok(project) = self.db.project(pid) else {
             return;
         };
-        let query = if self.search_query.trim().is_empty() {
-            "TODO".to_string()
-        } else {
-            self.search_query.clone()
-        };
-        self.search_query = query.clone();
-        let dir = std::path::PathBuf::from(&project.path);
-        self.search_results =
-            search::search(&dir, &query, &search::Options::default()).unwrap_or_default();
-    }
-
-    /// Fan the selected task out across the chosen agents: plan a branch +
-    /// worktree per agent, create the worktree (best effort - a non-repo demo
-    /// project just skips it), record a run row, move the task to Running, and
-    /// post a notification - the core loop: one prompt → N isolated agents.
-    pub fn run_fanout(&mut self) {
-        let Some(tid) = self.task_id else {
-            return;
-        };
-        let Ok(task) = self.db.task(tid) else {
-            return;
-        };
-        let Ok(project) = self.db.project(task.project_id) else {
-            return;
-        };
-        let repo = std::path::PathBuf::from(&project.path);
-        let plans = agent::plan::fanout(tid, &task.title, &self.fanout, ".asylum/worktrees");
-        for plan in &plans {
-            let _ = git::worktree::create(&repo, &plan.worktree, Some(&plan.branch), None);
-            let _ = self.db.create_run(tid, &plan.agent, &plan.worktree, &plan.branch);
+        let query = self.search_query.trim().to_string();
+        self.search_results.clear();
+        if let Ok(records) = self.db.search_project(pid, &query, 120) {
+            self.search_results
+                .extend(records.into_iter().map(SearchResult::Record));
         }
-        let now = now();
-        self.db.set_task_status(tid, TaskStatus::Running, now).ok();
-        self.push_notification(
-            "run_started",
-            &format!("Fanned out to {} agents", plans.len()),
-            &task.title,
-            None,
-        );
+        let root = self
+            .db
+            .note_vault(pid)
+            .ok()
+            .flatten()
+            .map(|vault| std::path::PathBuf::from(vault.path));
+        if let Some(root) = root {
+            if let Ok(index) = notes::index(&root) {
+                self.search_results.extend(
+                    notes::search(&index, &query)
+                        .into_iter()
+                        .take(120)
+                        .map(SearchResult::Note),
+                );
+            }
+        }
+        if query.is_empty() {
+            return;
+        }
+        let dir = std::path::PathBuf::from(&project.path);
+        let options = search::Options {
+            fixed: true,
+            max_results: 200,
+            ..Default::default()
+        };
+        match search::search(&dir, &query, &options) {
+            Ok(results) => self
+                .search_results
+                .extend(results.into_iter().map(SearchResult::File)),
+            Err(error) => self.push_error("Search failed", error.to_string()),
+        }
     }
 
     /// Store a notification and post a desktop notification for it.
-    fn push_notification(&self, kind: &str, title: &str, body: &str, run_id: Option<i64>) {
+    pub(crate) fn push_notification(
+        &self,
+        kind: &str,
+        title: &str,
+        body: &str,
+        run_id: Option<i64>,
+    ) {
         let _ = self.db.notify(kind, title, body, run_id, now());
         let _ = notify::send(&notify::Notification::new(title, body));
-    }
-
-    /// Merge a run's branch into its project's base branch - "merge the winner".
-    /// Reports the outcome (merged / conflicts / error) as a notification.
-    pub fn merge_run(&mut self, run_id: i64) {
-        let Ok(run) = self.db.run(run_id) else {
-            return;
-        };
-        let Ok(task) = self.db.task(run.task_id) else {
-            return;
-        };
-        let Ok(project) = self.db.project(task.project_id) else {
-            return;
-        };
-        let repo = std::path::PathBuf::from(&project.path);
-        let now = now();
-        let _ = git::branch::checkout(&repo, &project.base_branch);
-        match git::branch::merge(&repo, &run.branch) {
-            Ok(git::MergeOutcome::Conflicts(paths)) => {
-                self.push_notification(
-                    "attention",
-                    "Merge conflicts",
-                    &format!("{} · {} files conflict", run.agent, paths.len()),
-                    Some(run_id),
-                );
-            }
-            Ok(_) => {
-                self.db.set_task_status(task.id, TaskStatus::Merged, now).ok();
-                self.push_notification(
-                    "run_finished",
-                    "Merged",
-                    &format!("{} merged into {}", run.agent, project.base_branch),
-                    Some(run_id),
-                );
-            }
-            Err(e) => {
-                self.push_notification("attention", "Merge failed", &e.to_string(), Some(run_id));
-            }
-        }
     }
 
     /// Installed plugins (from the plugins directory) and any load diagnostics.
@@ -1001,9 +1379,25 @@ impl Root {
             .tasks(project_id)
             .ok()
             .and_then(|t| t.first().map(|t| t.id));
+        self.selected_run_id = self
+            .task_id
+            .and_then(|tid| self.db.runs(tid).ok())
+            .and_then(|runs| runs.first().map(|run| run.id));
+        let path = self.db.project(project_id).ok().map(|project| project.path);
+        if let Some(path) = path {
+            let (project, diagnostics) = config::load_project(std::path::Path::new(&path));
+            if !project.default_agents.is_empty() {
+                self.fanout = project.default_agents;
+            }
+            for diagnostic in diagnostics {
+                self.push_error("Project settings", diagnostic.message);
+            }
+        }
         // Quick-open lists this project's files; rebuild it.
         self.editor_file = None;
         self.quickopen = None;
+        self.note.project_id = None;
+        self.refresh_setup();
     }
 
     /// The title of the selected task, if any.
@@ -1011,5 +1405,11 @@ impl Root {
         self.task_id
             .and_then(|id| self.db.task(id).ok())
             .map(|t| t.title)
+    }
+
+    pub fn task_status(&self) -> Option<TaskStatus> {
+        self.task_id
+            .and_then(|id| self.db.task(id).ok())
+            .map(|task| task.status)
     }
 }

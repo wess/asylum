@@ -32,7 +32,10 @@ Each feature is backed by tested logic and a working UI or CLI surface. See
   (click an element → its HTML/CSS to an agent).
 - **GitHub / Linear** integration, **cross-worktree search**, **command palette**
   + **quick-open** (fuzzy), **desktop notifications** + unread inbox, **accounts**
-  + usage, **pinned/recent** projects.
+  + usage, **pinned/recent** projects, and a collapsible icon-only activity rail.
+- **Project memory** — private or repository-backed Markdown vaults with YAML
+  properties, `[[wiki links]]`, backlinks, tags, templates, live preview, and
+  durable task/run/check/PR links. Attached notes become agent context.
 - **Plugins** — manifest system with a process runtime *and* a sandboxed WASM
   runtime (`wasmi`, capability-gated).
 - **CLI** (`asylum`) with computer-use automation, and a **mobile companion**
@@ -49,6 +52,20 @@ cargo clippy --all-targets
 `guise-ui` and `libsinclair` are git dependencies; the first build fetches them.
 See [`docs/gpui.md`](docs/gpui.md) for the dependency recipe.
 
+## Website
+
+The GitHub Pages site lives in `site/` and uses Bun with Vite:
+
+```sh
+cd site
+bun install
+bun run dev
+bun run build
+```
+
+Pushes to `main` that touch `site/` deploy through
+`.github/workflows/pages.yml`. The production output is `site/dist/`.
+
 ## Layout
 
 ```
@@ -63,6 +80,7 @@ crates/
   linear    Linear GraphQL: teams, projects, issues
   checks    type-check / lint / test runner with PASS/FAIL
   search    cross-worktree content search (ripgrep / git grep)
+  notes     Markdown vault CRUD, properties, links/backlinks, templates, search
   preview   markdown → HTML, image / PDF / text classification
   remote    SSH remote-worktree + port-forward command builders
   notify    desktop notifications
@@ -72,8 +90,9 @@ crates/
   plugin    plugin.toml manifest parsing
   pluginrt  process runtime (JSON over stdio) + WASM runtime (wasmi)
   cli       the `asylum` binary (worktree/run/search/computer-use)
-  app       the gpui application (asylumdev) — 11 surfaces
+  app       the gpui application (asylumdev) - 13 surfaces
 ```
 
 See [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md) for the architecture and
-conventions, and [`docs/`](docs/) for detail.
+conventions. Start with [`docs/gettingstarted.md`](docs/gettingstarted.md) for
+the first-run workflow, then use [`docs/`](docs/) for subsystem detail.

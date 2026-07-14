@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Asylum documentation: install, configure, run, review, and extend the Agent Development Environment." />
+    <meta name="theme-color" content="#05070b" />
+    <link rel="icon" type="image/png" href="../favicon.png" />
+    <title>Documentation — Asylum</title>
+  </head>
+  <body data-page="docs">
+    <a class="skiplink" href="#docscontent">Skip to documentation</a>
+    <header class="siteheader solid" data-header>
+      <a class="brand" href="../" aria-label="Asylum home"><span class="brandmark" aria-hidden="true"></span><span>ASYLUM</span></a>
+      <nav class="primarynav" aria-label="Primary navigation" data-nav>
+        <a href="../">Overview</a>
+        <a class="active" href="./">Docs</a>
+        <a href="../tutorials/">Tutorials</a>
+        <a href="https://github.com/wess/asylum" target="_blank" rel="noreferrer">GitHub <i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
+      </nav>
+      <button class="navtoggle" type="button" aria-label="Open navigation" aria-expanded="false" data-navtoggle><i data-lucide="menu" aria-hidden="true"></i></button>
+    </header>
+
+    <main class="docsshell">
+      <aside class="docsidebar" aria-label="Documentation sections">
+        <div class="docsidentity">
+          <span>Documentation</span>
+          <strong>Operator manual</strong>
+        </div>
+        <label class="docssearch">
+          <i data-lucide="search" aria-hidden="true"></i>
+          <span class="visuallyhidden">Search documentation</span>
+          <input type="search" placeholder="Search docs" autocomplete="off" data-docsearch />
+          <kbd>/</kbd>
+        </label>
+        <div class="docsresults" data-docresults hidden></div>
+        <nav class="docsnav" data-docnav>
+          <p>Start</p>
+          <a href="#overview" data-doclink="overview">Overview</a>
+          <a href="#install" data-doclink="install">Install</a>
+          <a href="#firsttask" data-doclink="firsttask">Run your first task</a>
+          <p>Operate</p>
+          <a href="#agents" data-doclink="agents">Agents and fan-out</a>
+          <a href="#runs" data-doclink="runs">Runs and terminals</a>
+          <a href="#review" data-doclink="review">Review and merge</a>
+          <a href="#memory" data-doclink="memory">Project memory</a>
+          <a href="#search" data-doclink="search">Unified search</a>
+          <p>Extend</p>
+          <a href="#config" data-doclink="config">Project configuration</a>
+          <a href="#plugins" data-doclink="plugins">Plugins</a>
+          <a href="#cli" data-doclink="cli">CLI</a>
+          <a href="#troubleshooting" data-doclink="troubleshooting">Troubleshooting</a>
+        </nav>
+        <a class="sidehelp" href="../tutorials/">Prefer a guided path? <span>Open tutorials</span></a>
+      </aside>
+
+      <section id="docscontent" class="docscontent" tabindex="-1">
+        <article id="overview" data-article data-title="Overview" data-keywords="ade agent development environment projects tasks runs worktrees architecture">
+          <p class="doccrumb">Start / Overview</p>
+          <h1>Asylum documentation</h1>
+          <p class="doclead">Asylum is a native Agent Development Environment. It runs coding agents in isolated Git worktrees, records each attempt, and gives you one place to compare, verify, and merge the result.</p>
+          <div class="docstatus"><span class="livepulse"></span> Built features in this manual are backed by a working UI, CLI, or tested core.</div>
+          <h2>Core model</h2>
+          <div class="modelrows">
+            <div><code>Project</code><p>A Git repository registered with Asylum.</p></div>
+            <div><code>Task</code><p>The outcome you want agents to complete.</p></div>
+            <div><code>Run</code><p>One agent attempt in one branch and worktree.</p></div>
+          </div>
+          <h2>Workflow</h2>
+          <ol class="docsteps">
+            <li><strong>Set up</strong><span>Open a repository and verify Git, branches, agents, and project tooling.</span></li>
+            <li><strong>Dispatch</strong><span>Write one task and select one or more installed agents.</span></li>
+            <li><strong>Observe</strong><span>Watch each PTY, inspect its worktree, and retain terminal history.</span></li>
+            <li><strong>Review</strong><span>Compare diffs, comments, and detected project checks.</span></li>
+            <li><strong>Finish</strong><span>Merge the selected run or open a pull request.</span></li>
+          </ol>
+          <div class="docnext"><span>Next</span><a href="#install">Install Asylum <i data-lucide="arrow-right" aria-hidden="true"></i></a></div>
+        </article>
+
+        <article id="install" data-article data-title="Install" data-keywords="build cargo rust source clone dependencies macos linux install">
+          <p class="doccrumb">Start / Install</p>
+          <h1>Install</h1>
+          <p class="doclead">Asylum currently builds from source. You need Rust, Git, and at least one supported agent CLI.</p>
+          <h2>Prerequisites</h2>
+          <ul class="checklist">
+            <li>Rust toolchain with Cargo</li>
+            <li>Git available on <code>PATH</code></li>
+            <li>One signed-in coding-agent CLI</li>
+            <li>Bun for JavaScript project checks</li>
+          </ul>
+          <h2>Build and launch</h2>
+          <div class="codeblock">
+            <div><span>Terminal</span><button type="button" data-copy aria-label="Copy build command"><i data-lucide="copy" aria-hidden="true"></i></button></div>
+            <pre><code>git clone https://github.com/wess/asylum.git
+cd asylum
+cargo run -p app</code></pre>
+          </div>
+          <p>The development binary is named <code>asylumdev</code>, so it never collides with an installed release binary named <code>asylum</code>.</p>
+          <aside class="docnote"><i data-lucide="info" aria-hidden="true"></i><div><strong>First build</strong><p>Cargo fetches pinned GPUI, guise-ui, and libsinclair dependencies. This build takes longer than later launches.</p></div></aside>
+          <h2>Verify the workspace</h2>
+          <div class="codeblock">
+            <div><span>Terminal</span><button type="button" data-copy aria-label="Copy verification commands"><i data-lucide="copy" aria-hidden="true"></i></button></div>
+            <pre><code>cargo test --workspace
+cargo clippy --all-targets</code></pre>
+          </div>
+          <div class="docnext"><span>Next</span><a href="#firsttask">Run your first task <i data-lucide="arrow-right" aria-hidden="true"></i></a></div>
+        </article>
+
+        <article id="firsttask" data-article data-title="Run your first task" data-keywords="beginner open repository setup doctor create run task first">
+          <p class="doccrumb">Start / First task</p>
+          <h1>Run your first task</h1>
+          <p class="doclead">Start with one repository and one agent. Add parallel runs after the complete workflow feels familiar.</p>
+          <ol class="docsteps detailed">
+            <li><strong>Open a repository</strong><span>Select an existing Git repository. For a plain folder, Asylum asks before creating a repository and empty initial commit.</span></li>
+            <li><strong>Read Setup doctor</strong><span>Resolve blocked Git, branch, worktree, agent, Bun, or Cargo checks.</span></li>
+            <li><strong>Verify an agent</strong><span>Run the setup test. “Installed” means the executable exists; “verified” means it completed a real authenticated run.</span></li>
+            <li><strong>Describe the outcome</strong><span>Use a task template or write a concrete result with acceptance criteria.</span></li>
+            <li><strong>Create and run</strong><span>Asylum creates the branch, worktree, durable run row, and PTY in the background.</span></li>
+            <li><strong>Review the result</strong><span>Open Review, read the diff and checks, then merge or continue the run.</span></li>
+          </ol>
+          <aside class="docnote amber"><i data-lucide="lightbulb" aria-hidden="true"></i><div><strong>Good first task</strong><p>“Add a health endpoint returning JSON, include one test, and update the README.” It names a result and gives the agent a clear finish line.</p></div></aside>
+          <div class="docnext"><span>Practice</span><a href="../tutorials/#firsttask">Beginner: your first isolated task <i data-lucide="arrow-right" aria-hidden="true"></i></a></div>
+        </article>
+
+        <article id="agents" data-article data-title="Agents and fan-out" data-keywords="claude codex opencode gemini aider cursor parallel agent selection fanout queue">
+          <p class="doccrumb">Operate / Agents and fan-out</p>
+          <h1>Agents and fan-out</h1>
+          <p class="doclead">Asylum resolves an agent definition plus your preferences into a spawn specification. The app creates isolation before it launches the process.</p>
+          <h2>Built-in registry</h2>
+          <p>The registry includes Claude Code, Codex, OpenCode, Gemini, Aider, Cursor, and additional CLI agents. Settings can override the executable and append arguments without changing the built-in catalog.</p>
+          <h2>When to fan out</h2>
+          <div class="comparison">
+            <div><strong>One agent</strong><p>Small fixes, known implementation path, or low-cost work.</p></div>
+            <div><strong>Several agents</strong><p>Architecture choices, UI alternatives, uncertain bugs, or work where comparison improves confidence.</p></div>
+          </div>
+          <h2>Isolation contract</h2>
+          <p>Every plan receives a unique branch and absolute worktree path. The app persists that path before execution, so retries and review follow-ups continue in the same worktree.</p>
+          <div class="codeblock">
+            <div><span>Generated shape</span></div>
+            <pre><code>task: Add cache invalidation
+├── asylum/add-cache-42-claude-code  → .asylum/worktrees/...
+├── asylum/add-cache-42-opencode     → .asylum/worktrees/...
+└── asylum/add-cache-42-gemini       → .asylum/worktrees/...</code></pre>
+          </div>
+        </article>
+
+        <article id="runs" data-article data-title="Runs and terminals" data-keywords="pty terminal output retry cancel queue timeout history restart status">
+          <p class="doccrumb">Operate / Runs and terminals</p>
+          <h1>Runs and terminals</h1>
+          <p class="doclead">A run moves through queued, running, succeeded, failed, or cancelled states. Its worktree and transcript survive after the process exits.</p>
+          <h2>Run controls</h2>
+          <dl class="docdefinitions">
+            <div><dt>Cancel</dt><dd>Stops a queued or running attempt without deleting its worktree.</dd></div>
+            <div><dt>Retry</dt><dd>Starts another attempt in the same worktree and increments the attempt count.</dd></div>
+            <div><dt>Follow-up</dt><dd>Sends context to a live stdin-capable agent or queues a continuation.</dd></div>
+            <div><dt>Full terminal</dt><dd>Opens the persistent libsinclair terminal in a dedicated workspace tab.</dd></div>
+          </dl>
+          <h2>Restart recovery</h2>
+          <p>A PTY cannot survive the application process. On restart, Asylum marks interrupted runs failed and preserves their branches, worktrees, output, and retry path.</p>
+        </article>
+
+        <article id="review" data-article data-title="Review and merge" data-keywords="diff comments annotation checks pass fail merge pull request github conflicts cleanup">
+          <p class="doccrumb">Operate / Review and merge</p>
+          <h1>Review and merge</h1>
+          <p class="doclead">Select a run, then review its code, transcript, and checks together. Merge and pull-request actions stay blocked until the run is safe to finish.</p>
+          <h2>Inline feedback</h2>
+          <p>Click a diff line to attach a comment. “Send review to agent” batches unresolved comments into one continuation prompt and resolves them only after the queue operation succeeds.</p>
+          <h2>Automatic checks</h2>
+          <p>Asylum detects checks by project ecosystem. JavaScript projects use declared Bun scripts; Rust projects use Cargo. Each result is classified as pass, fail, or skipped.</p>
+          <h2>Merge preflight</h2>
+          <ul class="checklist">
+            <li>The selected run is finished.</li>
+            <li>Detected checks are not active or failing.</li>
+            <li>The base worktree has no uncommitted user changes.</li>
+            <li>The selected branch can merge without conflicts.</li>
+          </ul>
+          <p>The final confirmation performs the merge. Cleanup removes clean finished worktrees and preserves dirty worktrees and branches.</p>
+        </article>
+
+        <article id="memory" data-article data-title="Project memory" data-keywords="notes markdown obsidian wiki links backlinks tags properties yaml templates context task run">
+          <p class="doccrumb">Operate / Project memory</p>
+          <h1>Project memory</h1>
+          <p class="doclead">Project knowledge remains ordinary Markdown. Store it privately in Asylum’s data directory or in the repository’s <code>notes/</code> directory.</p>
+          <h2>Obsidian-style syntax</h2>
+          <div class="codeblock">
+            <div><span>cacheinvestigation.md</span><button type="button" data-copy aria-label="Copy note example"><i data-lucide="copy" aria-hidden="true"></i></button></div>
+            <pre><code>---
+title: Cache investigation
+type: investigation
+tags: [backend, reliability]
+---
+
+# Cache investigation
+
+The decision is in [[Cache policy|the policy]]. #active</code></pre>
+          </div>
+          <p>Properties, tags, wiki links, backlinks, autocomplete, and templates are indexed natively. Renaming a note updates incoming links across the vault.</p>
+          <h2>Agent context</h2>
+          <dl class="docdefinitions">
+            <div><dt>Create task</dt><dd>Turns the note into a task and makes it the source of truth.</dd></div>
+            <div><dt>Attach to run</dt><dd>Adds the note’s Markdown to an existing run’s durable context.</dd></div>
+            <div><dt>Send selection</dt><dd>Sends the exact selected passage to the current run.</dd></div>
+          </dl>
+          <p>Generated tasks, runs, checks, and pull requests append durable links back into the note.</p>
+        </article>
+
+        <article id="search" data-article data-title="Unified search" data-keywords="search ripgrep git grep notes tasks runs terminal transcripts files">
+          <p class="doccrumb">Operate / Unified search</p>
+          <h1>Unified search</h1>
+          <p class="doclead">One input searches repository files, notes, task prompts, run metadata, errors, and persisted terminal transcripts.</p>
+          <h2>Sources</h2>
+          <div class="modelrows">
+            <div><code>Files</code><p>Ripgrep with a Git grep fallback.</p></div>
+            <div><code>Notes</code><p>Title, path, body, tags, and linked content.</p></div>
+            <div><code>Tasks</code><p>Task titles and original prompts.</p></div>
+            <div><code>Runs</code><p>Agent, branch, output, and durable errors.</p></div>
+          </div>
+          <p>Selecting a result opens the owning surface and record, instead of leaving you in a detached search screen.</p>
+        </article>
+
+        <article id="config" data-article data-title="Project configuration" data-keywords="asylum.toml settings json keybindings environment setup commands base branch default agents">
+          <p class="doccrumb">Extend / Project configuration</p>
+          <h1>Project configuration</h1>
+          <p class="doclead">Commit <code>asylum.toml</code> at the repository root for shared defaults. Keep personal preferences in <code>settings.json</code>.</p>
+          <div class="codeblock">
+            <div><span>asylum.toml</span><button type="button" data-copy aria-label="Copy project configuration"><i data-lucide="copy" aria-hidden="true"></i></button></div>
+            <pre><code>base_branch = "main"
+default_agents = ["opencode"]
+setup = ["bun install"]
+
+[env]
+RUST_BACKTRACE = "1"</code></pre>
+          </div>
+          <p>Setup commands run once in every new worktree before the agent starts. A failed command creates a durable failed run with the worktree path and error.</p>
+          <h2>User settings</h2>
+          <p>Open Settings or edit <code>$XDG_CONFIG_HOME/asylum/settings.json</code>. The file accepts JSON with comments and live-reloads theme and keybindings. Invalid values produce diagnostics while valid settings remain active.</p>
+        </article>
+
+        <article id="plugins" data-article data-title="Plugins" data-keywords="plugin manifest toml process wasm capability command panel webview trigger tool sandbox">
+          <p class="doccrumb">Extend / Plugins</p>
+          <h1>Plugins</h1>
+          <p class="doclead">Plugins use a <code>plugin.toml</code> manifest and declare every capability they need. They can contribute commands, panels, webviews, triggers, and agent tools.</p>
+          <div class="codeblock">
+            <div><span>plugin.toml</span><button type="button" data-copy aria-label="Copy plugin manifest"><i data-lucide="copy" aria-hidden="true"></i></button></div>
+            <pre><code>id = "example.review"
+name = "Review helper"
+runtime = "process"
+command = ["bun", "run", "index.ts"]
+capabilities = ["notify"]
+
+[[command]]
+id = "summarize"
+title = "Summarize selected run"</code></pre>
+          </div>
+          <h2>Runtime choices</h2>
+          <div class="comparison"><div><strong>Process</strong><p>Newline JSON over stdio, one-shot or persistent session.</p></div><div><strong>WASM</strong><p>Sandboxed with wasmi; only declared host functions are linked.</p></div></div>
+          <div class="docnext"><span>Build one</span><a href="../tutorials/#plugin">Advanced: create a capability-gated plugin <i data-lucide="arrow-right" aria-hidden="true"></i></a></div>
+        </article>
+
+        <article id="cli" data-article data-title="CLI" data-keywords="command line worktree run search snapshot click fill computer use automation">
+          <p class="doccrumb">Extend / CLI</p>
+          <h1>CLI</h1>
+          <p class="doclead">The <code>asylum</code> binary exposes worktree operations, headless runs, search, and computer-use commands.</p>
+          <div class="codeblock">
+            <div><span>Terminal</span><button type="button" data-copy aria-label="Copy CLI examples"><i data-lucide="copy" aria-hidden="true"></i></button></div>
+            <pre><code>asylum worktree list /path/to/repo
+asylum run opencode "Add a health endpoint"
+asylum search /path/to/repo "cache key"
+asylum snapshot
+asylum click 420 280
+asylum fill "project name"</code></pre>
+          </div>
+          <p>The GUI and CLI share core crates for planning, Git operations, search, and execution. The CLI does not duplicate orchestration rules.</p>
+        </article>
+
+        <article id="troubleshooting" data-article data-title="Troubleshooting" data-keywords="error agent not found worktree dirty checks failed restart interrupted pages build">
+          <p class="doccrumb">Extend / Troubleshooting</p>
+          <h1>Troubleshooting</h1>
+          <div class="troubleshooting">
+            <details open><summary>Agent is installed but not verified</summary><p>Open Settings → Agents and run the setup test. Verification checks the executable, authentication, and real launch path.</p></details>
+            <details><summary>A run failed after restarting Asylum</summary><p>This is expected for a process that was active during shutdown. Retry the run to continue in its preserved worktree.</p></details>
+            <details><summary>Merge is blocked</summary><p>Resolve failed or active checks, clean user changes from the base worktree, and review any reported merge conflict.</p></details>
+            <details><summary>A worktree will not delete</summary><p>Asylum preserves dirty worktrees. Commit, move, or discard those changes explicitly before cleanup.</p></details>
+            <details><summary>JavaScript checks are skipped</summary><p>Declare <code>typecheck</code>, <code>lint</code>, or <code>test</code> scripts and make Bun available on <code>PATH</code>.</p></details>
+            <details><summary>Settings contain a diagnostic</summary><p>Fix the named key in <code>settings.json</code>. Other valid values remain active and defaults replace only invalid entries.</p></details>
+          </div>
+          <h2>Collect a useful report</h2>
+          <p>Include the task and run IDs, agent name, branch, worktree path, terminal output, failed check output, and the exact action that produced the problem.</p>
+          <a class="button quiet" href="https://github.com/wess/asylum/issues">Open a GitHub issue <i data-lucide="github" aria-hidden="true"></i></a>
+        </article>
+      </section>
+
+      <aside class="docoutline" aria-label="On this page">
+        <span>On this page</span>
+        <nav data-outline></nav>
+        <a href="https://github.com/wess/asylum/tree/main/docs"><i data-lucide="file-pen-line" aria-hidden="true"></i> Edit source docs</a>
+      </aside>
+    </main>
+    <script type="module" src="/src/docs.ts"></script>
+  </body>
+</html>

@@ -5,8 +5,8 @@
 use gpui::prelude::*;
 use gpui::{div, px, Entity, IntoElement, SharedString};
 use guise::prelude::*;
-use guise::Switch;
 
+use crate::control::{Button, Switch};
 use crate::state::Root;
 
 /// The whole surface: a design toolbar, the collected annotations, and the
@@ -92,21 +92,25 @@ fn toolbar(
             )
             .child(div().flex_1().child(note))
             .child(
-                Button::new(SharedString::from(format!("attach-note-{wid}")), "Attach note")
-                    .size(Size::Xs)
-                    .variant(Variant::Filled)
-                    .on_click(move |_, _, cx| {
-                        let text = note_read.read(cx).text();
-                        let mut pinned = None;
-                        attach.update(cx, |root, cx| {
-                            pinned = root.attach_design_note(&text);
-                            cx.notify();
-                        });
-                        if let Some((selector, n)) = pinned {
-                            wv.read(cx).evaluate_script(&designmode::pin_js(&selector, n));
-                        }
-                        note_read.update(cx, |n, cx| n.set_text("", cx));
-                    }),
+                Button::new(
+                    SharedString::from(format!("attach-note-{wid}")),
+                    "Attach note",
+                )
+                .size(Size::Xs)
+                .variant(Variant::Filled)
+                .on_click(move |_, _, cx| {
+                    let text = note_read.read(cx).text();
+                    let mut pinned = None;
+                    attach.update(cx, |root, cx| {
+                        pinned = root.attach_design_note(&text);
+                        cx.notify();
+                    });
+                    if let Some((selector, n)) = pinned {
+                        wv.read(cx)
+                            .evaluate_script(&designmode::pin_js(&selector, n));
+                    }
+                    note_read.update(cx, |n, cx| n.set_text("", cx));
+                }),
             )
             .child(
                 Button::new(SharedString::from(format!("dismiss-note-{wid}")), "Dismiss")
@@ -171,6 +175,13 @@ fn annotation_strip(
                         .id(SharedString::from(format!("design-x-{wid}-{i}")))
                         .px(px(4.0))
                         .cursor_pointer()
+                        .tab_index(0)
+                        .role(gpui::accesskit::Role::Button)
+                        .aria_label(SharedString::from(format!(
+                            "Remove design annotation {}",
+                            i + 1
+                        )))
+                        .focus_visible(|style| style.border_1().border_color(gpui::rgb(0x3b82f6)))
                         .child(Text::new("×").size(Size::Xs).dimmed())
                         .on_click(move |_, _, cx| {
                             let mut js = String::new();

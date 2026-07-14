@@ -12,7 +12,13 @@ use guise::overlay::ContextMenu;
 use crate::state::{Root, View};
 
 /// The context menu for a project row.
-pub fn project(handle: Entity<Root>, id: i64, pos: Point<Pixels>, window: &mut Window, cx: &mut App) {
+pub fn project(
+    handle: Entity<Root>,
+    id: i64,
+    pos: Point<Pixels>,
+    window: &mut Window,
+    cx: &mut App,
+) {
     let h = handle.clone();
     handle.update(cx, |root, cx| {
         let pinned = root.db.project(id).map(|p| p.pinned).unwrap_or(false);
@@ -65,7 +71,7 @@ pub fn project(handle: Entity<Root>, id: i64, pos: Point<Pixels>, window: &mut W
             let a = h.clone();
             m = m.danger_item("Remove project", move |_, cx| {
                 a.update(cx, |r, c| {
-                    r.remove_project(id);
+                    r.confirm = Some(crate::run::ConfirmAction::DeleteProject(id));
                     c.notify();
                 });
             });
@@ -88,7 +94,7 @@ pub fn task(handle: Entity<Root>, id: i64, pos: Point<Pixels>, window: &mut Wind
             m = m.item("Fan out to agents", move |window, cx| {
                 a.update(cx, |r, c| {
                     r.task_id = Some(id);
-                    r.run_fanout();
+                    r.run_fanout(window, c);
                     r.open_view(View::Tasks, window, c);
                     c.notify();
                 });
@@ -106,7 +112,7 @@ pub fn task(handle: Entity<Root>, id: i64, pos: Point<Pixels>, window: &mut Wind
             let a = h.clone();
             m = m.item("Archive", move |_, cx| {
                 a.update(cx, |r, c| {
-                    r.archive_task(id);
+                    r.confirm = Some(crate::run::ConfirmAction::ArchiveTask(id));
                     c.notify();
                 });
             });
@@ -115,7 +121,7 @@ pub fn task(handle: Entity<Root>, id: i64, pos: Point<Pixels>, window: &mut Wind
             let a = h.clone();
             m = m.danger_item("Delete task", move |_, cx| {
                 a.update(cx, |r, c| {
-                    r.delete_task(id);
+                    r.confirm = Some(crate::run::ConfirmAction::DeleteTask(id));
                     c.notify();
                 });
             });
@@ -131,13 +137,15 @@ pub fn task(handle: Entity<Root>, id: i64, pos: Point<Pixels>, window: &mut Wind
 pub fn run(handle: Entity<Root>, id: i64, pos: Point<Pixels>, window: &mut Window, cx: &mut App) {
     let h = handle.clone();
     handle.update(cx, |root, cx| {
+        let status = root.db.run(id).ok().map(|run| run.status);
         let menu = cx.new(|cx| {
             let mut m = ContextMenu::new(cx).section("Run");
 
             let a = h.clone();
             m = m.item("Open terminal", move |window, cx| {
                 a.update(cx, |r, c| {
-                    r.open_view(View::Terminal, window, c);
+                    r.open_run_terminal(id);
+                    let _ = window;
                     c.notify();
                 });
             });
@@ -145,35 +153,50 @@ pub fn run(handle: Entity<Root>, id: i64, pos: Point<Pixels>, window: &mut Windo
             let a = h.clone();
             m = m.item("Review diff", move |window, cx| {
                 a.update(cx, |r, c| {
+                    r.select_run(id);
                     r.open_view(View::Diff, window, c);
                     c.notify();
                 });
             });
 
-            let a = h.clone();
-            m = m.item("Merge winner", move |_, cx| {
-                a.update(cx, |r, c| {
-                    r.merge_run(id);
-                    c.notify();
+            if status == Some(store::RunStatus::Succeeded) {
+                let a = h.clone();
+                m = m.item("Merge winner", move |_, cx| {
+                    a.update(cx, |r, c| {
+                        r.request_merge(id);
+                        c.notify();
+                    });
                 });
-            });
 
-            let a = h.clone();
-            m = m.item("Create PR", move |_, cx| {
-                a.update(cx, |r, c| {
-                    r.create_pr_for_run(id);
-                    c.notify();
+                let a = h.clone();
+                m = m.item("Create PR", move |_, cx| {
+                    a.update(cx, |r, c| {
+                        r.create_pr_for_run(id);
+                        c.notify();
+                    });
                 });
-            });
+            }
 
             m = m.divider();
-            let a = h.clone();
-            m = m.danger_item("Cancel run", move |_, cx| {
-                a.update(cx, |r, c| {
-                    let _ = r.db.cancel_run(id, crate::state::now());
-                    c.notify();
+            if status.is_some_and(|status| {
+                matches!(status, store::RunStatus::Queued | store::RunStatus::Running)
+            }) {
+                let a = h.clone();
+                m = m.danger_item("Cancel run", move |_, cx| {
+                    a.update(cx, |r, c| {
+                        r.cancel_run(id, c);
+                        c.notify();
+                    });
                 });
-            });
+            } else if status.is_some_and(store::RunStatus::is_terminal) {
+                let a = h.clone();
+                m = m.item("Retry run", move |window, cx| {
+                    a.update(cx, |r, c| {
+                        r.retry_run(id, window, c);
+                        c.notify();
+                    });
+                });
+            }
             m
         });
         menu.update(cx, |m, cx| m.show(pos, window, cx));

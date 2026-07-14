@@ -55,30 +55,38 @@ fn plugin_card(p: plugin::Plugin) -> impl IntoElement {
         None => "none",
     };
 
-    let mut body = div()
-        .flex()
-        .flex_col()
-        .gap_2()
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .gap_2()
-                .child(Text::new(SharedString::from(p.name.clone())).bold())
-                .child(Text::new(SharedString::from(format!("v{}", p.version))).size(Size::Xs).dimmed())
-                .child(Badge::new(runtime).variant(Variant::Light)),
-        );
+    let mut body = div().flex().flex_col().gap_2().child(
+        div()
+            .flex()
+            .flex_row()
+            .items_center()
+            .gap_2()
+            .child(Text::new(SharedString::from(p.name.clone())).bold())
+            .child(
+                Text::new(SharedString::from(format!("v{}", p.version)))
+                    .size(Size::Xs)
+                    .dimmed(),
+            )
+            .child(Badge::new(runtime).variant(Variant::Light)),
+    );
 
     if let Some(desc) = &p.description {
-        body = body.child(Text::new(SharedString::from(desc.clone())).size(Size::Sm).dimmed());
+        body = body.child(
+            Text::new(SharedString::from(desc.clone()))
+                .size(Size::Sm)
+                .dimmed(),
+        );
     }
 
     // Capabilities.
     if !p.capabilities.is_empty() {
         let mut caps = div().flex().flex_row().flex_wrap().gap_1();
         for cap in &p.capabilities {
-            caps = caps.child(Badge::new(SharedString::from(cap.clone())).color(ColorName::Blue).variant(Variant::Light));
+            caps = caps.child(
+                Badge::new(SharedString::from(cap.clone()))
+                    .color(ColorName::Blue)
+                    .variant(Variant::Light),
+            );
         }
         body = body.child(caps);
     }
@@ -87,9 +95,8 @@ fn plugin_card(p: plugin::Plugin) -> impl IntoElement {
     if !p.commands.is_empty() {
         let mut cmds = div().flex().flex_col().gap_1();
         for c in &p.commands {
-            cmds = cmds.child(
-                Text::new(SharedString::from(format!("⌘ {}", c.title))).size(Size::Sm),
-            );
+            cmds =
+                cmds.child(Text::new(SharedString::from(format!("⌘ {}", c.title))).size(Size::Sm));
         }
         body = body.child(Divider::new()).child(cmds);
     }

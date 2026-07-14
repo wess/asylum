@@ -18,12 +18,14 @@ pub enum TabKind {
     Tasks,
     Diff,
     Search,
+    Notes,
     Integrations,
     Accounts,
     Inbox,
     Plugins,
     Settings,
     Terminal(Entity<TermView>),
+    Run(i64),
     Editor(Entity<Editor>, String),
     Browser(Entity<WebView>),
     Preview(Entity<WebView>),
@@ -35,12 +37,14 @@ pub enum TabKey {
     Tasks,
     Diff,
     Search,
+    Notes,
     Integrations,
     Accounts,
     Inbox,
     Plugins,
     Settings,
     Terminal,
+    Run,
     Editor,
     Browser,
     Preview,
@@ -52,12 +56,14 @@ impl TabKind {
             TabKind::Tasks => TabKey::Tasks,
             TabKind::Diff => TabKey::Diff,
             TabKind::Search => TabKey::Search,
+            TabKind::Notes => TabKey::Notes,
             TabKind::Integrations => TabKey::Integrations,
             TabKind::Accounts => TabKey::Accounts,
             TabKind::Inbox => TabKey::Inbox,
             TabKind::Plugins => TabKey::Plugins,
             TabKind::Settings => TabKey::Settings,
             TabKind::Terminal(_) => TabKey::Terminal,
+            TabKind::Run(_) => TabKey::Run,
             TabKind::Editor(..) => TabKey::Editor,
             TabKind::Browser(_) => TabKey::Browser,
             TabKind::Preview(_) => TabKey::Preview,
@@ -70,12 +76,14 @@ impl TabKind {
             TabKey::Tasks => "list-todo",
             TabKey::Diff => "git-compare",
             TabKey::Search => "search",
+            TabKey::Notes => "file-pen",
             TabKey::Integrations => "github",
             TabKey::Accounts => "circle-user",
             TabKey::Inbox => "inbox",
             TabKey::Plugins => "puzzle",
             TabKey::Settings => "settings",
             TabKey::Terminal => "terminal",
+            TabKey::Run => "terminal",
             TabKey::Editor => "file-pen",
             TabKey::Browser => "globe",
             TabKey::Preview => "eye",
@@ -88,17 +96,15 @@ impl TabKind {
             TabKind::Tasks => "Tasks".into(),
             TabKind::Diff => "Diff".into(),
             TabKind::Search => "Search".into(),
+            TabKind::Notes => "Notes".into(),
             TabKind::Integrations => "Integrations".into(),
             TabKind::Accounts => "Accounts".into(),
             TabKind::Inbox => "Inbox".into(),
             TabKind::Plugins => "Plugins".into(),
             TabKind::Settings => "Settings".into(),
             TabKind::Terminal(_) => "Terminal".into(),
-            TabKind::Editor(_, file) => file
-                .rsplit('/')
-                .next()
-                .unwrap_or(file)
-                .to_string(),
+            TabKind::Run(id) => format!("Run {id}"),
+            TabKind::Editor(_, file) => file.rsplit('/').next().unwrap_or(file).to_string(),
             TabKind::Browser(_) => "Browser".into(),
             TabKind::Preview(_) => "Preview".into(),
         }
@@ -108,7 +114,7 @@ impl TabKind {
     fn singleton(&self) -> bool {
         !matches!(
             self.key(),
-            TabKey::Terminal | TabKey::Editor | TabKey::Browser | TabKey::Preview
+            TabKey::Terminal | TabKey::Run | TabKey::Editor | TabKey::Browser | TabKey::Preview
         )
     }
 }

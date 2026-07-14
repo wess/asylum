@@ -82,7 +82,10 @@ pub fn merge_base(repo: &Path, a: &str, b: &str) -> Result<Option<String>, Error
 /// returning the conflicted paths. Uses `git merge-tree`, which computes the
 /// merge in memory and touches neither the index nor the working tree.
 pub fn would_conflict(repo: &Path, ours: &str, theirs: &str) -> Result<Vec<String>, Error> {
-    let out = git_capture(repo, &["merge-tree", "--write-tree", "--name-only", ours, theirs])?;
+    let out = git_capture(
+        repo,
+        &["merge-tree", "--write-tree", "--name-only", ours, theirs],
+    )?;
     if out.success {
         return Ok(Vec::new());
     }
@@ -130,6 +133,29 @@ pub fn merge(repo: &Path, branch: &str) -> Result<MergeOutcome, Error> {
 pub fn abort_merge(repo: &Path) -> Result<(), Error> {
     git(repo, &["merge", "--abort"])?;
     Ok(())
+}
+
+/// Commit every tracked and untracked change in a completed run worktree.
+/// Returns false when the worktree is already clean. The local identity is
+/// scoped to this invocation and never mutates user git configuration.
+pub fn commit_all(repo: &Path, message: &str) -> Result<bool, Error> {
+    if crate::status::status(repo)?.is_empty() {
+        return Ok(false);
+    }
+    git(repo, &["add", "--all"])?;
+    git(
+        repo,
+        &[
+            "-c",
+            "user.name=Asylum",
+            "-c",
+            "user.email=asylum@localhost",
+            "commit",
+            "-m",
+            message,
+        ],
+    )?;
+    Ok(true)
 }
 
 fn parse_branches(out: &str) -> Vec<Branch> {

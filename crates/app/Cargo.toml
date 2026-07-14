@@ -6,6 +6,9 @@ edition.workspace = true
 license.workspace = true
 description = "Asylum — an Agent Development Environment."
 
+[features]
+sitecapture = ["gpui/test-support", "gpui_platform/test-support"]
+
 # The bin is `asylumdev`: a dev build never collides with an installed `asylum`.
 # Release packaging installs this same binary as `asylum`.
 [[bin]]
@@ -32,6 +35,7 @@ git = { path = "../git" }
 github = { path = "../github" }
 linear = { path = "../linear" }
 notify = { path = "../notify" }
+notes = { path = "../notes" }
 plugin = { path = "../plugin" }
 pluginrt = { path = "../pluginrt" }
 preview = { path = "../preview" }

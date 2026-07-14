@@ -1,13 +1,15 @@
 //! Run a worktree's checks - type-check, lint, test - and report PASS/FAIL.
 //!
-//! A run's health is shown with PASS/FAIL indicators from type checking,
-//! ESLint, and tests. This crate detects the appropriate checks for a project
-//! (by the files present), runs them, and classifies each by exit status. The
-//! detection and classification are pure and tested; running shells out.
+//! A run's health is shown with PASS/FAIL indicators from declared Bun scripts
+//! and Cargo commands. This crate detects the appropriate checks for a project,
+//! runs them, and classifies each by exit status. Detection and classification
+//! are pure and tested; running shells out.
 
 use std::path::Path;
 use std::process::Command;
 use std::time::Instant;
+
+use serde_json::Value;
 
 /// A named check: a command to run in the worktree.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,33 +65,42 @@ pub struct CheckResult {
 }
 
 /// Detect the checks appropriate for the project rooted at `dir`, from the
-/// files it contains. Node projects get typecheck/lint/test; Rust projects get
-/// check/clippy/test; both may apply in a polyglot repo.
+/// files it contains. Bun projects run only scripts the package declares;
+/// Rust projects get check/clippy/test. Both may apply in a polyglot repo.
 pub fn detect(dir: &Path) -> Vec<Check> {
     let mut checks = Vec::new();
     let has = |name: &str| dir.join(name).exists();
 
     if has("package.json") {
-        if has("tsconfig.json") {
-            checks.push(Check::new(
-                "typecheck",
-                "Type check",
-                "npx",
-                &["tsc", "--noEmit"],
-            ));
+        let scripts = std::fs::read_to_string(dir.join("package.json"))
+            .ok()
+            .and_then(|source| serde_json::from_str::<Value>(&source).ok())
+            .and_then(|package| package.get("scripts")?.as_object().cloned())
+            .unwrap_or_default();
+        for (id, label) in [
+            ("typecheck", "Type check"),
+            ("lint", "Lint"),
+            ("test", "Tests"),
+        ] {
+            if scripts.get(id).is_some_and(Value::is_string) {
+                checks.push(Check::new(&format!("bun/{id}"), label, "bun", &["run", id]));
+            }
         }
-        checks.push(Check::new("lint", "ESLint", "npx", &["eslint", "."]));
-        checks.push(Check::new("test", "Tests", "npm", &["test", "--silent"]));
     }
     if has("Cargo.toml") {
-        checks.push(Check::new("check", "cargo check", "cargo", &["check"]));
         checks.push(Check::new(
-            "clippy",
+            "cargo/check",
+            "cargo check",
+            "cargo",
+            &["check"],
+        ));
+        checks.push(Check::new(
+            "cargo/clippy",
             "Clippy",
             "cargo",
             &["clippy", "--all-targets"],
         ));
-        checks.push(Check::new("test", "cargo test", "cargo", &["test"]));
+        checks.push(Check::new("cargo/test", "cargo test", "cargo", &["test"]));
     }
     checks
 }
