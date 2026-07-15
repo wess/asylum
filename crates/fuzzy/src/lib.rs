@@ -89,7 +89,11 @@ where
         .enumerate()
         .filter_map(|(index, c)| {
             let value = c.as_ref();
-            score(query, value).map(|score| Match { index, value, score })
+            score(query, value).map(|score| Match {
+                index,
+                value,
+                score,
+            })
         })
         .collect();
     // Stable sort by score desc; equal scores keep input order.

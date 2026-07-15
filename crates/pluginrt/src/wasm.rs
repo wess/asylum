@@ -22,9 +22,30 @@
 use std::collections::HashSet;
 
 use serde_json::Value;
-use wasmi::{Caller, Engine, Extern, Linker, Memory, Module, Store};
+use wasmi::{
+    Caller, Config, Engine, Extern, Linker, Memory, Module, Store, StoreLimits, StoreLimitsBuilder,
+};
 
 use crate::Error;
+
+/// Ceiling on a guest's linear memory. A plugin cannot grow past this, so a
+/// runaway allocation traps instead of exhausting host memory.
+const MEMORY_MAX_BYTES: usize = 64 * 1024 * 1024;
+/// Ceiling on a guest's table size (function-pointer table growth).
+const TABLE_MAX_ELEMENTS: u32 = 100_000;
+/// Fuel granted for instantiation (the module's `start`, if any).
+const FUEL_INSTANTIATE: u64 = 50_000_000;
+/// Fuel granted per `invoke` call. Fuel is roughly one unit per executed
+/// instruction, so an infinite loop exhausts it and traps deterministically.
+const FUEL_PER_CALL: u64 = 200_000_000;
+/// Ceiling on the JSON result a guest may return from `invoke`, so a bogus
+/// `(ptr, len)` cannot make the host allocate an enormous buffer.
+const MAX_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
+/// Ceiling on total bytes retained from `host_log` across a runtime's life, so a
+/// log flood cannot exhaust host memory.
+const MAX_LOG_BYTES: usize = 64 * 1024;
+/// Ceiling on a single `host_log` line the host will read from guest memory.
+const MAX_LOG_LINE_BYTES: usize = 8 * 1024;
 
 /// The host-side state a guest's imports operate on.
 pub struct HostState {
@@ -32,6 +53,39 @@ pub struct HostState {
     caps: HashSet<String>,
     /// Log lines the guest emitted via `host_log` (surfaced to the app).
     pub logs: Vec<String>,
+    /// Running total of retained log bytes, bounded by [`MAX_LOG_BYTES`].
+    log_bytes: usize,
+    /// Memory/table growth limits enforced by wasmi on this store.
+    limits: StoreLimits,
+}
+
+impl HostState {
+    /// Append a guest log line, dropping it (or the overflow) once the total log
+    /// budget is spent, so a flood of `host_log` calls cannot grow unbounded.
+    fn push_log(&mut self, mut text: String) {
+        if self.log_bytes >= MAX_LOG_BYTES {
+            return;
+        }
+        let remaining = MAX_LOG_BYTES - self.log_bytes;
+        if text.len() > remaining {
+            text.truncate(floor_char_boundary(&text, remaining));
+        }
+        self.log_bytes += text.len();
+        self.logs.push(text);
+    }
+}
+
+/// Largest char-boundary index at or below `max` (stable-Rust replacement for
+/// the nightly `str::floor_char_boundary`).
+fn floor_char_boundary(s: &str, max: usize) -> usize {
+    if max >= s.len() {
+        return s.len();
+    }
+    let mut i = max;
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
 }
 
 /// A loaded, instantiated WASM plugin ready to answer `invoke` calls.
@@ -43,27 +97,48 @@ pub struct WasmRuntime {
 }
 
 impl WasmRuntime {
-    /// Load and instantiate `wasm_bytes`, granting `capabilities`.
+    /// Load and instantiate `wasm_bytes`, granting `capabilities`. The store is
+    /// fuel-metered and memory/table-limited, so a defective or hostile guest
+    /// fails safely within deterministic bounds instead of monopolizing the host.
     pub fn new(wasm_bytes: &[u8], capabilities: &[String]) -> Result<Self, Error> {
-        let engine = Engine::default();
+        let mut config = Config::default();
+        config.consume_fuel(true);
+        let engine = Engine::new(&config);
         let module =
             Module::new(&engine, wasm_bytes).map_err(|e| Error::Protocol(e.to_string()))?;
 
+        let limits = StoreLimitsBuilder::new()
+            .memory_size(MEMORY_MAX_BYTES)
+            .table_elements(TABLE_MAX_ELEMENTS)
+            .memories(1)
+            .tables(4)
+            .instances(1)
+            // Trap on an over-limit grow instead of returning -1, so a runaway
+            // allocation surfaces as an error rather than odd guest behavior.
+            .trap_on_grow_failure(true)
+            .build();
         let state = HostState {
             caps: capabilities.iter().cloned().collect(),
             logs: Vec::new(),
+            log_bytes: 0,
+            limits,
         };
         let mut store = Store::new(&engine, state);
+        store.limiter(|s| &mut s.limits);
+        // Budget for instantiation (a module `start`, if present).
+        store
+            .add_fuel(FUEL_INSTANTIATE)
+            .map_err(|e| Error::Protocol(e.to_string()))?;
         let mut linker: Linker<HostState> = Linker::new(&engine);
 
-        // Always-linked: logging. Ungated, harmless.
+        // Always-linked: logging. Ungated, harmless. Bounded by MAX_LOG_BYTES.
         linker
             .func_wrap(
                 "env",
                 "host_log",
                 |mut caller: Caller<'_, HostState>, ptr: i32, len: i32| {
                     if let Some(text) = read_string(&caller, ptr, len) {
-                        caller.data_mut().logs.push(text);
+                        caller.data_mut().push_log(text);
                     }
                 },
             )
@@ -77,7 +152,7 @@ impl WasmRuntime {
                     "host_notify",
                     |mut caller: Caller<'_, HostState>, ptr: i32, len: i32| {
                         if let Some(text) = read_string(&caller, ptr, len) {
-                            caller.data_mut().logs.push(format!("notify: {text}"));
+                            caller.data_mut().push_log(format!("notify: {text}"));
                         }
                     },
                 )
@@ -110,6 +185,12 @@ impl WasmRuntime {
     /// Call the plugin's `invoke` with a method name and JSON params, returning
     /// the parsed JSON result.
     pub fn call(&mut self, method: &str, params: &Value) -> Result<Value, Error> {
+        // Grant this call a bounded fuel budget; an infinite loop traps when it
+        // runs out rather than hanging the host.
+        self.store
+            .add_fuel(FUEL_PER_CALL)
+            .map_err(|e| Error::Protocol(e.to_string()))?;
+
         let params_str = params.to_string();
         let (mp, ml) = self.write_bytes(method.as_bytes())?;
         let (pp, pl) = self.write_bytes(params_str.as_bytes())?;
@@ -121,6 +202,12 @@ impl WasmRuntime {
         let ptr = (packed >> 32) as u32 as usize;
         let len = (packed & 0xffff_ffff) as u32 as usize;
 
+        // Refuse an oversized result before allocating for it.
+        if len > MAX_RESPONSE_BYTES {
+            return Err(Error::Protocol(format!(
+                "plugin result too large: {len} bytes (max {MAX_RESPONSE_BYTES})"
+            )));
+        }
         let mut buf = vec![0u8; len];
         self.memory
             .read(&self.store, ptr, &mut buf)
@@ -151,12 +238,13 @@ impl WasmRuntime {
     }
 }
 
-/// Read a UTF-8 string from a caller's guest memory.
+/// Read a UTF-8 string from a caller's guest memory, capped at
+/// [`MAX_LOG_LINE_BYTES`] so a huge `len` cannot make the host allocate an
+/// enormous buffer.
 fn read_string(caller: &Caller<'_, HostState>, ptr: i32, len: i32) -> Option<String> {
-    let memory = caller
-        .get_export("memory")
-        .and_then(Extern::into_memory)?;
-    let mut buf = vec![0u8; len.max(0) as usize];
+    let memory = caller.get_export("memory").and_then(Extern::into_memory)?;
+    let want = (len.max(0) as usize).min(MAX_LOG_LINE_BYTES);
+    let mut buf = vec![0u8; want];
     memory.read(caller, ptr as usize, &mut buf).ok()?;
     Some(String::from_utf8_lossy(&buf).into_owned())
 }

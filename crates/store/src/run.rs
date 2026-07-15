@@ -21,6 +21,7 @@ fn from_row(row: &Row) -> rusqlite::Result<Run> {
         error: row.get("error")?,
         attempt: row.get("attempt")?,
         prompt: row.get("prompt")?,
+        activity: row.get("activity")?,
     })
 }
 
@@ -140,6 +141,20 @@ impl Db {
         Ok(())
     }
 
+    /// Set a run's live semantic activity (`idle`/`working`/`blocked`/`done`),
+    /// or clear it with `None`. Ephemeral display state, independent of the
+    /// lifecycle `status`.
+    pub fn set_run_activity(&self, id: i64, activity: Option<&str>) -> Result<()> {
+        let n = self.conn().execute(
+            "UPDATE runs SET activity = ?2 WHERE id = ?1",
+            params![id, activity],
+        )?;
+        if n == 0 {
+            return Err(Error::NotFound);
+        }
+        Ok(())
+    }
+
     /// Persist a live transcript snapshot without changing lifecycle state.
     pub fn save_run_output(&self, id: i64, output: &str) -> Result<()> {
         let n = self.conn().execute(
@@ -157,7 +172,7 @@ impl Db {
         let n = self.conn().execute(
             "UPDATE runs SET status = 'queued', started_at = NULL, ended_at = NULL,
                     exit_code = NULL, output = '', error = NULL, prompt = NULL,
-                    attempt = attempt + 1 WHERE id = ?1",
+                    activity = NULL, attempt = attempt + 1 WHERE id = ?1",
             params![id],
         )?;
         if n == 0 {
@@ -171,7 +186,7 @@ impl Db {
         let n = self.conn().execute(
             "UPDATE runs SET status = 'queued', started_at = NULL, ended_at = NULL,
                     exit_code = NULL, output = '', error = NULL, prompt = ?2,
-                    attempt = attempt + 1 WHERE id = ?1",
+                    activity = NULL, attempt = attempt + 1 WHERE id = ?1",
             params![id, prompt],
         )?;
         if n == 0 {

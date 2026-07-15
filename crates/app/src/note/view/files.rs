@@ -74,6 +74,30 @@ pub(super) fn pane(
         .child(header)
         .child(div().px(px(8.0)).pb(px(7.0)).child(search));
 
+    if let Some(tag) = root.note.tag_filter.clone() {
+        let clear = handle.clone();
+        pane = pane.child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_1()
+                .mx(px(8.0))
+                .mb(px(6.0))
+                .child(Text::new(SharedString::from(format!("#{tag}"))).size(Size::Xs))
+                .child(icon_button(
+                    "clear-tag-filter",
+                    "x",
+                    "Clear tag filter",
+                    palette.dimmed,
+                    palette.hover,
+                    move |_, cx| {
+                        clear.update(cx, |root, cx| root.clear_note_tag_filter(cx));
+                    },
+                )),
+        );
+    }
+
     let toggle = handle.clone();
     pane = pane.child(
         div()
@@ -125,6 +149,27 @@ pub(super) fn pane(
             .on_click(move |_, _, cx| {
                 create.update(cx, |root, cx| {
                     root.create_note(kind, cx);
+                    root.note.templates_open = false;
+                    cx.notify();
+                });
+            }),
+        );
+    }
+    // User templates from the vault's .templates/ folder.
+    for user in notes::user_templates(&root.note.root).unwrap_or_default() {
+        let create = handle.clone();
+        let body = user.body.clone();
+        templates = templates.child(
+            Button::new(
+                SharedString::from(format!("usertemplate-{}", user.name)),
+                SharedString::from(user.name.clone()),
+            )
+            .size(Size::Xs)
+            .variant(Variant::Subtle)
+            .on_click(move |_, _, cx| {
+                let body = body.clone();
+                create.update(cx, |root, cx| {
+                    root.create_note_from_template(body, cx);
                     root.note.templates_open = false;
                     cx.notify();
                 });

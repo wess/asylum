@@ -16,11 +16,13 @@
 //! The crate is pure and gpui-free: it never spawns a process itself. The app
 //! layer takes a [`SpawnSpec`] and runs it inside an embedded terminal pane.
 
+pub mod activity;
 pub mod command;
 pub mod doctor;
 pub mod plan;
 pub mod registry;
 
+pub use activity::{classify, default_rules, rules_for, Activity, ActivityRules};
 pub use command::SpawnSpec;
 pub use plan::{slugify, RunPlan};
 pub use registry::{builtins, catalog, find, resolve, Agent, AgentDef, Delivery};

@@ -6,10 +6,11 @@ below it; the core crates are gpui-free and the boundary is `app`.
 ```
 app  ─────────────────────────────  gpui + guise-ui + libsinclair
  │
- ├── agent ── config                 registry, command build, fan-out plan
- ├── plugin ── pluginrt              manifests + process runtime
+ ├── agent ── config                 registry, command build, fan-out plan, activity
+ ├── plugin ── pluginrt              manifests + process runtime + GitHub install
+ ├── companion / control ── store    mobile + agent JSON servers over the store
  ├── notes                           Markdown vault + knowledge index
- ├── store                           SQLite: projects / tasks / runs
+ ├── store                           SQLite: projects / tasks / runs / events
  └── git                             worktrees, status, diff
 ```
 
@@ -28,10 +29,19 @@ onto the crates like this:
 4. **Launch.** `agent::command::build(def, prefs, prompt, cwd)` produces a
    `SpawnSpec` (program, args, cwd, optional stdin). The app runs it on a pty
    inside a `libsinclair` terminal pane. `store::Db::start_run` marks it running.
-5. **Track.** Pty events snapshot terminal output into SQLite. Exit updates the
-   durable status, commits a successful run's worktree changes, and starts that
-   worktree's detected checks. The queue launches another run when capacity
-   opens.
+5. **Track.** Pty events snapshot terminal output into SQLite. Each snapshot is
+   also classified into a **semantic activity** (`agent::activity`:
+   working / blocked / done / idle) so the board shows which agent is *blocked
+   waiting on you*, and every transition appends to the `store` event log. Exit
+   updates the durable status, commits a successful run's worktree changes, and
+   starts that worktree's detected checks. The queue launches another run when
+   capacity opens.
+   - **Agents can steer.** The app injects control-surface env vars into each
+     run (`ASYLUM_CONTROL_URL`, `ASYLUM_TASK_ID`, `ASYLUM_RUN_ID`). A running
+     agent uses the `control` server to spawn a helper run, read a sibling,
+     report its state, run checks, or wait on another run. Write-effects are
+     queued as `store::ControlRequest`s and drained by the app on a timer,
+     exactly like mobile follow-ups.
 6. **Review.** `git::diff::since_fork(worktree, base_branch)` yields the selected
    run's diff. Review comments queue another attempt in the same worktree and
    survive app restarts.
@@ -40,7 +50,7 @@ onto the crates like this:
    confirmation. Cleanup removes clean finished worktrees and keeps branches.
 
 Project memory crosses this loop without replacing it. `notes` indexes plain
-Markdown and Obsidian-style metadata; `store` remembers the selected vault and
+Markdown and wiki-style metadata; `store` remembers the selected vault and
 note attachments. Task attachments are inherited by every generated run, their
 Markdown is appended to the launch prompt, and run/check/PR links are written
 back to the attached notes.
@@ -59,7 +69,11 @@ old/new line numbers so annotations can anchor to a side.
 the gpui app has no tokio. `schema.rs` runs ordered migrations guarded by
 `PRAGMA user_version`. `model.rs` holds the row types and their status enums
 (round-tripped through lowercase tokens). `project.rs` / `task.rs` / `run.rs`
-are the CRUD, implemented as inherent methods on `Db`.
+are the CRUD, implemented as inherent methods on `Db`. A run also carries a
+live `activity` token (ephemeral, distinct from the lifecycle `status`).
+`control.rs` is the agent control-request queue and `event.rs` the append-only
+event log both servers replay from a cursor; both follow the `followup.rs`
+drain contract.
 
 ### `notes`
 Plain Markdown is the source of truth. `vault.rs` performs path-safe recursive
@@ -71,7 +85,8 @@ gpui or SQLite.
 
 ### `config`
 `model.rs` is the typed `Settings` schema with serde defaults so a partial file
-still deserializes. `jsonc.rs` blanks `//` and `/* */` comments to spaces
+still deserializes — including named fan-out `Layout` presets (built-in
+`duel` / `triad` / `swarm`, overridable) and the `control` server prefs. `jsonc.rs` blanks `//` and `/* */` comments to spaces
 (preserving offsets) before `serde_json`. `load.rs` resolves the path and
 turns any parse failure into a `Diagnostic` plus defaults — the app always gets
 a usable `Settings`. `edit.rs` sets or removes one top-level key in the
@@ -86,15 +101,30 @@ defaults layered with the user's `keybindings` entries (`chord=action`;
 ### `agent`
 `registry.rs` is the static catalog of CLI agents and the `Delivery` vocabulary
 (prompt as arg vs. stdin). `command.rs` lowers a def + user prefs + prompt into
-a `SpawnSpec`. `plan.rs` does fan-out and the `slugify` used for branch names.
+a `SpawnSpec` (whose `env` carries the injected control vars). `plan.rs` does
+fan-out and the `slugify` used for branch names. `activity.rs` classifies a
+transcript snapshot into `working / blocked / done / idle` using generic rules
+plus per-agent additions — a pure function the app calls on each pty snapshot.
 The crate never spawns a process — that is the app's job.
+
+### `companion` / `control`
+Two dependency-light blocking HTTP/JSON servers over the same `store`, each with
+a pure `route()` tested without sockets. `companion` is the read-mostly mobile
+API (projects / tasks / runs / notifications, a follow-up endpoint, a mobile web
+page) plus an `/api/events` stream. `control` is the agent-facing surface: an
+in-worktree agent lists siblings, reads a run, reports its activity, queues a
+helper run or a checks pass, and follows `/control/events`. A running agent
+learns the API from the `SKILL` document (`asylum control skill`) and reaches it
+through the injected env vars; writes are queued for the app to drain.
 
 ### `plugin`
 `model.rs` is the parsed manifest and the fixed vocabularies (`CAPABILITIES`,
 `TRIGGER_EVENTS`). `parse.rs` deserializes `plugin.toml` into private `Raw*`
 shapes then validates/lowers them, turning unknown tokens into error strings.
 `load.rs` scans a plugins directory, loading the good and collecting a
-`Diagnostic` per bad one.
+`Diagnostic` per bad one. `install.rs` parses an `owner/repo[@ref]` spec, builds
+the shallow-clone command into the plugins directory, and exposes the
+`asylum-plugin` GitHub topic used for `asylum plugin search`.
 
 ### `pluginrt`
 The runtime host. `invoke_once` spawns a runtime process, sends one JSON

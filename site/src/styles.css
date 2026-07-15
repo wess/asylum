@@ -620,12 +620,12 @@ svg {
   gap: 20px;
   align-items: center;
   min-height: 112px;
+  padding-inline: 12px;
   border-bottom: 1px solid var(--line);
-  transition: background 160ms ease, padding 160ms ease;
+  transition: background 160ms ease;
 }
 
 .capabilitylist article:hover {
-  padding-inline: 12px;
   background: var(--graphite2);
 }
 
@@ -1357,6 +1357,84 @@ svg {
   border-top: 1px solid var(--line);
 }
 
+.cinema { padding-block: 48px 96px; }
+
+.cinemahead,
+.coursehead {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+  align-items: end;
+  gap: 48px;
+  margin-bottom: 32px;
+}
+
+.cinemahead h2,
+.coursehead h2 {
+  max-width: 780px;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(38px, 5vw, 72px);
+  line-height: 1.05;
+}
+
+.cinemahead > p,
+.coursehead > p { max-width: 52ch; margin: 0; color: var(--muted); }
+
+.cinemaframe {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--linebright);
+  background: var(--black);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.46);
+}
+
+.cinemaframe::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(51, 214, 255, 0.12);
+}
+
+.cinemaframe video,
+.courseepisode video { width: 100%; aspect-ratio: 16 / 9; background: var(--black); }
+
+.videocourse { padding-block: 96px; border-top: 1px solid var(--line); }
+.courseepisodes { border-top: 1px solid var(--linebright); }
+
+.courseepisode {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.85fr) minmax(0, 1.15fr);
+  gap: 40px;
+  align-items: center;
+  padding-block: 32px;
+  border-bottom: 1px solid var(--line);
+}
+
+.courseepisode video { border: 1px solid var(--line); }
+
+.courseepisode > div > span,
+.courseepisode > div > a { color: var(--cyan); font-family: var(--mono); font-size: 11px; }
+
+.courseepisode h3 {
+  margin: 10px 0 8px;
+  font-family: var(--display);
+  font-size: clamp(24px, 3vw, 38px);
+  line-height: 1.15;
+}
+
+.courseepisode p { max-width: 62ch; margin: 0 0 16px; color: var(--muted); }
+
+.courseepisode > div > a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  border-bottom: 1px solid var(--cyan);
+}
+
+.courseepisode > div > a:hover { color: var(--paper); }
+
 .cataloghead {
   display: flex;
   align-items: end;
@@ -1641,6 +1719,290 @@ svg {
   transform: translateY(0);
 }
 
+/* Learning hub */
+
+.learningrail {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.learningrail .learnroute {
+  min-height: 360px;
+}
+
+.learningrail .learnroute + .learnroute {
+  border-left: 1px solid var(--linebright);
+}
+
+.bookroute {
+  background: #0c151b;
+}
+
+.bookpage,
+.videopage {
+  padding-top: var(--header);
+}
+
+.bookhero {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: clamp(36px, 8vw, 120px);
+  align-items: end;
+  min-height: 650px;
+  padding-block: clamp(90px, 12vw, 160px) 100px;
+  border-bottom: 1px solid var(--linebright);
+}
+
+.bookheroindex {
+  display: grid;
+  align-content: end;
+  min-height: 300px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--cyan);
+}
+
+.bookheroindex span {
+  font-family: var(--display);
+  font-size: clamp(72px, 10vw, 144px);
+  font-weight: 520;
+  line-height: 0.8;
+}
+
+.bookheroindex small {
+  margin-top: 24px;
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.bookhero h1,
+.videohero h1 {
+  max-width: 900px;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(48px, 7vw, 88px);
+  font-weight: 570;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.bookhero > div:last-child > p:last-of-type,
+.videoherocopy > p:last-child {
+  max-width: 680px;
+  margin: 30px 0 0;
+  color: #b9c8d3;
+  font-size: 19px;
+  text-wrap: pretty;
+}
+
+.bookmap {
+  padding-block: 100px 140px;
+}
+
+.bookmap > header,
+.curriculum > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 48px;
+  align-items: end;
+  padding-bottom: 30px;
+  border-bottom: 1px solid var(--linebright);
+}
+
+.bookmap > header h2,
+.curriculum h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(30px, 4vw, 48px);
+  font-weight: 560;
+}
+
+.bookmap > header p,
+.curriculum > header p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.chaptergroup {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+  gap: 54px;
+  padding-block: 56px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chapterlevel span,
+.curriculumlist small {
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.chapterlevel strong {
+  display: block;
+  margin-top: 12px;
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 560;
+}
+
+.chapterlevel p {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chaptergroup ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chaptergroup li + li {
+  border-top: 1px solid var(--line);
+}
+
+.chaptergroup a {
+  display: grid;
+  grid-template-columns: 44px minmax(180px, 0.8fr) minmax(220px, 1.2fr) 24px;
+  gap: 20px;
+  align-items: center;
+  min-height: 76px;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.chaptergroup a::after {
+  content: "↗";
+  color: var(--linebright);
+  font-size: 16px;
+}
+
+.chaptergroup a:hover {
+  color: var(--cyan);
+  transform: translateX(4px);
+}
+
+.chaptergroup a > span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.chaptergroup a strong {
+  font-size: 15px;
+}
+
+.chaptergroup a small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chaptergroup.expert .chapterlevel span,
+.chaptergroup.expert a:hover {
+  color: var(--amber);
+}
+
+.videohero {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.72fr) minmax(520px, 1.28fr);
+  gap: clamp(40px, 6vw, 90px);
+  align-items: center;
+  min-height: 760px;
+  padding-block: 90px;
+}
+
+.videotheater {
+  position: relative;
+  padding: 10px;
+  border: 1px solid var(--linebright);
+  background: var(--black);
+  box-shadow: 0 28px 100px rgba(0, 0, 0, 0.5);
+}
+
+.videotheater::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  background: linear-gradient(115deg, var(--cyan), transparent 32%, transparent 68%, var(--amber));
+  filter: blur(18px);
+  opacity: 0.24;
+}
+
+.videotheater video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--black);
+}
+
+.videotheater > span {
+  display: block;
+  padding: 9px 4px 2px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.curriculum {
+  padding-block: 80px 140px;
+}
+
+.curriculum > header a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.curriculumlist {
+  border-bottom: 1px solid var(--linebright);
+}
+
+.curriculumlist article {
+  display: grid;
+  grid-template-columns: 52px minmax(300px, 0.9fr) minmax(280px, 1.1fr);
+  gap: 28px;
+  align-items: center;
+  padding-block: 26px;
+  border-top: 1px solid var(--line);
+}
+
+.curriculumlist article > span {
+  color: var(--linebright);
+  font-family: var(--display);
+  font-size: 18px;
+}
+
+.curriculumlist video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--black);
+}
+
+.curriculumlist h3 {
+  margin: 7px 0 0;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 560;
+}
+
+.curriculumlist p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.curriculumlist a {
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
 @media (max-width: 1180px) {
   .docsshell {
     grid-template-columns: 240px minmax(0, 1fr);
@@ -1693,6 +2055,31 @@ svg {
     grid-template-columns: 1fr;
   }
 
+  .learningrail .learnroute + .learnroute {
+    border-top: 1px solid var(--linebright);
+    border-left: 0;
+  }
+
+  .bookhero,
+  .videohero {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .bookheroindex {
+    min-height: 0;
+  }
+
+  .chaptergroup {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+
+  .curriculumlist article {
+    grid-template-columns: 42px minmax(260px, 0.9fr) minmax(240px, 1.1fr);
+    gap: 18px;
+  }
+
   .learnroute + .learnroute {
     border-left: 0;
     border-top: 1px solid var(--linebright);
@@ -1739,6 +2126,68 @@ svg {
 }
 
 @media (max-width: 700px) {
+  .bookhero {
+    padding-block: 72px;
+  }
+
+  .bookheroindex span {
+    font-size: 64px;
+  }
+
+  .bookmap,
+  .curriculum {
+    padding-block: 64px 90px;
+  }
+
+  .bookmap > header,
+  .curriculum > header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .chaptergroup a {
+    grid-template-columns: 34px 1fr 20px;
+    gap: 12px;
+    padding-block: 12px;
+  }
+
+  .chaptergroup a small {
+    grid-column: 2;
+  }
+
+  .chaptergroup a::after {
+    grid-column: 3;
+    grid-row: 1 / 3;
+  }
+
+  .videohero {
+    padding-block: 64px;
+  }
+
+  .curriculumlist article {
+    grid-template-columns: 32px 1fr;
+    gap: 14px;
+  }
+
+  .curriculumlist video,
+  .curriculumlist article > div {
+    grid-column: 2;
+  }
+
+  .cinemahead,
+  .coursehead,
+  .courseepisode {
+    grid-template-columns: 1fr;
+  }
+
+  .cinemahead,
+  .coursehead { gap: 20px; }
+
+  .cinema { padding-block: 24px 72px; }
+  .videocourse { padding-block: 72px; }
+  .courseepisode { gap: 20px; padding-block: 28px; }
+
   :root {
     --header: 58px;
   }

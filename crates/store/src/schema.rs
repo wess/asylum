@@ -115,10 +115,74 @@ const MIGRATIONS: &[&str] = &[
     CREATE INDEX idx_noteattachments_project ON noteattachments(project_id);
     CREATE INDEX idx_noteattachments_task ON noteattachments(task_id);
     CREATE INDEX idx_noteattachments_run ON noteattachments(run_id);",
+    // 7 - follow-ups queued from the mobile companion. The desktop app drains
+    // pending rows and delivers each to an active run of the task, so a phone
+    // message actually reaches the agent instead of only landing in the inbox.
+    "CREATE TABLE followups (
+        id         INTEGER PRIMARY KEY,
+        task_id    INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+        message    TEXT NOT NULL,
+        source     TEXT NOT NULL DEFAULT 'companion',
+        processed  INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+    );
+    CREATE INDEX idx_followups_pending ON followups(processed);",
+    // 8 - live semantic activity on a run (idle/working/blocked/done), the
+    // agent control-request queue (an in-worktree agent asks the app to spawn a
+    // helper run, run checks, …; drained like followups), and an append-only
+    // event log powering the companion and control event streams.
+    "ALTER TABLE runs ADD COLUMN activity TEXT;
+    CREATE TABLE controlrequests (
+        id         INTEGER PRIMARY KEY,
+        task_id    INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+        run_id     INTEGER REFERENCES runs(id) ON DELETE SET NULL,
+        kind       TEXT NOT NULL,
+        payload    TEXT NOT NULL DEFAULT '',
+        source     TEXT NOT NULL DEFAULT 'agent',
+        processed  INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+    );
+    CREATE INDEX idx_controlrequests_pending ON controlrequests(processed);
+    CREATE TABLE events (
+        id         INTEGER PRIMARY KEY,
+        kind       TEXT NOT NULL,
+        task_id    INTEGER,
+        run_id     INTEGER,
+        data       TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL
+    );",
+    // 9 - retryable, auditable drain queues. The boolean `processed` flag hid
+    // failures (a row was marked done even when delivery/execution failed) and
+    // could not be retried. Replace it with an explicit lifecycle
+    // (pending/running/succeeded/failed) plus attempt count, last error, claim
+    // and completion timestamps, and a backoff schedule, on both the followups
+    // and controlrequests queues.
+    "DROP INDEX idx_followups_pending;
+    ALTER TABLE followups ADD COLUMN status TEXT NOT NULL DEFAULT 'pending';
+    ALTER TABLE followups ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE followups ADD COLUMN last_error TEXT;
+    ALTER TABLE followups ADD COLUMN claimed_at INTEGER;
+    ALTER TABLE followups ADD COLUMN completed_at INTEGER;
+    ALTER TABLE followups ADD COLUMN next_attempt_at INTEGER NOT NULL DEFAULT 0;
+    UPDATE followups SET status = 'succeeded', attempts = 1 WHERE processed = 1;
+    ALTER TABLE followups DROP COLUMN processed;
+    CREATE INDEX idx_followups_pending ON followups(status, next_attempt_at);
+
+    DROP INDEX idx_controlrequests_pending;
+    ALTER TABLE controlrequests ADD COLUMN status TEXT NOT NULL DEFAULT 'pending';
+    ALTER TABLE controlrequests ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE controlrequests ADD COLUMN last_error TEXT;
+    ALTER TABLE controlrequests ADD COLUMN claimed_at INTEGER;
+    ALTER TABLE controlrequests ADD COLUMN completed_at INTEGER;
+    ALTER TABLE controlrequests ADD COLUMN next_attempt_at INTEGER NOT NULL DEFAULT 0;
+    UPDATE controlrequests SET status = 'succeeded', attempts = 1 WHERE processed = 1;
+    ALTER TABLE controlrequests DROP COLUMN processed;
+    CREATE INDEX idx_controlrequests_pending ON controlrequests(status, next_attempt_at);",
 ];
 
 /// Apply pragmas and any pending migrations.
 pub(crate) fn migrate(conn: &Connection) -> rusqlite::Result<()> {
+    // `journal_mode`/`foreign_keys` must be set outside any transaction.
     conn.execute_batch(
         "PRAGMA journal_mode = WAL;
          PRAGMA foreign_keys = ON;",
@@ -127,10 +191,31 @@ pub(crate) fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     for (i, step) in MIGRATIONS.iter().enumerate() {
         let target = (i + 1) as i64;
         if version < target {
-            conn.execute_batch(step)?;
-            // user_version can't be parameterized; the value is a trusted usize.
-            conn.execute_batch(&format!("PRAGMA user_version = {target}"))?;
+            apply_migration(conn, step, target)?;
         }
     }
     Ok(())
 }
+
+/// Apply one migration `step` and its `user_version` bump as a single
+/// transaction. On any failure the transaction is rolled back, so a crash or
+/// error mid-migration leaves the database at the *previous* complete schema
+/// version rather than a half-applied step that would fail every future open.
+fn apply_migration(conn: &Connection, step: &str, target: i64) -> rusqlite::Result<()> {
+    conn.execute_batch("BEGIN")?;
+    // user_version can't be parameterized; `target` is a trusted index+1.
+    let applied = conn
+        .execute_batch(step)
+        .and_then(|_| conn.execute_batch(&format!("PRAGMA user_version = {target}")));
+    match applied {
+        Ok(()) => conn.execute_batch("COMMIT"),
+        Err(err) => {
+            let _ = conn.execute_batch("ROLLBACK");
+            Err(err)
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "../tests/schema.rs"]
+mod tests;

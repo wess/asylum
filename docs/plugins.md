@@ -8,6 +8,23 @@ Plugins live under `$XDG_DATA_HOME/asylum/plugins/<id>/` (see
 `plugin::default_dir`). Discovery loads the good ones and reports a diagnostic
 per bad manifest — a broken plugin never blocks the others.
 
+## Installing and discovering
+
+Because a plugin is just a directory with a `plugin.toml`, installing one is a
+shallow clone into the plugins directory:
+
+```sh
+asylum plugin install <owner>/<repo>        # e.g. asylum plugin install acme/asylum-reviewr
+asylum plugin install <owner>/<repo>@<ref>  # pin a branch, tag, or commit
+asylum plugin list                          # what's installed (and any diagnostics)
+asylum plugin search                        # community plugins, by topic
+```
+
+Community plugins tag their repository with the GitHub topic `asylum-plugin`;
+`asylum plugin search` lists them via the `gh` CLI. Install refuses a
+destination that already exists and rejects a repo with no `plugin.toml`, so a
+non-plugin repo can't masquerade as one (`plugin::install`).
+
 ## Manifest
 
 ```toml
@@ -90,4 +107,24 @@ not JSON objects (a runtime's stray logging) are ignored. `pluginrt` provides
 `pluginrt::invoke_wasm` loads `type = "wasm"` runtimes under `wasmi`. Guests use
 a linear-memory string ABI and export `alloc` and `invoke`. The host links only
 the functions allowed by the manifest's capabilities, so an undeclared host
-function cannot be imported.
+function cannot be imported. Each call runs fuel-metered with memory, table,
+log, and response-size limits, and the module path is contained to the plugin
+directory (no absolute/`..`/symlink escape).
+
+## Trust model
+
+The two runtimes have very different trust:
+
+- **`process` runtimes are fully trusted.** A process plugin is an ordinary
+  child process with your full user privileges — filesystem, network,
+  subprocesses. Its declared `capabilities` are *advisory only*; nothing
+  enforces them. Enable a process plugin only if you trust its source. The
+  Plugins surface shows the exact command and a trust warning
+  (`Runtime::trust_summary` / `RuntimeKind::is_trusted`), and the app scrubs its
+  environment to a small allowlist before launch, so app secrets
+  (`ASYLUM_CONTROL_TOKEN`, `ASYLUM_LINEAR_TOKEN`, cloud/CI credentials) are not
+  exported into it.
+- **`wasm` runtimes are capability-sandboxed.** A WASM plugin has no ambient
+  authority: it can import only the host functions its capabilities grant, and
+  runs under fuel/memory/time/log/response bounds. Prefer WASM for third-party
+  plugins.

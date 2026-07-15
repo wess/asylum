@@ -1,0 +1,225 @@
+WEBVTT
+
+1
+00:00:00.200 --> 00:00:09.600
+The asylum command-line tool scripts the ADE from a shell — or from inside an agent's worktree. asylum help prints the whole surface. Let's tour it.
+
+2
+00:00:10.250 --> 00:00:22.500
+One note up front. A released install puts asylum on your PATH. From a source checkout, run it through cargo: cargo run, dash p, cli, dash dash, then the subcommand. I'll say the short form.
+
+3
+00:00:23.150 --> 00:00:31.600
+First, worktree — create, list, and remove the isolated checkouts runs execute in. List marks the primary worktree with a star.
+
+4
+00:00:32.250 --> 00:00:46.325
+Create takes a path and an optional branch and start ref; it prints the created path. Remove tears one down — add dash dash force to remove a dirty one. All of these take dash dash repo to target another repository.
+
+5
+00:00:46.975 --> 00:00:55.325
+run launches a single agent against a prompt and streams its output. This is the fastest way to confirm an agent is installed.
+
+6
+00:00:55.975 --> 00:01:08.900
+It echoes the exact command it will launch, runs the agent on a real pty, prints the captured screen when it finishes, and exits with the agent's exit code. dash dash cwd sets the working directory.
+
+7
+00:01:09.550 --> 00:01:21.950
+search does cross-worktree content search — ripgrep where available, falling back to git grep. Results print as file, colon, line, colon, column, colon, text, with a match count on stderr.
+
+8
+00:01:22.600 --> 00:01:37.100
+control is how a running agent drives the fleet from inside its worktree — status, read, spawn, activity, check, and skill. It reads the environment variables the app injects. This is a whole episode of its own, coming next.
+
+9
+00:01:37.750 --> 00:01:47.325
+One control subcommand always works, even outside a run: asylum control skill prints the instruction document that teaches an agent the API.
+
+10
+00:01:47.975 --> 00:02:03.425
+wait blocks until a run reaches a status or activity, then returns. Block until run forty-two succeeds — or until it goes blocked, with dash dash timeout to cap the wait. It polls about every three-quarters of a second and errors on timeout.
+
+11
+00:02:04.075 --> 00:02:17.475
+plugin manages the plugins directory — install from GitHub by owner-slash-repo, list what's installed, and search discovers community plugins by GitHub topic. Search uses gh, so authenticate it first.
+
+12
+00:02:18.125 --> 00:02:25.275
+layout reads the fan-out presets from your settings — list them all, or show one in full with its resolved concurrency.
+
+13
+00:02:25.925 --> 00:02:33.900
+The last three are low-level computer-use commands for driving the desktop itself. snapshot takes a screenshot and prints its path.
+
+14
+00:02:34.550 --> 00:02:44.950
+click moves and clicks at screen coordinates; fill types text. They're platform-aware and shell out to the OS's automation tooling — the building blocks of computer-use flows.
+
+15
+00:02:45.600 --> 00:02:55.000
+And asylum dash dash version prints the version. That's the whole CLI. Next, the deep one: an agent commanding its own siblings through control.
+
+16
+00:02:55.650 --> 00:03:05.475
+Work usually starts as an issue and lands as a pull request. Integrations connects the fleet to GitHub and Linear so you can do both without leaving Asylum.
+
+17
+00:03:06.125 --> 00:03:23.225
+GitHub works through the gh CLI. That means Asylum uses whatever authentication gh already has — install gh, run gh auth login once, and there's no token to paste. If gh isn't installed or authenticated, the GitHub features are simply unavailable.
+
+18
+00:03:23.875 --> 00:03:29.450
+With gh authenticated, you can list the repository's open pull requests right here.
+
+19
+00:03:30.100 --> 00:03:32.075
+And browse open issues.
+
+20
+00:03:33.500 --> 00:03:45.675
+The most useful flow is turning an issue into work. Pick an issue and Asylum derives a worktree branch named for it — so the agents you fan out are already on the right branch for a PR that closes it.
+
+21
+00:03:46.325 --> 00:03:54.050
+You go from 'issue one-two-three needs doing' to 'three agents attempting it in isolated worktrees' in a couple of clicks.
+
+22
+00:03:54.700 --> 00:04:04.075
+When one run wins, open a pull request from its branch — the natural alternative to a local merge when you want the change reviewed on GitHub with CI.
+
+23
+00:04:04.725 --> 00:04:19.225
+And remember from the notes episode: a created PR appends its link to every note attached to the task. So opening the PR also leaves a durable trail — the note that started the task ends up carrying the link to the PR that finished it.
+
+24
+00:04:19.875 --> 00:04:31.450
+Linear is the other integration. Unlike GitHub, it needs an API token. Create one at linear dot app settings API and set linear underscore token in settings.
+
+25
+00:04:32.100 --> 00:04:39.375
+Live reload picks it up immediately. An empty token leaves Linear disabled and the surface just doesn't offer it.
+
+26
+00:04:40.025 --> 00:04:45.600
+With it set, Integrations browses your Linear workspace — teams, projects, and issues.
+
+27
+00:04:46.250 --> 00:04:56.200
+You can open a worktree from a Linear issue just like GitHub, so a Linear ticket becomes a fanned-out task — and you can create an issue from inside the ADE too.
+
+28
+00:04:56.850 --> 00:05:06.400
+Two ways to land a winner: a local merge for speed, or a PR for review. Next: the workaday surfaces — terminal, editor, preview, and browser.
+
+29
+00:05:07.050 --> 00:05:20.500
+A big fan-out can run longer than your attention span at the desk. The mobile companion lets you keep an eye on the fleet from your phone, and the event stream lets your phone — and your agents — follow along without hammering the database.
+
+30
+00:05:21.150 --> 00:05:33.850
+The companion is a small HTTP server the app runs on a background thread, over the same store the desktop uses. Configure it under the companion key — enabled, a bind address, and a token.
+
+31
+00:05:34.500 --> 00:05:50.125
+Here's the rule of thumb. Localhost with no token for solo desktop use. To reach it from your phone on the LAN, bind zero-dot-zero-dot-zero-dot-zero — but only with a token set. Never expose it to the network without a token. The token is the gate.
+
+32
+00:05:50.775 --> 00:05:57.450
+Set a token, bind to all interfaces on port eight-seven-eight-seven, and save. Live reload applies it.
+
+33
+00:05:58.100 --> 00:06:08.975
+Open that address in your phone's browser and you get a self-contained mobile status page — it polls the API and shows your projects, tasks, runs, and inbox at a glance.
+
+34
+00:06:09.625 --> 00:06:24.125
+And this is the payoff: the runs list includes each run's live activity. So the phone shows which agent is blocked and needs you — exactly like the board. You can be away from your machine and still know a run is waiting on your answer.
+
+35
+00:06:24.775 --> 00:06:39.900
+You can nudge a run from your phone too. Send a follow-up — a message the app queues and delivers into a live run, and also posts to your inbox. A live, stdin-capable agent gets it immediately; a finished run starts a fresh attempt with it.
+
+36
+00:06:40.550 --> 00:06:55.400
+Under all of this is the event stream. Polling every table for 'what changed' is wasteful, so every meaningful transition appends one row to an append-only log. It's never mutated after insert, so a cursor is a stable position.
+
+37
+00:06:56.050 --> 00:07:10.875
+The kinds you'll see: run_started, run_activity when a run's semantic state changes, run_finished, run_failed, and run_spawned. Each carries an id — the cursor — a kind, the task and run it concerns, an optional payload, and a timestamp.
+
+38
+00:07:11.525 --> 00:07:24.175
+Follow it from a cursor. Call with since equals zero to read from the start; the response gives you a batch and a cursor — the id of the last event. Pass that cursor back as since on the next call to get only what's new.
+
+39
+00:07:24.825 --> 00:07:30.875
+That's the whole protocol. A page is capped at two hundred events; lower it with a limit parameter.
+
+40
+00:07:31.525 --> 00:07:45.525
+And the same stream is served on both servers — the companion for your phone, and control for your agents. So a lead agent can tail the fleet's events the same way your phone does. Next: extending the ADE itself with plugins.
+
+41
+00:07:46.175 --> 00:07:58.125
+Asylum is extensible. A plugin is just a directory with a plugin-dot-toml manifest — contributing palette commands, a panel, a webview, event triggers, and tools for the agents.
+
+42
+00:07:58.775 --> 00:08:14.050
+Plugins live under your data directory, in asylum slash plugins slash the plugin id. On startup Asylum scans that directory, loads the good ones, and reports a diagnostic for each bad manifest — one broken plugin never blocks the others.
+
+43
+00:08:14.700 --> 00:08:22.075
+Here's a manifest. Up top: identity — id, name, version, description — and capabilities, which we'll come back to.
+
+44
+00:08:22.725 --> 00:08:37.575
+The extension points. Double-bracket command adds a command-palette action. Its mode decides what running it does — invoke calls a runtime method, panel opens the plugin's panel, webview opens its web surface — and it can carry a keybind.
+
+45
+00:08:38.225 --> 00:08:50.200
+panel is a side-drawer rendered from the runtime's responses. webview is a native web surface placed as a panel, tab, or window — sourced from a url, a bundled entry, or a service.
+
+46
+00:08:50.850 --> 00:09:02.125
+Double-bracket trigger hooks an ADE event. Its action is notify — post a desktop notification — or invoke a runtime method, and it can be conditioned with a when clause.
+
+47
+00:09:02.775 --> 00:09:11.375
+The events you can hook: task_created, run_started, run_finished, run_failed, worktree_created, worktree_removed, diff_ready, and task_merged.
+
+48
+00:09:12.025 --> 00:09:21.550
+And double-bracket tool exposes a tool to the coding agents themselves, with typed parameters — so an agent can call your plugin's functionality directly.
+
+49
+00:09:22.200 --> 00:09:35.900
+Now capabilities. A plugin declares what it's allowed to touch — git, agents, store, network, filesystem, clipboard, notify. Under the process runtime these are advisory. Under WASM they're the enforced gate.
+
+50
+00:09:36.550 --> 00:09:56.675
+There are two runtimes. The process runtime is a normal program the app talks to over newline-delimited JSON on stdin and stdout — request in, result or error out. Non-JSON lines, like stray logging, are ignored, so your runtime can print debug freely. One-shot, or persistent to stay warm across calls.
+
+51
+00:09:57.325 --> 00:10:17.325
+The WASM runtime runs a WebAssembly module in a sandbox. The crucial property: the host links only the host functions your declared capabilities allow — so a guest that never asked for notify literally cannot import the notify function. That makes WASM the right tier for untrusted or shared plugins.
+
+52
+00:10:17.975 --> 00:10:35.125
+Installing is a shallow clone into the plugins directory. asylum plugin install, owner slash repo — optionally at a branch, tag, or commit. It refuses if the destination exists or the repo has no manifest, so you can't accidentally install a non-plugin.
+
+53
+00:10:35.775 --> 00:10:50.900
+list shows what's installed and reports broken manifests. search discovers community plugins tagged with the GitHub topic asylum-plugin — via gh, so authenticate it first. Tag your own repo with that topic to make it discoverable.
+
+54
+00:10:51.550 --> 00:11:03.975
+Let's build one. A minimal process plugin is a manifest and a runtime script. The manifest declares an id, the notify capability, a process runtime running the script, and one greet command.
+
+55
+00:11:04.625 --> 00:11:17.700
+The runtime reads one JSON request per line and answers each — returning a result for greet, an error otherwise, and skipping anything that isn't JSON. Bun and TypeScript are a natural fit here.
+
+56
+00:11:18.350 --> 00:11:29.075
+Drop the directory under the plugins path, and 'Say Hello' appears in the command palette. From there you grow it — a panel, a trigger on run_finished, a tool the agents can call.

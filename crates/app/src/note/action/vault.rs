@@ -16,7 +16,75 @@ impl Root {
         notes::search(&self.note.index, &self.note.query)
             .into_iter()
             .filter_map(|hit| self.note.index.note(&hit.path).cloned())
+            .filter(|note| match &self.note.tag_filter {
+                Some(tag) => note.tags.iter().any(|t| t == tag),
+                None => true,
+            })
             .collect()
+    }
+
+    /// Filter the note list to a tag (clicked from the details pane).
+    pub fn set_note_tag_filter(&mut self, tag: String, cx: &mut Context<Self>) {
+        self.note.tag_filter = Some(tag);
+        cx.notify();
+    }
+
+    /// Clear the active tag filter.
+    pub fn clear_note_tag_filter(&mut self, cx: &mut Context<Self>) {
+        self.note.tag_filter = None;
+        cx.notify();
+    }
+
+    /// Add a frontmatter property from the `name: value` input.
+    pub fn add_note_property(&mut self, cx: &mut Context<Self>) {
+        let Some(path) = self.note.path.clone() else {
+            return;
+        };
+        let Some(input) = self.note.property_input.clone() else {
+            return;
+        };
+        let raw = input.read(cx).text();
+        let Some((name, value)) = raw.split_once(':') else {
+            self.push_error("Property needs a value", "Write it as name: value.");
+            return;
+        };
+        let (name, value) = (name.trim(), value.trim());
+        if name.is_empty() {
+            return;
+        }
+        match notes::set_property(&self.note.root, &path, name, value) {
+            Ok(_) => {
+                input.update(cx, |input, cx| input.set_text("", cx));
+                self.refresh_current_note(cx);
+            }
+            Err(error) => self.push_error("Could not set property", error.to_string()),
+        }
+    }
+
+    /// Remove a frontmatter property by name.
+    pub fn remove_note_property(&mut self, name: &str, cx: &mut Context<Self>) {
+        let Some(path) = self.note.path.clone() else {
+            return;
+        };
+        match notes::remove_property(&self.note.root, &path, name) {
+            Ok(_) => self.refresh_current_note(cx),
+            Err(error) => self.push_error("Could not remove property", error.to_string()),
+        }
+    }
+
+    /// Create a note from a user-authored template.
+    pub fn create_note_from_template(&mut self, body: String, cx: &mut Context<Self>) {
+        match notes::create_from_template(&self.note.root, &body, "Untitled", now()) {
+            Ok(note) => self.refresh_note_index(Some(note.path), cx),
+            Err(error) => self.push_error("Could not create note", error.to_string()),
+        }
+    }
+
+    /// Reload the on-disk copy of the current note after an out-of-editor edit,
+    /// refreshing the editor, preview, and details pane.
+    fn refresh_current_note(&mut self, cx: &mut Context<Self>) {
+        let selected = self.note.path.clone();
+        self.refresh_note_index(selected, cx);
     }
 
     pub fn select_note(&mut self, path: &str, cx: &mut Context<Self>) {

@@ -20,10 +20,12 @@
 //! - [`parse`] - TOML → [`Plugin`], with friendly [`Diagnostic`]s.
 //! - [`load`] - discover and load plugins from a directory.
 
+pub mod install;
 pub mod load;
 pub mod model;
 pub mod parse;
 
+pub use install::{clone_command, discover_command, fetch, Source, TOPIC};
 pub use load::{default_dir, load_dir, Installed};
 pub use model::{
     Command, CommandMode, Diagnostic, Panel, Placement, Plugin, Runtime, RuntimeKind, Tool,

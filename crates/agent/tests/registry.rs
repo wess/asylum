@@ -14,8 +14,21 @@ fn builtins_have_unique_ids() {
 fn catalog_is_broad() {
     // Ensure the catalog is broad (30+) and includes the
     // marquee ones.
-    assert!(builtins().len() >= 30, "catalog too small: {}", builtins().len());
-    for id in ["claude-code", "codex", "grok", "cursor-agent", "copilot", "gemini", "cline", "devin"] {
+    assert!(
+        builtins().len() >= 30,
+        "catalog too small: {}",
+        builtins().len()
+    );
+    for id in [
+        "claude-code",
+        "codex",
+        "grok",
+        "cursor-agent",
+        "copilot",
+        "gemini",
+        "cline",
+        "devin",
+    ] {
         assert!(find(id).is_some(), "missing built-in agent {id}");
     }
 }
@@ -54,7 +67,11 @@ fn custom_agent_overrides_builtin_in_place() {
         delivery: "arg".into(),
     }];
     let cat = catalog(&custom);
-    assert_eq!(cat.len(), builtins().len(), "override should not grow the catalog");
+    assert_eq!(
+        cat.len(),
+        builtins().len(),
+        "override should not grow the catalog"
+    );
     let codex = resolve("codex", &custom).unwrap();
     assert_eq!(codex.program, "codex-nightly");
     assert!(!codex.builtin);

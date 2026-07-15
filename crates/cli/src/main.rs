@@ -6,12 +6,19 @@
 //! asylum worktree remove <path> [--repo <dir>] [--force]
 //! asylum run <agent> <prompt...> [--cwd <dir>]
 //! asylum search <pattern> [--dir <dir>]
+//! asylum control <status|read|spawn|activity|check|skill>   # orchestrate the fleet
+//! asylum wait run <id> [--status <s>] [--activity <a>] [--timeout <secs>]
+//! asylum plugin <install <owner/repo> | search | list>
+//! asylum layout <list | show <name>>
 //! asylum snapshot [<out.png>]          # computer use: screenshot
 //! asylum click <x> <y>                 # computer use: mouse click
 //! asylum fill <text...>                # computer use: type text
 //! ```
 
 mod computer;
+mod ctl;
+mod layouts;
+mod plugins;
 
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -26,6 +33,10 @@ fn main() {
         "worktree" => worktree(rest),
         "run" => run_agent(rest),
         "search" => do_search(rest),
+        "control" => ctl::control(rest),
+        "wait" => ctl::wait(rest),
+        "plugin" => plugins::plugin(rest),
+        "layout" => layouts::layout(rest),
         "snapshot" => snapshot(rest),
         "click" => click(rest),
         "fill" => fill(rest),
@@ -47,19 +58,19 @@ fn main() {
 }
 
 /// Value of `--flag <value>`; returns None if absent.
-fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
+pub(crate) fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
     args.iter()
         .position(|a| a == name)
         .and_then(|i| args.get(i + 1))
         .map(String::as_str)
 }
 
-fn has_flag(args: &[String], name: &str) -> bool {
+pub(crate) fn has_flag(args: &[String], name: &str) -> bool {
     args.iter().any(|a| a == name)
 }
 
 /// Positional args (those not consumed by `--flag value` pairs and not flags).
-fn positionals(args: &[String]) -> Vec<String> {
+pub(crate) fn positionals(args: &[String]) -> Vec<String> {
     let mut out = Vec::new();
     let mut skip = false;
     for a in args {
@@ -202,6 +213,10 @@ fn print_help() {
          \x20 asylum worktree remove <path> [--force] [--repo <dir>]\n\
          \x20 asylum run <agent> <prompt...> [--cwd <dir>]\n\
          \x20 asylum search <pattern> [--dir <dir>]\n\
+         \x20 asylum control <status|read <id>|spawn <agent> <prompt>|activity <state>|check|skill>\n\
+         \x20 asylum wait run <id> [--status <s>] [--activity <a>] [--timeout <secs>]\n\
+         \x20 asylum plugin <install <owner/repo> | search [--limit n] | list>\n\
+         \x20 asylum layout <list | show <name>>\n\
          \x20 asylum snapshot [<out.png>]\n\
          \x20 asylum click <x> <y>\n\
          \x20 asylum fill <text...>\n"

@@ -21,7 +21,10 @@ fn fanout_one_plan_per_agent() {
     assert_eq!(plans.len(), 2);
     assert_eq!(plans[0].agent, "claude-code");
     assert_eq!(plans[0].branch, "asylum/add-login-7-claude-code");
-    assert_eq!(plans[0].worktree, ".asylum/worktrees/add-login-7-claude-code");
+    assert_eq!(
+        plans[0].worktree,
+        ".asylum/worktrees/add-login-7-claude-code"
+    );
     assert_eq!(plans[1].branch, "asylum/add-login-7-codex");
 }
 

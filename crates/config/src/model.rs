@@ -25,10 +25,21 @@ pub struct Settings {
     pub agents: std::collections::BTreeMap<String, AgentPrefs>,
     /// Bring-your-own agents: definitions added on top of the built-in catalog.
     pub custom_agents: Vec<CustomAgent>,
+    /// Named fan-out presets. Picking a layout when composing a task selects its
+    /// set of agents (and optional concurrency) in one gesture, instead of
+    /// ticking agents by hand each time.
+    pub layouts: Vec<Layout>,
     /// Built-in editor preferences.
     pub editor: EditorPrefs,
     /// Keybindings as `chord=action` strings, layered over the defaults.
     pub keybindings: Vec<String>,
+    /// Linear API token. When set, the Integrations surface browses Linear
+    /// teams and issues; empty leaves Linear disabled.
+    pub linear_token: String,
+    /// Mobile companion server preferences.
+    pub companion: CompanionPrefs,
+    /// Agent control-surface server preferences.
+    pub control: ControlPrefs,
 }
 
 impl Default for Settings {
@@ -41,8 +52,134 @@ impl Default for Settings {
             run_timeout_minutes: 60,
             agents: std::collections::BTreeMap::new(),
             custom_agents: Vec::new(),
+            layouts: Layout::builtins(),
             editor: EditorPrefs::default(),
             keybindings: Vec::new(),
+            linear_token: String::new(),
+            companion: CompanionPrefs::default(),
+            control: ControlPrefs::default(),
+        }
+    }
+}
+
+impl Settings {
+    /// Look up a fan-out preset by name (case-insensitive).
+    pub fn layout(&self, name: &str) -> Option<&Layout> {
+        self.layouts
+            .iter()
+            .find(|l| l.name.eq_ignore_ascii_case(name))
+    }
+}
+
+/// A named fan-out preset. Picking a layout when composing a task fans it out
+/// across every listed agent in one gesture, optionally capping how many run at
+/// once for that task. A layout is data, not a keybinding: it defines *which*
+/// agents race, so the same task shape can be re-run without re-ticking boxes.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Layout {
+    /// Stable, human-facing name shown in the picker and used by `asylum layout`.
+    pub name: String,
+    /// One-line description of what the preset is for.
+    pub description: String,
+    /// Agent ids (from the registry) that each get a run.
+    pub agents: Vec<String>,
+    /// Max simultaneous runs for a task launched from this layout. 0 defers to
+    /// the global `max_parallel_runs`.
+    pub concurrency: u32,
+}
+
+impl Layout {
+    /// The starter presets shipped when the user has not defined their own.
+    /// Overridable by setting `layouts` in settings.json.
+    pub fn builtins() -> Vec<Layout> {
+        vec![
+            Layout {
+                name: "duel".to_string(),
+                description: "Two frontier agents, head to head.".to_string(),
+                agents: vec!["claude-code".to_string(), "codex".to_string()],
+                concurrency: 0,
+            },
+            Layout {
+                name: "triad".to_string(),
+                description: "Three takes on one prompt.".to_string(),
+                agents: vec![
+                    "claude-code".to_string(),
+                    "codex".to_string(),
+                    "aider".to_string(),
+                ],
+                concurrency: 0,
+            },
+            Layout {
+                name: "swarm".to_string(),
+                description: "A wide net; three running at a time.".to_string(),
+                agents: vec![
+                    "claude-code".to_string(),
+                    "codex".to_string(),
+                    "opencode".to_string(),
+                    "gemini".to_string(),
+                    "aider".to_string(),
+                ],
+                concurrency: 3,
+            },
+        ]
+    }
+}
+
+/// Mobile companion HTTP server preferences.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct CompanionPrefs {
+    /// Whether the companion server runs at all.
+    pub enabled: bool,
+    /// Address to bind. Localhost by default; set to `0.0.0.0:8787` to reach it
+    /// from a phone on the LAN. A non-loopback bind requires a token - the app
+    /// refuses to start the server on a LAN/wildcard address without one.
+    pub bind: String,
+    /// Bearer token required on API requests. Empty is allowed only for a
+    /// loopback bind (localhost-only, no auth); a non-loopback bind without a
+    /// token is refused at startup. When set, it is required as
+    /// `Authorization: Bearer <token>` on every `/api/*` request.
+    pub token: String,
+}
+
+impl Default for CompanionPrefs {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            bind: "127.0.0.1:8787".to_string(),
+            token: String::new(),
+        }
+    }
+}
+
+/// Agent control-surface server preferences. The control server lets a running
+/// agent orchestrate the fleet from inside its worktree; because it can spawn
+/// runs and read transcripts, it is loopback-only and always authenticated.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ControlPrefs {
+    /// Whether the control server runs at all. When off, agents cannot
+    /// orchestrate the ADE (the `asylum control` commands report "not inside a
+    /// worktree").
+    pub enabled: bool,
+    /// Address to bind. Loopback only - a non-loopback bind is refused at
+    /// startup. An agent reaches it at `127.0.0.1:<port>`.
+    pub bind: String,
+    /// Bearer token required on control requests. When empty (the default) the
+    /// app provisions a strong per-session token, kept in memory only and never
+    /// written back to settings. Either way the token is injected into each
+    /// managed agent as `ASYLUM_CONTROL_TOKEN`; localhost is not treated as an
+    /// authentication boundary.
+    pub token: String,
+}
+
+impl Default for ControlPrefs {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            bind: "127.0.0.1:8788".to_string(),
+            token: String::new(),
         }
     }
 }
@@ -97,3 +234,7 @@ impl Default for EditorPrefs {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/model.rs"]
+mod tests;

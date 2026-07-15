@@ -74,18 +74,22 @@ and the gpui-free core crates never import gpui.
   becomes a `Diagnostic` and the default is used. `edit` writes single keys
   back without disturbing the user's comments (the Settings surface writes
   through it); `watch` polls the file's mtime for live reload; `keys` is the
-  chord→action keymap layered over defaults. `$XDG_CONFIG_HOME/asylum/settings.json`.
-- **`agent`** — the agent-facing half of orchestration. A `registry` of known
-  CLI agents (Claude Code, Codex, OpenCode, Gemini, Aider, Cursor) and how each
+  chord→action keymap layered over defaults; `layouts` are named fan-out presets
+  (built-in `duel` / `triad` / `swarm`). `$XDG_CONFIG_HOME/asylum/settings.json`.
+- **`agent`** — the agent-facing half of orchestration. A `registry` of 31
+  built-in CLI agents (Claude Code, Codex, OpenCode, Gemini, Aider, Cursor, …)
+  plus user-defined custom agents, and how each
   is launched; `command` building (agent def + user prefs + prompt → a
-  `SpawnSpec`); and `plan` (fan a task out to N agents → one branch + worktree
-  per agent). Pure — it never spawns a process; the app runs a `SpawnSpec`
-  inside a `libsinclair` terminal pane.
+  `SpawnSpec`); `plan` (fan a task out to N agents → one branch + worktree
+  per agent); and `activity` (classify a transcript snapshot into
+  `working`/`blocked`/`done`/`idle`). Pure — it never spawns a process; the app
+  runs a `SpawnSpec` inside a `libsinclair` terminal pane.
 - **`plugin`** — manifest-based plugins (`plugin.toml`). A manifest contributes
   `[[command]]` palette actions, a `[panel]`, a
   `[webview]`, `[[trigger]]` hooks on ADE events (`run_finished`,
   `worktree_created`, …), and `[[tool]]`s exposed to the agents. Plugins declare
-  `capabilities`. Pure parsing + validation.
+  `capabilities`. Pure parsing + validation, plus `install` (GitHub
+  `owner/repo` install + `asylum-plugin` topic discovery).
 - **`pluginrt`** — the plugin runtime host. A **process runtime** (newline JSON
   over stdio, one-shot `invoke_once` or warm `Session`) and a sandboxed **WASM
   runtime** (`wasmi`): `invoke_wasm` loads a module and calls its `invoke` export
@@ -107,7 +111,7 @@ and the gpui-free core crates never import gpui.
 - **`preview`** — rich file previews: markdown → HTML (`pulldown-cmark`) plus
   image / PDF / text / binary classification.
 - **`notes`** — plain Markdown project vaults. Path-safe recursive CRUD,
-  Obsidian-compatible YAML properties, `[[wiki links]]`, backlinks, tags,
+  YAML frontmatter properties, `[[wiki links]]`, backlinks, tags,
   templates, autocomplete, note search, rename relinking, and durable Markdown
   references to Asylum tasks/runs/checks/PRs. Pure and gpui-free.
 - **`remote`** — SSH remote-worktree and port-forward command builders
@@ -121,15 +125,24 @@ and the gpui-free core crates never import gpui.
   command palette and quick-open.
 - **`companion`** — the mobile companion HTTP server: a dependency-light blocking
   server over the store (projects / tasks / runs / notifications, a follow-up
-  endpoint, and a mobile web page). Routing is pure over a `Db`, so it is tested
-  without sockets.
+  endpoint, an `/api/events` stream, and a mobile web page). Routing is pure over
+  a `Db`, so it is tested without sockets.
+- **`control`** — the agent control surface: a second dependency-light JSON
+  server over the store that lets a *running* agent orchestrate the fleet from
+  inside its worktree — list siblings, read a run, report its semantic activity,
+  queue a helper run or a checks pass, and follow `/control/events`. Reads answer
+  from the store; writes are queued as `store::ControlRequest`s and drained by
+  the app, so `route()` stays pure. An agent learns the API from the `SKILL` doc
+  (`asylum control skill`) and reaches it through injected env vars
+  (`ASYLUM_CONTROL_URL` / `ASYLUM_TASK_ID` / `ASYLUM_RUN_ID`).
 - **`cli`** — the `asylum` binary: `worktree` ops, `run <agent> <prompt>`,
-  `search`, and computer-use `snapshot` / `click` / `fill`.
+  `search`, `control` / `wait` (fleet orchestration), `plugin install` / `search`,
+  `layout`, and computer-use `snapshot` / `click` / `fill`.
 - **`app`** — the gpui application. Owns the window, the guise theme bridge, and
   the ADE shell composed with guise's `AppShell`: a header (with the command
   palette + quick-open overlays), a collapsible activity switcher + project/task navbar
   (with pins), a status footer, and a routed main area with thirteen surfaces —
-  Tasks (fan-out board with drag-drop, merge, PR-create), Diff review (+ PASS/FAIL
+  Tasks (fan-out board with file drop-to-task, merge, PR-create), Diff review (+ PASS/FAIL
   checks, branch chips, click-a-line inline annotations with resolve/delete,
   shipped back to an agent), Search, Notes (private/repository Markdown vault,
   editor/preview, properties, wiki links/backlinks/tags, templates, and
@@ -176,3 +189,4 @@ links are written back to the note.
 - `docs/architecture.md` — crate-by-crate detail and data flow.
 - `docs/plugins.md` — the plugin manifest, runtime, and capability model.
 - `docs/gpui.md` — the gpui/guise/libsinclair dependency recipe.
+- `docs/homelab.md` — local media and infrastructure API map; canonical specs live in `~/Desktop/Dev/docs`.

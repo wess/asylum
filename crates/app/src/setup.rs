@@ -115,11 +115,26 @@ pub fn inspect(root: &Root) -> Vec<Check> {
             Status::Attention,
         )
     } else {
-        Check::new(
-            "Agents",
-            "No configured agent executable was found on PATH.",
-            Status::Blocked,
-        )
+        // Nothing installed: show copy-pasteable install lines. Prefer the
+        // agents the user chose as defaults, else a few well-known ones.
+        let preferred = &root.settings.default_agents;
+        let hints: Vec<String> = reports
+            .iter()
+            .filter(|(agent, _)| preferred.is_empty() || preferred.contains(&agent.id))
+            .filter_map(|(agent, report)| {
+                report.install.map(|hint| format!("• {}: {hint}", agent.name))
+            })
+            .take(3)
+            .collect();
+        let detail = if hints.is_empty() {
+            "No agent CLI was found on PATH. Install one (e.g. Claude Code) and enable it in Settings.".to_string()
+        } else {
+            format!(
+                "No agent CLI was found on PATH. Install one, then reopen the project:\n{}",
+                hints.join("\n")
+            )
+        };
+        Check::new("Agents", detail, Status::Blocked)
     });
 
     let detected_checks = checks::detect(path);

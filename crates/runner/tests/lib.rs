@@ -8,6 +8,7 @@ fn spec(program: &str, args: &[&str]) -> SpawnSpec {
         args: args.iter().map(|s| s.to_string()).collect(),
         cwd: std::env::temp_dir().to_string_lossy().into_owned(),
         stdin: None,
+        env: Vec::new(),
     }
 }
 
@@ -43,8 +44,8 @@ fn nonzero_exit_is_captured() {
 #[cfg(unix)]
 #[test]
 fn captures_output_text() {
-    let run = Runner::start(&spec("sh", &["-c", "echo asylum-marker; sleep 0.2"]))
-        .expect("spawn sh");
+    let run =
+        Runner::start(&spec("sh", &["-c", "echo asylum-marker; sleep 0.2"])).expect("spawn sh");
     // Give the pty a moment to render, then snapshot before it exits.
     std::thread::sleep(Duration::from_millis(120));
     let text = run.screen_text();
@@ -59,7 +60,10 @@ fn scrollback_save_load_clear_roundtrip() {
         .join(format!("asylum-sb-{}", std::process::id()))
         .join("run.scrollback");
     scrollback::save(&path, "line one\nline two\n").unwrap();
-    assert_eq!(scrollback::load(&path).as_deref(), Some("line one\nline two\n"));
+    assert_eq!(
+        scrollback::load(&path).as_deref(),
+        Some("line one\nline two\n")
+    );
     scrollback::clear(&path).unwrap();
     assert!(scrollback::load(&path).is_none());
     // Clearing a missing file is not an error.

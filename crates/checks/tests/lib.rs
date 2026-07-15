@@ -67,6 +67,41 @@ fn javascript_checks_use_bun() {
 }
 
 #[test]
+fn lockfiles_pick_the_package_manager() {
+    for (lockfile, manager) in [
+        ("pnpm-lock.yaml", "pnpm"),
+        ("yarn.lock", "yarn"),
+        ("package-lock.json", "npm"),
+    ] {
+        let d = scratch();
+        std::fs::write(d.join("package.json"), r#"{"scripts":{"test":"jest"}}"#).unwrap();
+        std::fs::write(d.join(lockfile), "").unwrap();
+        let check = detect(&d).into_iter().next().unwrap();
+        assert_eq!(check.program, manager);
+        assert_eq!(check.id, format!("{manager}/test"));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+}
+
+#[test]
+fn detects_python_and_go() {
+    let d = scratch();
+    std::fs::write(d.join("pyproject.toml"), "[project]\nname='x'").unwrap();
+    let ids: Vec<String> = detect(&d).into_iter().map(|c| c.id).collect();
+    assert!(ids.contains(&"python/lint".to_string()));
+    assert!(ids.contains(&"python/test".to_string()));
+
+    let g = scratch();
+    std::fs::write(g.join("go.mod"), "module x").unwrap();
+    let ids: Vec<String> = detect(&g).into_iter().map(|c| c.id).collect();
+    assert!(ids.contains(&"go/build".to_string()));
+    assert!(ids.contains(&"go/vet".to_string()));
+    assert!(ids.contains(&"go/test".to_string()));
+    let _ = std::fs::remove_dir_all(&d);
+    let _ = std::fs::remove_dir_all(&g);
+}
+
+#[test]
 fn malformed_package_has_no_implicit_checks() {
     let d = scratch();
     std::fs::write(d.join("package.json"), "not json").unwrap();

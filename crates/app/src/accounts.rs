@@ -5,10 +5,12 @@ use gpui::prelude::*;
 use gpui::{div, px, App, Entity, IntoElement, SharedString, Window};
 use guise::prelude::*;
 
+use crate::control::Button;
 use crate::state::{AccountRow, Root};
 
 pub fn accounts_view(
     rows: Vec<AccountRow>,
+    input: Entity<guise::TextInput>,
     handle: Entity<Root>,
     _window: &mut Window,
     cx: &mut App,
@@ -17,9 +19,28 @@ pub fn accounts_view(
     let mut col = div().flex().flex_col().w_full().gap_4().p(px(20.0));
     col = col.child(Title::new("Accounts").order(2));
 
+    // Add-account form: provider and optional label, Enter or the button adds.
+    let add = handle.clone();
+    col = col.child(
+        div()
+            .flex()
+            .flex_row()
+            .items_center()
+            .gap_2()
+            .child(div().flex_1().min_w_0().child(input))
+            .child(
+                Button::new("add-account", "Add account")
+                    .size(Size::Sm)
+                    .variant(Variant::Filled)
+                    .on_click(move |_, _, cx| {
+                        add.update(cx, |root, cx| root.add_account_from_input(cx));
+                    }),
+            ),
+    );
+
     if rows.is_empty() {
         return col.child(
-            Text::new("No accounts yet. Sign in to a provider to track usage.")
+            Text::new("No accounts yet. Add one above, then run an agent to verify it.")
                 .size(Size::Sm)
                 .dimmed(),
         );

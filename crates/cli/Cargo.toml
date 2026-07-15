@@ -12,6 +12,10 @@ path = "src/main.rs"
 
 [dependencies]
 agent = { path = "../agent" }
+config = { path = "../config" }
+control = { path = "../control" }
 git = { path = "../git" }
+plugin = { path = "../plugin" }
 runner = { path = "../runner" }
 search = { path = "../search" }
+serde_json = { workspace = true }

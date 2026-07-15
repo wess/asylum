@@ -11,6 +11,9 @@ pub struct Report {
     pub path: Option<PathBuf>,
     /// Set by the host when this agent has completed a real run successfully.
     pub verified: bool,
+    /// A copy-pasteable install hint for this agent's CLI, when known. Shown to
+    /// a user who has the agent enabled but not installed.
+    pub install: Option<&'static str>,
 }
 
 impl Report {
@@ -29,7 +32,34 @@ pub fn inspect(agent: &Agent) -> Report {
         program: agent.program.clone(),
         path: find_program(&agent.program),
         verified: false,
+        install: install_hint(&agent.id),
     }
+}
+
+/// A best-effort install command or docs URL for a known agent CLI. Returns
+/// `None` for agents we don't have a canonical install line for.
+pub fn install_hint(id: &str) -> Option<&'static str> {
+    Some(match id {
+        "claude-code" => {
+            "npm i -g @anthropic-ai/claude-code  ·  https://docs.claude.com/claude-code"
+        }
+        "codex" => "npm i -g @openai/codex  ·  https://github.com/openai/codex",
+        "opencode" => "curl -fsSL https://opencode.ai/install | bash",
+        "gemini" => "npm i -g @google/gemini-cli",
+        "grok" => "npm i -g @vibe-kit/grok-cli",
+        "cursor-agent" => "curl https://cursor.com/install -fsS | bash",
+        "copilot" => "npm i -g @github/copilot",
+        "aider" => "python -m pip install aider-install && aider-install  ·  https://aider.chat",
+        "continue" => "npm i -g @continuedev/cli",
+        "cline" => "npm i -g cline",
+        "goose" => {
+            "curl -fsSL https://raw.githubusercontent.com/block/goose/main/download_cli.sh | bash"
+        }
+        "amp" => "npm i -g @sourcegraph/amp",
+        "qwen-code" => "npm i -g @qwen-code/qwen-code",
+        "codebuff" => "npm i -g codebuff",
+        _ => return None,
+    })
 }
 
 pub fn find_program(program: &str) -> Option<PathBuf> {

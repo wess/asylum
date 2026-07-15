@@ -10,7 +10,11 @@ fn error_display() {
 
 #[test]
 fn init_repo_makes_a_usable_repo() {
-    if std::process::Command::new("git").arg("--version").output().is_err() {
+    if std::process::Command::new("git")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
         return; // no git
     }
     let dir = std::env::temp_dir().join(format!("asylum-init-{}", std::process::id()));

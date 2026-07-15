@@ -50,9 +50,28 @@ pub fn write(root: &Path, relative: &str, content: &str) -> Result<Note> {
 }
 
 pub fn create(root: &Path, title: &str, kind: Template, created: i64) -> Result<Note> {
-    fs::create_dir_all(root)?;
     let title = clean_title(title);
-    let base = slug(&title);
+    let content = template(kind, &title, created);
+    create_with_body(root, &title, &content)
+}
+
+/// Create a note from a user-authored template body, substituting its
+/// `{{title}}`/`{{date}}`/`{{time}}` variables against `created`.
+pub fn create_from_template(
+    root: &Path,
+    template_body: &str,
+    title: &str,
+    created: i64,
+) -> Result<Note> {
+    let title = clean_title(title);
+    let content = crate::render_user_template(template_body, &title, created);
+    create_with_body(root, &title, &content)
+}
+
+/// Write `content` to a fresh, de-duplicated note file named after `title`.
+fn create_with_body(root: &Path, title: &str, content: &str) -> Result<Note> {
+    fs::create_dir_all(root)?;
+    let base = slug(title);
     let mut suffix = 1;
     let relative = loop {
         let candidate = if suffix == 1 {
@@ -65,7 +84,72 @@ pub fn create(root: &Path, title: &str, kind: Template, created: i64) -> Result<
         }
         suffix += 1;
     };
-    write(root, &relative, &template(kind, &title, created))
+    write(root, &relative, content)
+}
+
+/// A user-authored note template stored under the vault's `.templates/` folder.
+/// The folder is hidden from the note index, so templates never appear as notes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserTemplate {
+    pub name: String,
+    pub path: String,
+    pub body: String,
+}
+
+/// List the user templates in `<root>/.templates/*.md`, sorted by name.
+pub fn user_templates(root: &Path) -> Result<Vec<UserTemplate>> {
+    let dir = root.join(".templates");
+    if !dir.is_dir() {
+        return Ok(Vec::new());
+    }
+    let mut out = Vec::new();
+    for entry in fs::read_dir(&dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+            continue;
+        }
+        let name = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or("template")
+            .to_string();
+        let body = fs::read_to_string(&path).unwrap_or_default();
+        out.push(UserTemplate {
+            name,
+            path: format!(
+                ".templates/{}",
+                slash(path.file_name().map_or(Path::new(""), Path::new))
+            ),
+            body,
+        });
+    }
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(out)
+}
+
+/// Save `body` as a reusable user template named `name`. The filename keeps the
+/// name's casing (path-unsafe characters removed) so the listing reads back the
+/// name the author chose.
+pub fn save_user_template(root: &Path, name: &str, body: &str) -> Result<UserTemplate> {
+    let dir = root.join(".templates");
+    fs::create_dir_all(&dir)?;
+    let stem: String = name
+        .trim()
+        .chars()
+        .filter(|ch| ch.is_alphanumeric())
+        .collect();
+    let stem = if stem.is_empty() {
+        "template".to_string()
+    } else {
+        stem
+    };
+    fs::write(dir.join(format!("{stem}.md")), body)?;
+    Ok(UserTemplate {
+        name: stem.clone(),
+        path: format!(".templates/{stem}.md"),
+        body: body.to_string(),
+    })
 }
 
 pub fn delete(root: &Path, relative: &str) -> Result<()> {

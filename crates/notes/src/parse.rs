@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use serde_yaml_ng::Value;
 
-use crate::{Link, Note, Property};
+use crate::{Index, Link, Note, Property};
 
 /// Parse one Markdown file without changing its source.
 pub fn parse(path: &str, content: &str) -> Note {
@@ -44,9 +44,18 @@ pub fn completion_fragment(line_before_caret: &str) -> Option<String> {
 }
 
 /// Markdown for preview: frontmatter is rendered in the property pane and wiki
-/// links become ordinary links while keeping their Obsidian spelling useful.
+/// links become ordinary links while keeping their original spelling useful.
+/// Without an index, embeds (`![[note]]`) degrade to plain links rather than
+/// broken images.
 pub fn preview_source(note: &Note) -> String {
-    rewrite_wiki_links(&note.body)
+    rewrite(&note.body, None, 0)
+}
+
+/// Markdown for preview, resolving embeds against a vault index. `![[note]]`
+/// and `![[note#heading]]` inline the target note (or section) as a quoted
+/// block; unresolved embeds render a short notice instead of broken markup.
+pub fn preview_source_in(index: &Index, note: &Note) -> String {
+    rewrite(&note.body, Some(index), 0)
 }
 
 pub(crate) fn split_frontmatter(content: &str) -> (Option<&str>, &str) {
@@ -199,29 +208,143 @@ fn wiki_links(body: &str) -> Vec<Link> {
     links
 }
 
-fn rewrite_wiki_links(body: &str) -> String {
+/// Rewrite `[[link]]` and `![[embed]]` wiki syntax into preview-ready Markdown.
+/// `depth` bounds embed transclusion so a note that embeds itself (directly or
+/// in a cycle) cannot recurse forever.
+fn rewrite(body: &str, index: Option<&Index>, depth: u8) -> String {
     let mut out = String::with_capacity(body.len());
     let mut rest = body;
-    while let Some(start) = rest.find("[[") {
-        out.push_str(&rest[..start]);
-        let after = &rest[start + 2..];
+    while let Some(pos) = rest.find("[[") {
+        let is_embed = pos > 0 && rest.as_bytes()[pos - 1] == b'!';
+        let prefix_end = if is_embed { pos - 1 } else { pos };
+        out.push_str(&rest[..prefix_end]);
+        let after = &rest[pos + 2..];
         let Some(end) = after.find("]]") else {
-            out.push_str(&rest[start..]);
+            out.push_str(&rest[prefix_end..]);
             return out;
         };
-        let raw = &after[..end];
-        let mut parts = raw.splitn(2, '|');
-        let target = parts.next().unwrap_or_default().trim();
-        let alias = parts.next().map(str::trim).unwrap_or(target);
-        let slug = target
-            .chars()
-            .map(|ch| if ch.is_alphanumeric() { ch } else { '-' })
-            .collect::<String>();
-        out.push_str(&format!("[{alias}](asylum://note/{slug})"));
+        let (target, alias) = split_alias(&after[..end]);
         rest = &after[end + 2..];
+        if is_embed {
+            out.push_str(&embed(index, target, alias, depth));
+        } else {
+            out.push_str(&link_markdown(target, alias));
+        }
     }
     out.push_str(rest);
     out
+}
+
+/// Split a wiki-link body into its target and optional display alias.
+fn split_alias(raw: &str) -> (&str, Option<&str>) {
+    let mut parts = raw.splitn(2, '|');
+    let target = parts.next().unwrap_or_default().trim();
+    let alias = parts
+        .next()
+        .map(str::trim)
+        .filter(|alias| !alias.is_empty());
+    (target, alias)
+}
+
+/// Render a `[[target|alias]]` link as a Markdown link into the note scheme.
+/// The `#heading` fragment is kept in the display text but dropped from the
+/// slug, which addresses the note as a whole.
+fn link_markdown(target: &str, alias: Option<&str>) -> String {
+    let display = alias.unwrap_or(target);
+    let name = target.split('#').next().unwrap_or(target).trim();
+    format!("[{display}](asylum://note/{})", slug(name))
+}
+
+/// Render an `![[target]]` embed. Note embeds are transcluded as a quoted block
+/// when an index is available and the depth budget allows; image embeds become
+/// real images; everything else degrades to a plain link.
+fn embed(index: Option<&Index>, target: &str, alias: Option<&str>, depth: u8) -> String {
+    let name = target.split('#').next().unwrap_or(target).trim();
+    let heading = target.split_once('#').map(|(_, tail)| tail.trim());
+    if is_image(name) {
+        let alt = alias.unwrap_or(name);
+        return format!("![{alt}]({target})");
+    }
+    if let Some(index) = index.filter(|_| depth < 1) {
+        if let Some(note) = index.resolve(name) {
+            let content = heading
+                .and_then(|heading| extract_section(&note.body, heading))
+                .unwrap_or_else(|| note.body.clone());
+            let inner = rewrite(content.trim(), Some(index), depth + 1);
+            let title = match heading {
+                Some(heading) => format!("{} › {heading}", note.title),
+                None => note.title.clone(),
+            };
+            let quoted = inner
+                .lines()
+                .map(|line| {
+                    if line.is_empty() {
+                        ">".to_string()
+                    } else {
+                        format!("> {line}")
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            return format!("\n> **{title}**\n>\n{quoted}\n\n");
+        }
+        return format!("\n> _Embedded note \"{name}\" was not found._\n\n");
+    }
+    link_markdown(target, alias)
+}
+
+/// Content of the section under `heading`: the lines after the matching heading
+/// up to the next heading of the same or shallower level.
+fn extract_section(body: &str, heading: &str) -> Option<String> {
+    let wanted = heading.trim().to_lowercase();
+    let mut lines = body.lines();
+    let mut level = 0;
+    for line in lines.by_ref() {
+        if let Some((depth, text)) = heading_parts(line) {
+            if text.to_lowercase() == wanted {
+                level = depth;
+                break;
+            }
+        }
+    }
+    if level == 0 {
+        return None;
+    }
+    let mut collected = Vec::new();
+    for line in lines {
+        if let Some((depth, _)) = heading_parts(line) {
+            if depth <= level {
+                break;
+            }
+        }
+        collected.push(line);
+    }
+    Some(collected.join("\n"))
+}
+
+/// Parse a Markdown ATX heading into its level and trimmed text.
+fn heading_parts(line: &str) -> Option<(usize, &str)> {
+    let hashes = line.chars().take_while(|ch| *ch == '#').count();
+    if hashes == 0 || hashes > 6 {
+        return None;
+    }
+    let rest = &line[hashes..];
+    rest.strip_prefix(' ').map(|text| (hashes, text.trim()))
+}
+
+fn is_image(target: &str) -> bool {
+    let lower = target.to_lowercase();
+    [
+        ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico", ".avif",
+    ]
+    .iter()
+    .any(|ext| lower.ends_with(ext))
+}
+
+fn slug(name: &str) -> String {
+    name.chars()
+        .map(|ch| if ch.is_alphanumeric() { ch } else { '-' })
+        .collect()
 }
 
 fn unquote(value: &str) -> String {

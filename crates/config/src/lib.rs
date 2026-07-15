@@ -12,18 +12,24 @@
 //! - [`load`] - path resolution and file loading.
 //! - [`edit`] - comment-preserving writes back to settings.json.
 //! - [`watch`] - live reload: poll the file's mtime, fire on change.
+//! - [`bind`] - refuse unsafe (unauthenticated non-loopback) server binds.
+//! - [`token`] - generate the control surface's per-session credential.
 
+pub mod bind;
 pub mod edit;
 mod jsonc;
 pub mod keys;
 pub mod load;
 pub mod model;
 pub mod project;
+pub mod token;
 pub mod watch;
 
 pub use keys::{Keymap, DEFAULTS as KEY_DEFAULTS};
 pub use load::{default_path, load, load_str, Loaded};
-pub use model::{AgentPrefs, CustomAgent, EditorPrefs, Settings};
+pub use model::{
+    AgentPrefs, CompanionPrefs, ControlPrefs, CustomAgent, EditorPrefs, Layout, Settings,
+};
 pub use project::{load_project, parse_project, ProjectConfig, PROJECT_FILE};
 pub use watch::{watch, WatchHandle};
 

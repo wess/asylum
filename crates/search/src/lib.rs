@@ -76,7 +76,11 @@ fn run_rg(dir: &Path, pattern: &str, opts: &Options) -> Option<String> {
         args.push("-F");
     }
     args.push(pattern);
-    let out = Command::new("rg").args(&args).current_dir(dir).output().ok()?;
+    let out = Command::new("rg")
+        .args(&args)
+        .current_dir(dir)
+        .output()
+        .ok()?;
     // rg exits 2 on a real error; 0/1 are match/no-match (both fine).
     if out.status.code() == Some(2) {
         return None;
@@ -95,7 +99,11 @@ fn run_git_grep(dir: &Path, pattern: &str, opts: &Options) -> Option<String> {
     }
     args.push("-e");
     args.push(pattern);
-    let out = Command::new("git").args(&args).current_dir(dir).output().ok()?;
+    let out = Command::new("git")
+        .args(&args)
+        .current_dir(dir)
+        .output()
+        .ok()?;
     // git grep exits 1 when nothing matches; >1 is a real error.
     if out.status.code().unwrap_or(1) > 1 {
         return None;

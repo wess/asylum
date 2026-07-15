@@ -13,9 +13,9 @@
 //! - [`status`] - working-tree status (porcelain v2).
 //! - [`diff`] - unified-diff capture and parsing into a reviewable model.
 
-mod run;
 pub mod branch;
 pub mod diff;
+mod run;
 pub mod status;
 pub mod worktree;
 

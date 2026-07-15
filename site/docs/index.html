@@ -14,8 +14,9 @@
       <a class="brand" href="../" aria-label="Asylum home"><span class="brandmark" aria-hidden="true"></span><span>ASYLUM</span></a>
       <nav class="primarynav" aria-label="Primary navigation" data-nav>
         <a href="../">Overview</a>
+        <a href="../book/">Book</a>
+        <a href="../videos/">Videos</a>
         <a class="active" href="./">Docs</a>
-        <a href="../tutorials/">Tutorials</a>
         <a href="https://github.com/wess/asylum" target="_blank" rel="noreferrer">GitHub <i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
       </nav>
       <button class="navtoggle" type="button" aria-label="Open navigation" aria-expanded="false" data-navtoggle><i data-lucide="menu" aria-hidden="true"></i></button>
@@ -42,6 +43,7 @@
           <p>Operate</p>
           <a href="#agents" data-doclink="agents">Agents and fan-out</a>
           <a href="#runs" data-doclink="runs">Runs and terminals</a>
+          <a href="#control" data-doclink="control">Fleet control</a>
           <a href="#review" data-doclink="review">Review and merge</a>
           <a href="#memory" data-doclink="memory">Project memory</a>
           <a href="#search" data-doclink="search">Unified search</a>
@@ -96,7 +98,7 @@ cd asylum
 cargo run -p app</code></pre>
           </div>
           <p>The development binary is named <code>asylumdev</code>, so it never collides with an installed release binary named <code>asylum</code>.</p>
-          <aside class="docnote"><i data-lucide="info" aria-hidden="true"></i><div><strong>First build</strong><p>Cargo fetches pinned GPUI, guise-ui, and libsinclair dependencies. This build takes longer than later launches.</p></div></aside>
+          <aside class="docnote"><i data-lucide="info" aria-hidden="true"></i><div><strong>First build</strong><p>Cargo fetches pinned GPUI, guise-ui, and <a href="https://github.com/wess/sinclair">libsinclair</a> dependencies. This build takes longer than later launches.</p></div></aside>
           <h2>Verify the workspace</h2>
           <div class="codeblock">
             <div><span>Terminal</span><button type="button" data-copy aria-label="Copy verification commands"><i data-lucide="copy" aria-hidden="true"></i></button></div>
@@ -153,10 +155,33 @@ cargo clippy --all-targets</code></pre>
             <div><dt>Cancel</dt><dd>Stops a queued or running attempt without deleting its worktree.</dd></div>
             <div><dt>Retry</dt><dd>Starts another attempt in the same worktree and increments the attempt count.</dd></div>
             <div><dt>Follow-up</dt><dd>Sends context to a live stdin-capable agent or queues a continuation.</dd></div>
-            <div><dt>Full terminal</dt><dd>Opens the persistent libsinclair terminal in a dedicated workspace tab.</dd></div>
+            <div><dt>Full terminal</dt><dd>Opens the persistent terminal — powered by <a href="https://github.com/wess/sinclair">libsinclair</a> — in a dedicated workspace tab.</dd></div>
           </dl>
           <h2>Restart recovery</h2>
           <p>A PTY cannot survive the application process. On restart, Asylum marks interrupted runs failed and preserves their branches, worktrees, output, and retry path.</p>
+        </article>
+
+        <article id="control" data-article data-title="Fleet control" data-keywords="semantic states blocked working done idle activity control surface skill spawn wait events layouts orchestrate">
+          <p class="doccrumb">Operate / Fleet control</p>
+          <h1>Fleet control</h1>
+          <p class="doclead">See which agent needs you, race a preset of agents in one pick, and let a running agent orchestrate the rest of the fleet.</p>
+          <h2>Semantic states</h2>
+          <p>Beyond queued/running/succeeded, each run shows a live activity classified from its output, so a fan-out board tells you at a glance which agent is waiting on you.</p>
+          <dl class="docdefinitions">
+            <div><dt>working</dt><dd>Actively thinking, editing, or running a command.</dd></div>
+            <div><dt>blocked</dt><dd>Stopped at a prompt, waiting for your answer — the state worth surfacing first.</dd></div>
+            <div><dt>done</dt><dd>Printed a completion marker; awaiting review.</dd></div>
+            <div><dt>idle</dt><dd>Initialised but producing no recognisable signal.</dd></div>
+          </dl>
+          <h2>Fan-out layouts</h2>
+          <p>A layout is a named preset in <code>settings.json</code> — race a set of agents in one gesture. Built-ins <code>duel</code>, <code>triad</code>, and <code>swarm</code> ship out of the box; define your own with an optional per-layout concurrency cap. Inspect them with <code>asylum layout list</code>.</p>
+          <h2>The control surface</h2>
+          <p>A running agent can orchestrate the fleet from inside its worktree over a local JSON API it learns from a skill (<code>asylum control skill</code>). The app injects <code>ASYLUM_CONTROL_URL</code>, <code>ASYLUM_TASK_ID</code>, and <code>ASYLUM_RUN_ID</code> into every run.</p>
+          <pre class="codeblock"><code>asylum control status                 # your run + siblings, with live activity
+asylum control spawn codex "write the tests"
+asylum control activity blocked       # report yourself before you ask a question
+asylum wait run 42 --status succeeded # block until a sibling finishes</code></pre>
+          <p>Write-effects (spawning a helper run, running checks) are queued and drained by the desktop app, so the API stays safe and pure. An append-only event log streams over both the control and companion servers, so a phone or an agent can follow the fleet without polling.</p>
         </article>
 
         <article id="review" data-article data-title="Review and merge" data-keywords="diff comments annotation checks pass fail merge pull request github conflicts cleanup">
@@ -177,11 +202,11 @@ cargo clippy --all-targets</code></pre>
           <p>The final confirmation performs the merge. Cleanup removes clean finished worktrees and preserves dirty worktrees and branches.</p>
         </article>
 
-        <article id="memory" data-article data-title="Project memory" data-keywords="notes markdown obsidian wiki links backlinks tags properties yaml templates context task run">
+        <article id="memory" data-article data-title="Project memory" data-keywords="notes markdown wiki links backlinks tags properties yaml templates context task run">
           <p class="doccrumb">Operate / Project memory</p>
           <h1>Project memory</h1>
           <p class="doclead">Project knowledge remains ordinary Markdown. Store it privately in Asylum’s data directory or in the repository’s <code>notes/</code> directory.</p>
-          <h2>Obsidian-style syntax</h2>
+          <h2>Wiki-style syntax</h2>
           <div class="codeblock">
             <div><span>cacheinvestigation.md</span><button type="button" data-copy aria-label="Copy note example"><i data-lucide="copy" aria-hidden="true"></i></button></div>
             <pre><code>---
@@ -233,7 +258,7 @@ RUST_BACKTRACE = "1"</code></pre>
           </div>
           <p>Setup commands run once in every new worktree before the agent starts. A failed command creates a durable failed run with the worktree path and error.</p>
           <h2>User settings</h2>
-          <p>Open Settings or edit <code>$XDG_CONFIG_HOME/asylum/settings.json</code>. The file accepts JSON with comments and live-reloads theme and keybindings. Invalid values produce diagnostics while valid settings remain active.</p>
+          <p>Open Settings or edit <code>$XDG_CONFIG_HOME/asylum/settings.json</code>. The file accepts JSON with comments and live-reloads theme and keybindings. Invalid values produce diagnostics while valid settings remain active. Alongside agents and the editor, it holds <code>layouts</code> (named fan-out presets), <code>companion</code> (the mobile server), and <code>control</code> (the agent control surface).</p>
         </article>
 
         <article id="plugins" data-article data-title="Plugins" data-keywords="plugin manifest toml process wasm capability command panel webview trigger tool sandbox">
@@ -254,6 +279,11 @@ title = "Summarize selected run"</code></pre>
           </div>
           <h2>Runtime choices</h2>
           <div class="comparison"><div><strong>Process</strong><p>Newline JSON over stdio, one-shot or persistent session.</p></div><div><strong>WASM</strong><p>Sandboxed with wasmi; only declared host functions are linked.</p></div></div>
+          <h2>Install and discover</h2>
+          <p>A plugin is just a directory with a <code>plugin.toml</code>, so installing one is a shallow clone. Community plugins tag their repo with the <code>asylum-plugin</code> GitHub topic.</p>
+          <pre class="codeblock"><code>asylum plugin install acme/asylum-reviewr   # clone into the plugins dir
+asylum plugin list                          # what's installed
+asylum plugin search                        # community plugins, by topic</code></pre>
           <div class="docnext"><span>Build one</span><a href="../tutorials/#plugin">Advanced: create a capability-gated plugin <i data-lucide="arrow-right" aria-hidden="true"></i></a></div>
         </article>
 
@@ -266,6 +296,10 @@ title = "Summarize selected run"</code></pre>
             <pre><code>asylum worktree list /path/to/repo
 asylum run opencode "Add a health endpoint"
 asylum search /path/to/repo "cache key"
+asylum control status                 # fleet control from inside a worktree
+asylum wait run 42 --activity blocked
+asylum plugin install acme/asylum-reviewr
+asylum layout list
 asylum snapshot
 asylum click 420 280
 asylum fill "project name"</code></pre>

@@ -145,7 +145,8 @@ fn persist(path: &Path, contents: &str) -> Result<(), String> {
         .map(|n| n.to_string_lossy().into_owned())
         .ok_or("settings path has no file name")?;
     let tmp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
-    std::fs::write(&tmp, contents).map_err(|e| format!("could not write {}: {e}", tmp.display()))?;
+    std::fs::write(&tmp, contents)
+        .map_err(|e| format!("could not write {}: {e}", tmp.display()))?;
     std::fs::rename(&tmp, path).map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
         format!("could not update {}: {e}", path.display())
@@ -212,7 +213,11 @@ fn scan(text: &str) -> Option<(Vec<Span>, usize)> {
         pos += 1;
         pos += count_trivia(&text[pos..]);
         skip_value(text, &mut pos)?;
-        spans.push(Span { key, start, end: pos });
+        spans.push(Span {
+            key,
+            start,
+            end: pos,
+        });
     }
 }
 

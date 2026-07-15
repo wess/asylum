@@ -55,3 +55,25 @@ fn missing_file_is_clean_defaults() {
     assert!(loaded.diagnostics.is_empty());
     assert_eq!(loaded.settings, Settings::default());
 }
+
+#[test]
+fn env_fills_only_empty_secrets() {
+    // Empty secrets are filled from the environment override.
+    let mut s = Settings::default();
+    resolve_secrets(&mut s, Some("lin_tok".into()), Some("comp_tok".into()));
+    assert_eq!(s.linear_token, "lin_tok");
+    assert_eq!(s.companion.token, "comp_tok");
+
+    // A value already in the file wins over the environment.
+    let mut s = Settings {
+        linear_token: "from_file".into(),
+        ..Default::default()
+    };
+    resolve_secrets(&mut s, Some("from_env".into()), None);
+    assert_eq!(s.linear_token, "from_file");
+
+    // A blank override is ignored.
+    let mut s = Settings::default();
+    resolve_secrets(&mut s, Some("   ".into()), None);
+    assert!(s.linear_token.is_empty());
+}

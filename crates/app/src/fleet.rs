@@ -23,6 +23,7 @@ pub fn main_content(
     setup_checks: Vec<crate::setup::Check>,
     setup_open: bool,
     compose: Entity<guise::TextInput>,
+    start_ref: Entity<guise::TextInput>,
     handle: Entity<Root>,
     window: &mut Window,
     cx: &mut App,
@@ -56,6 +57,7 @@ pub fn main_content(
         setup_open,
         handle.clone(),
     ));
+    let layout_names = handle.read(cx).layout_names();
     col = col.child(compose_box(
         project_name,
         &fanout,
@@ -64,7 +66,9 @@ pub fn main_content(
         show_all,
         preparing,
         setup_blocked,
+        layout_names,
         compose,
+        start_ref,
         handle.clone(),
     ));
 
@@ -268,7 +272,9 @@ fn compose_box(
     show_all: bool,
     preparing: bool,
     setup_blocked: bool,
+    layouts: Vec<String>,
     compose: Entity<guise::TextInput>,
+    start_ref: Entity<guise::TextInput>,
     handle: Entity<Root>,
 ) -> impl IntoElement {
     let create = handle.clone();
@@ -356,7 +362,40 @@ fn compose_box(
         );
 
     if advanced {
+        if !layouts.is_empty() {
+            let mut row = div()
+                .flex()
+                .flex_row()
+                .flex_wrap()
+                .items_center()
+                .gap_2()
+                .child(Text::new("Layouts").size(Size::Xs).dimmed());
+            for name in &layouts {
+                let pick = handle.clone();
+                let chosen = name.clone();
+                row = row.child(
+                    Button::new(SharedString::from(format!("layout-{name}")), name.clone())
+                        .size(Size::Xs)
+                        .variant(Variant::Subtle)
+                        .on_click(move |_, _, cx| {
+                            pick.update(cx, |root, cx| {
+                                root.apply_layout(&chosen);
+                                cx.notify();
+                            });
+                        }),
+                );
+            }
+            body = body.child(row);
+        }
         body = body.child(agent_controls(reports, fanout, show_all, handle.clone()));
+        body = body.child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .child(Text::new("Start worktrees from").size(Size::Xs).dimmed())
+                .child(start_ref),
+        );
     }
 
     body = body.child(
@@ -551,6 +590,22 @@ fn agent_controls(
     )
 }
 
+/// A live semantic-activity chip - which agent is working, blocked on input, or
+/// done - shown only while the run is active. This is the "which of my agents
+/// needs me right now" signal, distinct from the lifecycle status badge.
+fn activity_chip(run: &RunRow) -> Option<impl IntoElement> {
+    if run.status != RunStatus::Running {
+        return None;
+    }
+    let (label, color) = match run.activity.as_deref()? {
+        "blocked" => ("blocked", ColorName::Orange),
+        "working" => ("working", ColorName::Blue),
+        "done" => ("done", ColorName::Green),
+        _ => ("idle", ColorName::Gray),
+    };
+    Some(Badge::new(label).color(color).variant(Variant::Light))
+}
+
 fn run_card(run: RunRow, handle: Entity<Root>) -> impl IntoElement {
     let name = agent::find(&run.agent)
         .map(|agent| agent.name)
@@ -586,17 +641,39 @@ fn run_card(run: RunRow, handle: Entity<Root>) -> impl IntoElement {
                                 .variant(Variant::Light)
                         })),
                 )
-                .child(status_badge(run.status)),
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_2()
+                        .children(activity_chip(&run))
+                        .child(status_badge(run.status)),
+                ),
         )
         .child(
-            Text::new(SharedString::from(run.branch.clone()))
-                .size(Size::Xs)
-                .dimmed(),
+            div()
+                .id(SharedString::from(format!("branch-tip-{}", run.id)))
+                .tooltip(guise::tooltip(
+                    "A branch is a named line of changes. This agent's work lands on its own branch so you can compare and merge it independently.",
+                ))
+                .child(
+                    Text::new(SharedString::from(run.branch.clone()))
+                        .size(Size::Xs)
+                        .dimmed(),
+                ),
         )
         .child(
-            Text::new(SharedString::from(run.worktree.clone()))
-                .size(Size::Xs)
-                .dimmed(),
+            div()
+                .id(SharedString::from(format!("worktree-tip-{}", run.id)))
+                .tooltip(guise::tooltip(
+                    "A worktree is this agent's private copy of your project, so parallel agents never overwrite each other's files.",
+                ))
+                .child(
+                    Text::new(SharedString::from(run.worktree.clone()))
+                        .size(Size::Xs)
+                        .dimmed(),
+                ),
         )
         .child(
             div()

@@ -1,0 +1,14 @@
+[package]
+autotests = false
+name = "control"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The agent control surface: a local JSON API an in-worktree agent uses to orchestrate the ADE - spawn helper runs, read siblings, report state, and wait."
+
+[dependencies]
+store = { path = "../store" }
+serde_json = { workspace = true }
+hmac = "0.12"
+sha2 = "0.10"
+subtle = "2"

@@ -1,0 +1,61 @@
+WEBVTT
+
+1
+00:00:00.200 --> 00:00:06.400
+A project in Asylum is just a git repository. On first run it walks you through opening one.
+
+2
+00:00:07.050 --> 00:00:17.825
+Point it at a repo folder. If that folder isn't a git repo yet, Asylum asks for explicit consent before it runs git init — it never touches your folders silently.
+
+3
+00:00:18.475 --> 00:00:26.825
+A built-in setup doctor checks that git, branches, worktrees, your agents, Bun, and Cargo are all in order, and tells you what's missing.
+
+4
+00:00:27.475 --> 00:00:39.075
+Once it's open, the project has a base branch — usually main — where merged winners will land. Per-task worktrees get created under the project, by default in dot-asylum slash worktrees.
+
+5
+00:00:39.725 --> 00:00:46.325
+Now let's pick our agents. Command-comma opens Settings, which is a real editor over your settings file.
+
+6
+00:00:46.975 --> 00:00:56.425
+That file lives under your config directory, at asylum slash settings dot json. It's JSON with comments, so you can annotate it freely.
+
+7
+00:00:57.075 --> 00:01:03.975
+Here's the key that matters: default underscore agents. These are the agents a task fans out to by default.
+
+8
+00:01:04.625 --> 00:01:13.800
+Ids come from the built-in catalog — claude-code, codex, opencode, gemini, aider, cursor-agent, and many more. I'll set two I have installed.
+
+9
+00:01:14.450 --> 00:01:24.300
+Save it, and it applies live — a watcher reloads the config, no restart. Leave the list empty instead and Asylum asks you which agents to use each time.
+
+10
+00:01:24.950 --> 00:01:37.775
+One common first snag: an agent that isn't actually installed. Asylum launches agents by program name, so if your shell can't find it, Asylum can't either. Check with the agent's own version command.
+
+11
+00:01:38.425 --> 00:01:48.225
+You can also let Asylum drive one agent from the CLI. From source that's cargo run, dash p, cli, dash dash, run, the agent id, and a prompt.
+
+12
+00:01:48.875 --> 00:02:01.050
+Watch the line it echoes — dollar sign, claude, dash p, your prompt. That's exactly what Asylum runs, no shell in between. If that program is missing, install the agent's CLI and retry.
+
+13
+00:02:01.700 --> 00:02:08.425
+The doctor in the app shows installed-versus-verified state for each configured agent too, so you're not guessing.
+
+14
+00:02:09.075 --> 00:02:19.125
+And if you need to tweak one agent — a wrapper program, extra arguments, or disabling it — that's the agents key. We'll cover overrides in the config episode.
+
+15
+00:02:19.775 --> 00:02:24.625
+Project open, agents chosen and verified. Next: our first fan-out.

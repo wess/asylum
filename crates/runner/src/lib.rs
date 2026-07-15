@@ -9,7 +9,7 @@
 //!
 //! ```no_run
 //! use runner::Runner;
-//! # let spec = agent::SpawnSpec { program: "echo".into(), args: vec!["hi".into()], cwd: ".".into(), stdin: None };
+//! # let spec = agent::SpawnSpec { program: "echo".into(), args: vec!["hi".into()], cwd: ".".into(), stdin: None, env: Vec::new() };
 //! let run = Runner::start(&spec).unwrap();
 //! run.wait(std::time::Duration::from_secs(5));
 //! println!("{}", run.screen_text());
@@ -82,6 +82,7 @@ impl Runner {
         options.rows = rows;
         options.spawn = SpawnOptions {
             cwd: Some(spec.cwd.clone().into()),
+            env: spec.env.clone(),
             ..options.spawn
         };
 

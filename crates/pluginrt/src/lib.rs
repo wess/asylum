@@ -19,7 +19,7 @@
 pub mod wasm;
 
 use std::io::{BufRead, BufReader, Write};
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use serde::{Deserialize, Serialize};
@@ -73,7 +73,34 @@ fn split_command(command: &str) -> Option<(String, Vec<String>)> {
     Some((program, parts.collect()))
 }
 
+/// Environment variables a process plugin inherits. A process plugin is a fully
+/// trusted child process (see `docs/plugins.md`), but it should still not
+/// silently receive the app's secrets. Everything outside this small allowlist -
+/// notably `ASYLUM_CONTROL_TOKEN`, `ASYLUM_LINEAR_TOKEN`, cloud/CI credentials -
+/// is scrubbed before the process starts.
+const ENV_ALLOWLIST: &[&str] = &[
+    "PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "TMPDIR", "TMP",
+    "TEMP", "TZ", "SHELL", "PWD",
+];
+
+/// The environment a plugin process inherits: the current environment filtered
+/// down to [`ENV_ALLOWLIST`].
+fn scrubbed_env() -> Vec<(String, String)> {
+    filter_allowed(std::env::vars(), ENV_ALLOWLIST)
+}
+
+/// Keep only the pairs whose key is in `allow`. Pure, so it is testable without
+/// touching the process environment.
+fn filter_allowed(
+    vars: impl Iterator<Item = (String, String)>,
+    allow: &[&str],
+) -> Vec<(String, String)> {
+    vars.filter(|(k, _)| allow.contains(&k.as_str())).collect()
+}
+
 /// Spawn a runtime process with piped stdio, in `cwd`. Rejects a `wasm` runtime.
+/// The child starts from a scrubbed environment ([`scrubbed_env`]) so the app's
+/// secrets are not exported into it.
 pub fn spawn(runtime: &Runtime, cwd: &std::path::Path) -> Result<Child, Error> {
     if runtime.kind == RuntimeKind::Wasm {
         return Err(Error::Unsupported);
@@ -83,6 +110,8 @@ pub fn spawn(runtime: &Runtime, cwd: &std::path::Path) -> Result<Child, Error> {
     Command::new(program)
         .args(args)
         .current_dir(cwd)
+        .env_clear()
+        .envs(scrubbed_env())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -104,10 +133,47 @@ pub fn invoke_wasm(
         .wasm
         .as_deref()
         .ok_or_else(|| Error::Spawn("wasm runtime has no module path".into()))?;
-    let path = plugin_dir.join(rel);
+    let path = contained_module_path(plugin_dir, rel)?;
     let bytes = std::fs::read(&path).map_err(|e| Error::Spawn(e.to_string()))?;
     let mut rt = WasmRuntime::new(&bytes, capabilities)?;
     rt.call(method, params)
+}
+
+/// Resolve a manifest `rel` module path against `plugin_dir`, refusing anything
+/// that escapes the plugin's own directory. Absolute paths and `..`/root
+/// components are rejected before touching the filesystem; the plugin root and
+/// the module are then canonicalized (which resolves symlinks) and the module
+/// must remain under the root - so a symlink pointing outside is contained too.
+pub(crate) fn contained_module_path(plugin_dir: &Path, rel: &str) -> Result<PathBuf, Error> {
+    let rel_path = Path::new(rel);
+    if rel_path.is_absolute() {
+        return Err(Error::Spawn(format!(
+            "wasm module path must be relative, got {rel:?}"
+        )));
+    }
+    for comp in rel_path.components() {
+        match comp {
+            Component::Normal(_) | Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return Err(Error::Spawn(format!(
+                    "wasm module path must not contain '..' or a root component, got {rel:?}"
+                )));
+            }
+        }
+    }
+    let root = plugin_dir
+        .canonicalize()
+        .map_err(|e| Error::Spawn(format!("plugin dir: {e}")))?;
+    let module = root
+        .join(rel_path)
+        .canonicalize()
+        .map_err(|e| Error::Spawn(format!("wasm module: {e}")))?;
+    if !module.starts_with(&root) {
+        return Err(Error::Spawn(format!(
+            "wasm module {rel:?} resolves outside the plugin directory"
+        )));
+    }
+    Ok(module)
 }
 
 /// One-shot invoke: spawn, send one request, read one response, and reap.
@@ -193,7 +259,9 @@ fn read_response(reader: &mut impl BufRead) -> Result<Response, Error> {
     let mut line = String::new();
     loop {
         line.clear();
-        let n = reader.read_line(&mut line).map_err(|e| Error::Io(e.to_string()))?;
+        let n = reader
+            .read_line(&mut line)
+            .map_err(|e| Error::Io(e.to_string()))?;
         if n == 0 {
             return Err(Error::Closed);
         }

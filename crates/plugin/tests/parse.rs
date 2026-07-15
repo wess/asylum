@@ -73,7 +73,12 @@ param = [{ name = "title", type = "string", required = true }]
 
     let trig = &p.triggers[0];
     assert_eq!(trig.on, "run_finished");
-    assert_eq!(trig.action, TriggerAction::Notify { text: "A run finished".into() });
+    assert_eq!(
+        trig.action,
+        TriggerAction::Notify {
+            text: "A run finished".into()
+        }
+    );
 
     let tool = &p.tools[0];
     assert_eq!(tool.id, "create_issue");

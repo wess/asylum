@@ -22,7 +22,9 @@ pub fn run(settings: &config::Settings, path: PathBuf) -> anyhow::Result<()> {
                 root.note.details_open = false;
             }
             root.setup_open = false;
-            root.open_kind(TabKind::Notes);
+            if let Some(kind) = surface() {
+                root.open_kind(kind);
+            }
             root
         })
     })?;
@@ -38,6 +40,16 @@ pub fn run(settings: &config::Settings, path: PathBuf) -> anyhow::Result<()> {
     }
     cx.capture_screenshot(window.into())?.save(path)?;
     Ok(())
+}
+
+fn surface() -> Option<TabKind> {
+    match std::env::var("ASYLUM_SITE_SURFACE").as_deref() {
+        Ok("tasks") => None,
+        Ok("diff") => Some(TabKind::Diff),
+        Ok("integrations") => Some(TabKind::Integrations),
+        Ok("settings") => Some(TabKind::Settings),
+        _ => Some(TabKind::Notes),
+    }
 }
 
 fn loadnotes(root: &mut Root) -> anyhow::Result<()> {

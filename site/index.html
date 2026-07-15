@@ -20,8 +20,9 @@
       </a>
       <nav class="primarynav" aria-label="Primary navigation" data-nav>
         <a class="active" href="./">Overview</a>
+        <a href="./book/">Book</a>
+        <a href="./videos/">Videos</a>
         <a href="./docs/">Docs</a>
-        <a href="./tutorials/">Tutorials</a>
         <a href="https://github.com/wess/asylum" target="_blank" rel="noreferrer">
           GitHub
           <i data-lucide="arrow-up-right" aria-hidden="true"></i>
@@ -46,9 +47,9 @@
               Build from source
               <i data-lucide="arrow-right" aria-hidden="true"></i>
             </a>
-            <a class="button quiet" href="./tutorials/">
-              Start a tutorial
-              <i data-lucide="graduation-cap" aria-hidden="true"></i>
+            <a class="button quiet" href="./videos/">
+              Watch the course
+              <i data-lucide="play" aria-hidden="true"></i>
             </a>
           </div>
           <dl class="herostats" aria-label="Asylum runtime model">
@@ -146,6 +147,20 @@
               <p>Inspect a page, pin visual feedback, and send exact element context back to an agent.</p>
               <small>browser · designmode</small>
             </article>
+            <article>
+              <span class="capabilityindex">E</span>
+              <i data-lucide="gauge" aria-hidden="true"></i>
+              <h3>See who needs you</h3>
+              <p>Every run shows a live state — working, blocked, done — so you spot the agent waiting on your input at a glance.</p>
+              <small>semantic states</small>
+            </article>
+            <article>
+              <span class="capabilityindex">F</span>
+              <i data-lucide="workflow" aria-hidden="true"></i>
+              <h3>Agents that orchestrate</h3>
+              <p>A running agent can spawn a helper, read a sibling, report its state, and wait on another run — from inside its worktree.</p>
+              <small>control surface</small>
+            </article>
           </div>
         </div>
       </section>
@@ -159,7 +174,14 @@
             </div>
             <p>Reference material for operators and guided paths for people running their first agent fleet.</p>
           </div>
-          <div class="learnroutes">
+          <div class="learnroutes learningrail">
+            <a href="./book/" class="learnroute bookroute">
+              <span class="routeicon"><i data-lucide="book-open-text" aria-hidden="true"></i></span>
+              <span class="routelabel">Beginner to expert</span>
+              <strong>Read the book</strong>
+              <p>Fifteen focused chapters that move from your first task to agent-driven sub-fleets.</p>
+              <span class="routelink">Open chapter one <i data-lucide="arrow-right" aria-hidden="true"></i></span>
+            </a>
             <a href="./docs/" class="learnroute">
               <span class="routeicon"><i data-lucide="book-open-text" aria-hidden="true"></i></span>
               <span class="routelabel">Reference</span>
@@ -167,12 +189,12 @@
               <p>Install, configure, operate, extend, and troubleshoot Asylum.</p>
               <span class="routelink">Open documentation <i data-lucide="arrow-right" aria-hidden="true"></i></span>
             </a>
-            <a href="./tutorials/" class="learnroute accent">
-              <span class="routeicon"><i data-lucide="graduation-cap" aria-hidden="true"></i></span>
-              <span class="routelabel">Guided learning</span>
-              <strong>Follow a tutorial</strong>
-              <p>Beginner, intermediate, and advanced tracks with real project workflows.</p>
-              <span class="routelink">Choose your level <i data-lucide="arrow-right" aria-hidden="true"></i></span>
+            <a href="./videos/" class="learnroute accent">
+              <span class="routeicon"><i data-lucide="play" aria-hidden="true"></i></span>
+              <span class="routelabel">Watch and follow</span>
+              <strong>Learn by video</strong>
+              <p>The trailer and ten captioned lessons, from the core model through expert security.</p>
+              <span class="routelink">Watch the course <i data-lucide="arrow-right" aria-hidden="true"></i></span>
             </a>
           </div>
         </div>
@@ -193,10 +215,11 @@
     <footer class="sitefooter">
       <div class="shell">
         <a class="brand" href="./"><span class="brandmark" aria-hidden="true"></span><span>ASYLUM</span></a>
-        <p>Agent Development Environment. Native Rust, durable state, isolated work.</p>
+        <p>Agent Development Environment. Native Rust, durable state, isolated work. Terminals powered by <a href="https://github.com/wess/sinclair">libsinclair</a>.</p>
         <nav aria-label="Footer navigation">
+          <a href="./book/">Book</a>
+          <a href="./videos/">Videos</a>
           <a href="./docs/">Docs</a>
-          <a href="./tutorials/">Tutorials</a>
           <a href="https://github.com/wess/asylum">GitHub</a>
         </nav>
       </div>

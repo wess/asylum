@@ -75,7 +75,10 @@ impl Host {
             argv.push(kv);
         };
         if self.keepalive_secs > 0 {
-            opt(&mut argv, format!("ServerAliveInterval={}", self.keepalive_secs));
+            opt(
+                &mut argv,
+                format!("ServerAliveInterval={}", self.keepalive_secs),
+            );
             opt(&mut argv, "ServerAliveCountMax=3".into());
         }
         if let Some(cp) = &self.control_path {
@@ -103,7 +106,12 @@ impl Host {
     }
 
     /// Build a local port-forward: `ssh -N -L local:remote_host:remote_port target`.
-    pub fn port_forward(&self, local_port: u16, remote_host: &str, remote_port: u16) -> Vec<String> {
+    pub fn port_forward(
+        &self,
+        local_port: u16,
+        remote_host: &str,
+        remote_port: u16,
+    ) -> Vec<String> {
         let mut argv = self.base();
         argv.push("-N".into());
         argv.push("-L".into());
@@ -114,18 +122,102 @@ impl Host {
 
     /// Build the command to create a worktree on the remote host: it changes to
     /// `repo`, adds a worktree at `path` (optionally on a new `branch`).
-    pub fn worktree_create(&self, repo: &str, path: &str, branch: Option<&str>) -> Vec<String> {
+    ///
+    /// The remote command is executed by the remote user's shell, so every
+    /// interpolated value is POSIX-quoted ([`shell_quote`]) and cannot inject
+    /// shell syntax. `repo`/`path` are additionally refused if empty or starting
+    /// with `-` (which git would read as an option), and `branch` is validated
+    /// against git ref rules ([`valid_branch`]). Returns an error rather than a
+    /// dangerous command.
+    pub fn worktree_create(
+        &self,
+        repo: &str,
+        path: &str,
+        branch: Option<&str>,
+    ) -> Result<Vec<String>, String> {
+        safe_pathish("repo", repo)?;
+        safe_pathish("worktree path", path)?;
         let add = match branch {
-            Some(b) if !b.is_empty() => format!("git worktree add -b {b} {path} HEAD"),
-            _ => format!("git worktree add {path}"),
+            Some(b) if !b.is_empty() => {
+                if !valid_branch(b) {
+                    return Err(format!("invalid branch name: {b:?}"));
+                }
+                format!(
+                    "git worktree add -b {} {} HEAD",
+                    shell_quote(b),
+                    shell_quote(path)
+                )
+            }
+            _ => format!("git worktree add {}", shell_quote(path)),
         };
-        self.exec(&format!("cd {repo} && {add}"))
+        Ok(self.exec(&format!("cd {} && {add}", shell_quote(repo))))
     }
 
-    /// Build the command to remove a remote worktree.
-    pub fn worktree_remove(&self, repo: &str, path: &str) -> Vec<String> {
-        self.exec(&format!("cd {repo} && git worktree remove --force {path}"))
+    /// Build the command to remove a remote worktree. `repo`/`path` are quoted
+    /// and refused if empty or option-like, as in [`Self::worktree_create`].
+    pub fn worktree_remove(&self, repo: &str, path: &str) -> Result<Vec<String>, String> {
+        safe_pathish("repo", repo)?;
+        safe_pathish("worktree path", path)?;
+        Ok(self.exec(&format!(
+            "cd {} && git worktree remove --force {}",
+            shell_quote(repo),
+            shell_quote(path)
+        )))
     }
+}
+
+/// POSIX-quote `s` so it is a single literal shell word: wrap in single quotes
+/// and rewrite each embedded `'` as `'\''`. Inside single quotes the shell
+/// treats every other byte literally, so spaces, quotes, `;`, `|`, `&`,
+/// newlines, `$(...)`/backtick substitutions, and Unicode cannot change the
+/// command's structure.
+pub fn shell_quote(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('\'');
+    for ch in s.chars() {
+        if ch == '\'' {
+            out.push_str("'\\''");
+        } else {
+            out.push(ch);
+        }
+    }
+    out.push('\'');
+    out
+}
+
+/// A `repo`/`path` argument safe to embed in a remote git command: non-empty and
+/// not starting with `-`. Quoting neutralizes shell metacharacters; this guards
+/// the separate option-injection layer (a value like `--upload-pack=…` that git
+/// would read as a flag). Note that quoting deliberately disables `~`/`$VAR`
+/// expansion, so remote paths must be absolute.
+fn safe_pathish(label: &str, value: &str) -> Result<(), String> {
+    if value.is_empty() {
+        return Err(format!("{label} must not be empty"));
+    }
+    if value.starts_with('-') {
+        return Err(format!("{label} must not start with '-': {value:?}"));
+    }
+    Ok(())
+}
+
+/// Whether `name` is a safe git branch name to embed. Applies git's ref rules
+/// plus a leading-`-` guard, so a branch can never be read as an option or carry
+/// shell/control characters.
+pub fn valid_branch(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with('-')
+        && !name.starts_with('/')
+        && !name.starts_with('.')
+        && !name.ends_with('/')
+        && !name.ends_with(".lock")
+        && !name.contains("..")
+        && !name.contains("//")
+        && !name.contains("@{")
+        && name.chars().all(|c| {
+            !c.is_control()
+                && !c.is_whitespace()
+                && !matches!(c, '~' | '^' | ':' | '?' | '*' | '[' | '\\')
+        })
 }
 
 #[cfg(test)]

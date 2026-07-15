@@ -102,14 +102,17 @@ pub(super) fn pane(
         properties = properties.child(Text::new("No properties").size(Size::Xs).dimmed());
     }
     for property in note.properties {
+        let name = property.name.clone();
+        let remove = handle.clone();
         properties = properties.child(
             div()
                 .flex()
                 .flex_row()
+                .items_center()
                 .gap_2()
                 .child(
                     div()
-                        .w(px(76.0))
+                        .w(px(70.0))
                         .flex_none()
                         .overflow_hidden()
                         .whitespace_nowrap()
@@ -127,14 +130,42 @@ pub(super) fn pane(
                         .text_size(px(11.0))
                         .text_color(palette.text)
                         .child(SharedString::from(property.value)),
-                ),
+                )
+                .child(icon_button(
+                    format!("remove-prop-{name}"),
+                    "x",
+                    "Remove property",
+                    palette.dimmed,
+                    palette.hover,
+                    move |_, cx| {
+                        remove.update(cx, |root, cx| root.remove_note_property(&name, cx));
+                    },
+                )),
         );
+    }
+    // Add a property via a `name: value` input (Enter to apply).
+    if let Some(input) = root.note.property_input.clone() {
+        properties = properties.child(div().pt(px(2.0)).child(input));
     }
     content = content.child(properties);
 
     let mut tags = detailsection("Tags").flex_row().flex_wrap();
     for tag in note.tags {
-        tags = tags.child(Badge::new(SharedString::from(format!("#{tag}"))));
+        let value = tag.clone();
+        let filter = handle.clone();
+        tags = tags.child(
+            div()
+                .id(SharedString::from(format!("tag-{tag}")))
+                .cursor_pointer()
+                .tab_index(0)
+                .role(gpui::accesskit::Role::Button)
+                .aria_label(SharedString::from(format!("Filter notes by tag {tag}")))
+                .on_click(move |_, _, cx| {
+                    let value = value.clone();
+                    filter.update(cx, |root, cx| root.set_note_tag_filter(value, cx));
+                })
+                .child(Badge::new(SharedString::from(format!("#{tag}")))),
+        );
     }
     content = content.child(tags);
     content = content.child(linksection("Links", outgoing, handle.clone()));

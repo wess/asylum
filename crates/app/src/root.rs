@@ -344,9 +344,34 @@ impl Render for Root {
                     .placeholder("Describe a task… e.g. Add a dark-mode toggle")
             }));
         }
+        if self.start_ref_input.is_none() {
+            let input = cx.new(|cx| {
+                guise::TextInput::new(cx).placeholder("Start from branch/commit (default: base)")
+            });
+            cx.subscribe(&input, |root, _input, event: &guise::TextInputEvent, cx| {
+                let (guise::TextInputEvent::Change(value) | guise::TextInputEvent::Submit(value)) =
+                    event;
+                root.start_ref = value.clone();
+                cx.notify();
+            })
+            .detach();
+            self.start_ref_input = Some(input);
+        }
         if self.review_note.is_none() {
             self.review_note =
                 Some(cx.new(|cx| guise::TextInput::new(cx).placeholder("Add a review comment…")));
+        }
+        if self.account_input.is_none() {
+            let input = cx.new(|cx| {
+                guise::TextInput::new(cx).placeholder("provider: label (e.g. claude: work)")
+            });
+            cx.subscribe(&input, |root, _input, event: &guise::TextInputEvent, cx| {
+                if matches!(event, guise::TextInputEvent::Submit(_)) {
+                    root.add_account_from_input(cx);
+                }
+            })
+            .detach();
+            self.account_input = Some(input);
         }
         if self.design_note.is_none() {
             self.design_note = Some(
@@ -697,6 +722,7 @@ impl Root {
                 self.setup_checks.clone(),
                 self.setup_open,
                 compose.clone(),
+                self.start_ref_input.clone().unwrap(),
                 handle,
                 window,
                 cx,
@@ -713,6 +739,7 @@ impl Root {
                 self.review_target.clone(),
                 self.branches(),
                 self.runs(),
+                self.diff_split,
                 review_note.clone(),
                 handle,
                 window,
@@ -732,19 +759,26 @@ impl Root {
             TabKind::Integrations => integrations::integrations_view(
                 self.prs.clone(),
                 self.issues.clone(),
+                self.linear_issues.clone(),
+                !self.settings.linear_token.trim().is_empty(),
                 self.integration_error.clone(),
                 handle,
                 window,
                 cx,
             )
             .into_any_element(),
-            TabKind::Accounts => {
-                accounts::accounts_view(self.accounts(), handle, window, cx).into_any_element()
-            }
+            TabKind::Accounts => accounts::accounts_view(
+                self.accounts(),
+                self.account_input.clone().unwrap(),
+                handle,
+                window,
+                cx,
+            )
+            .into_any_element(),
             TabKind::Inbox => notifications::inbox_view(self.notifications(), handle, window, cx)
                 .into_any_element(),
             TabKind::Plugins => {
-                crate::plugins::plugins_view(self.plugins(), self.plugins_dir(), window, cx)
+                crate::plugins::plugins_view(self.plugins(), self.plugins_dir(), handle, window, cx)
                     .into_any_element()
             }
             TabKind::Settings => match self.settings_inputs.clone() {

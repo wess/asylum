@@ -45,6 +45,16 @@ impl Root {
             .detach();
             self.note.title = Some(input);
         }
+        if self.note.property_input.is_none() {
+            let input = cx.new(|cx| guise::TextInput::new(cx).placeholder("name: value"));
+            cx.subscribe(&input, |root, _input, event: &TextInputEvent, cx| {
+                if matches!(event, TextInputEvent::Submit(_)) {
+                    root.add_note_property(cx);
+                }
+            })
+            .detach();
+            self.note.property_input = Some(input);
+        }
         if self.note.preview.is_none() {
             let preview = cx.new(|cx| {
                 guise::WebView::new(cx).html(preview::html_markdown("# No note selected"))
@@ -181,7 +191,7 @@ impl Root {
         let Some(preview) = self.note.preview.clone() else {
             return;
         };
-        let html = preview::html_markdown(&notes::preview_source(note));
+        let html = preview::html_markdown(&notes::preview_source_in(&self.note.index, note));
         preview.update(cx, |view, cx| view.load_html(html, cx));
         self.note.previewed = Some(note.content.clone());
     }

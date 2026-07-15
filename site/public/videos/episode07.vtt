@@ -1,0 +1,53 @@
+WEBVTT
+
+1
+00:00:00.200 --> 00:00:06.425
+You've reviewed the diffs and run the checks. One run is clearly best. Now you make it the winner and merge.
+
+2
+00:00:07.075 --> 00:00:19.625
+Select the run whose diff is right and whose checks pass, and merge. But Asylum's merge is deliberately careful — it won't let you land broken or conflicting work by accident. Watch the guards fire in order.
+
+3
+00:00:20.275 --> 00:00:27.675
+One: failed-check blocking. If the run's checks failed, the merge is simply blocked. The arbiter is the checks, not your gut.
+
+4
+00:00:28.325 --> 00:00:36.925
+Two: dirty-base protection. It verifies the base worktree is clean before it touches it, so it never merges onto uncommitted changes.
+
+5
+00:00:37.575 --> 00:00:47.125
+Three: a conflict preflight. It runs a non-destructive check for merge conflicts first — so a conflict gets reported, not left half-applied in your tree.
+
+6
+00:00:47.775 --> 00:00:56.775
+Four: explicit confirmation. It asks you to confirm before it merges the run's branch back to the base branch. Nothing merges behind your back.
+
+7
+00:00:57.425 --> 00:01:00.600
+Confirm, and the winning branch merges into base.
+
+8
+00:01:01.250 --> 00:01:10.250
+Then cleanup. Asylum removes the clean, finished worktrees but keeps their branches — so your workspace stays tidy and no work is ever lost.
+
+9
+00:01:10.900 --> 00:01:18.725
+And the task's status moves to merged. That's the full loop closed — one prompt, several attempts, the best one landed safely.
+
+10
+00:01:19.375 --> 00:01:26.425
+There's a second way to land a winner. Instead of merging locally, you can open a pull request from the winning run's branch.
+
+11
+00:01:27.075 --> 00:01:41.725
+That opens the change on GitHub for review and CI — best for team work or anything that needs a second pair of eyes. Same starting point: a selected run whose diff is right and whose checks pass. We'll do that in the integrations episode.
+
+12
+00:01:42.375 --> 00:01:48.350
+Local merge for speed, a PR for review. Either way, the guards and the checks keep you honest.
+
+13
+00:01:49.000 --> 00:01:53.150
+Next: layouts — racing a whole set of agents in one gesture.

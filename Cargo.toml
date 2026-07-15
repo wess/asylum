@@ -13,9 +13,11 @@ members = [
     "crates/notes",
     "crates/preview",
     "crates/remote",
+    "crates/update",
     "crates/notify",
     "crates/designmode",
     "crates/companion",
+    "crates/control",
     "crates/fuzzy",
     "crates/plugin",
     "crates/pluginrt",
@@ -67,4 +69,10 @@ thiserror = "1"
 debug = "limited"
 
 [profile.release]
-lto = "thin"
+# Fat LTO + a single codegen unit for a smaller, faster release binary, and
+# strip symbols to shrink the artifact. `panic` is deliberately left at the
+# default (unwind): switching to `abort` needs shutdown/crash-reporting
+# validation first (a background-thread panic must not abort the whole app).
+lto = "fat"
+codegen-units = 1
+strip = "symbols"

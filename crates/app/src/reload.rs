@@ -16,6 +16,10 @@ use crate::{menus, theme};
 /// multi-write save, fine enough to feel immediate.
 const INTERVAL: Duration = Duration::from_millis(250);
 
+/// How often the app drains follow-ups queued by the mobile companion and
+/// delivers each to an active run.
+const FOLLOWUP_INTERVAL: Duration = Duration::from_secs(4);
+
 /// Seed the freshly created root with the boot-time settings and start
 /// watching settings.json; each change re-loads and re-applies it.
 pub fn init(window: WindowHandle<Root>, loaded: config::Loaded, cx: &mut App) {
@@ -41,6 +45,22 @@ pub fn init(window: WindowHandle<Root>, loaded: config::Loaded, cx: &mut App) {
             {
                 break;
             }
+        }
+    })
+    .detach();
+
+    // Deliver mobile follow-ups queued by the companion server, and control
+    // requests queued by agents through the control surface, to live runs.
+    cx.spawn(async move |cx| loop {
+        cx.background_executor().timer(FOLLOWUP_INTERVAL).await;
+        if window
+            .update(cx, |root, window, cx| {
+                root.drain_followups(window, cx);
+                root.drain_control_requests(window, cx);
+            })
+            .is_err()
+        {
+            break;
         }
     })
     .detach();

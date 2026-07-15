@@ -1,8 +1,9 @@
 # Feature matrix
 
 Asylum's feature coverage. Status: ✅ done · 🟡 partial. "Logic" =
-tested crate logic; "UI" = wired into the gpui app. Every feature below is
-implemented with real, tested logic and a working UI (or CLI) surface.
+tested crate logic; "UI" = wired into the gpui app. Where a capability is
+library-only or awaiting wiring, it is marked 🟡 with a note — the matrix tracks
+what actually reaches the user, not just what compiles.
 
 ## Worktrees & git
 | Feature | Logic | UI |
@@ -14,7 +15,9 @@ implemented with real, tested logic and a working UI (or CLI) surface.
 | Conflict detection | ✅ | ✅ |
 | Diff parsing (files/hunks/lines) | ✅ | ✅ |
 | Diff annotations (line comments) + feedback to agents | ✅ | ✅ |
-| SSH remote worktrees + auto-reconnect + port forward | ✅ | ✅ (CLI/argv) |
+| Unified + side-by-side diff views | ✅ | ✅ |
+| Start worktrees from a chosen branch/commit | ✅ | ✅ |
+| SSH remote worktrees + auto-reconnect + port forward | ✅ | 🟡 (argv library; not yet surfaced in UI/CLI) |
 
 ## Agents
 | Feature | Logic | UI |
@@ -24,8 +27,13 @@ implemented with real, tested logic and a working UI (or CLI) surface.
 | Command building + fan-out planning | ✅ | ✅ |
 | Run execution on pty (lifecycle, status) | ✅ | ✅ |
 | Fan-out action (one prompt → N runs) | ✅ | ✅ |
-| Account switching (hot-swap) | ✅ | ✅ |
-| Usage tracking (used/limit/reset) | ✅ | ✅ |
+| Semantic agent states (working/blocked/done/idle) | ✅ | ✅ (board chip) |
+| Fan-out layouts (named agent presets) | ✅ | ✅ (composer picker + `asylum layout`) |
+| Agent control surface (spawn/read/report/wait) | ✅ | ✅ (server + env inject + drain) |
+| ADE event stream (companion + control) | ✅ | ✅ |
+| Agent install guidance in the setup doctor | ✅ | ✅ |
+| Account add + switching (hot-swap) | ✅ | ✅ |
+| Usage tracking (used/limit/reset) | ✅ | 🟡 (schema + meter; no live provider feed yet) |
 
 ## Terminal
 | Feature | Logic | UI |
@@ -61,12 +69,14 @@ implemented with real, tested logic and a working UI (or CLI) surface.
 | GitHub PRs / issues browse | ✅ | ✅ |
 | PR creation from IDE | ✅ | ✅ |
 | GitHub issue → worktree | ✅ | ✅ |
-| Linear teams/projects/issues | ✅ | ✅ |
+| Linear issues browse + issue → worktree (token required) | ✅ | ✅ |
 
 ## Rich preview
 | Feature | Logic | UI |
 |---|---|---|
-| Markdown render | ✅ | ✅ |
+| Markdown render (GFM) | ✅ | ✅ |
+| Callouts + Mermaid diagrams + code highlighting | ✅ | ✅ |
+| Note embeds / transclusion (`![[note]]`, `#heading`) | ✅ | ✅ |
 | Image preview (data URI) | ✅ | ✅ |
 | PDF preview (embed) | ✅ | ✅ |
 
@@ -74,6 +84,7 @@ implemented with real, tested logic and a working UI (or CLI) surface.
 | Feature | Logic | UI |
 |---|---|---|
 | Type check / lint / test runner + PASS/FAIL | ✅ | ✅ |
+| Ecosystems: JS (bun/npm/pnpm/yarn), Cargo, Python, Go | ✅ | ✅ |
 
 ## Search
 | Feature | Logic | UI |
@@ -86,10 +97,11 @@ implemented with real, tested logic and a working UI (or CLI) surface.
 | Feature | Logic | UI |
 |---|---|---|
 | Private or repository-backed Markdown vault | ✅ | ✅ |
-| YAML properties, tags, wiki links, backlinks | ✅ | ✅ |
+| YAML properties (view + inline edit), wiki links, backlinks | ✅ | ✅ |
+| Tags with click-to-filter | ✅ | ✅ |
 | Note create/rename/delete + rename relinking | ✅ | ✅ |
-| Task/decision/investigation/retrospective templates | ✅ | ✅ |
-| Wiki-link autocomplete + navigable preview | ✅ | ✅ |
+| Built-in + user-defined templates (`{{title}}`/`{{date}}`) | ✅ | ✅ |
+| Wiki-link autocomplete + navigable preview + embeds | ✅ | ✅ |
 | Create task, attach to run, send exact selection | ✅ | ✅ |
 | Prompt context + automatic task/run/check/PR links | ✅ | ✅ |
 
@@ -115,9 +127,13 @@ implemented with real, tested logic and a working UI (or CLI) surface.
 | Multi-surface layout (activity switcher) | ✅ | ✅ |
 | Collapsible icon-only activity rail | ✅ | ✅ |
 | Project config (asylum.toml) + keybindings | ✅ | ✅ |
-| Plugin system (manifest + process runtime) | ✅ | ✅ |
-| WASM plugin runtime (wasmi, capability-gated) | ✅ | ✅ |
-| Mobile companion (server + mobile web page) | ✅ | ✅ |
+| Plugin manifest + process/WASM runtime + command invocation | ✅ | ✅ |
+| Plugin install from GitHub + topic discovery | ✅ | ✅ (CLI) |
+| Plugin trigger dispatch (auto-fire on ADE events) | ✅ | 🟡 (runtime ready; auto-dispatch not wired) |
+| Mobile companion (server + web page + token auth) | ✅ | ✅ |
+| Companion follow-up delivery to a live run | ✅ | ✅ |
+| Packaging (dmg/deb) + release workflow | ✅ | ✅ (CI) |
+| Update check against GitHub Releases | ✅ | ✅ |
 
 ## Notes on scope
 

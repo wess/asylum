@@ -1,0 +1,57 @@
+WEBVTT
+
+1
+00:00:00.200 --> 00:00:06.275
+Asylum is a native Rust app. To run it you need a Rust toolchain and git. That's it for the core.
+
+2
+00:00:06.925 --> 00:00:12.900
+From the repository root, one command builds and launches the app: cargo run, dash p, app.
+
+3
+00:00:13.550 --> 00:00:21.050
+The first build pulls the UI component library and the terminal engine, so it takes a while. Later launches are fast.
+
+4
+00:00:21.700 --> 00:00:31.550
+The dev build installs itself as asylumdev — deliberately, so it never collides with a released copy installed as asylum. Same behavior either way.
+
+5
+00:00:32.200 --> 00:00:34.800
+And here's the app. Let's take the tour.
+
+6
+00:00:35.600 --> 00:00:40.825
+Up top is the header, with the command palette and quick-open for jumping around fast.
+
+7
+00:00:41.475 --> 00:00:50.000
+On the left, the activity switcher and the project and task navbar — where your projects and their tasks live, with pins for the ones you use most.
+
+8
+00:00:50.650 --> 00:00:57.350
+The big area in the middle is the routed main view. Right now it's on Tasks — the fan-out board, the home screen.
+
+9
+00:00:58.000 --> 00:01:10.500
+Asylum routes between thirteen surfaces — Tasks, Diff, Search, Notes, Integrations, Terminal, Editor, Preview, Browser, Plugins, Accounts, Inbox, and Settings. We'll visit each across the series.
+
+10
+00:01:11.150 --> 00:01:14.675
+The footer is your status line — what's happening at a glance.
+
+11
+00:01:15.325 --> 00:01:21.900
+Two more commands worth knowing: cargo build compiles the whole workspace, and cargo test runs the suite.
+
+12
+00:01:22.550 --> 00:01:28.850
+And command-comma opens Settings — an editor over your settings file. We'll live there next episode.
+
+13
+00:01:29.500 --> 00:01:35.075
+That's the build and the tour. Next we open a real project and pick which agents to race.
+
+14
+00:01:35.725 --> 00:01:37.625
+See you in episode two.

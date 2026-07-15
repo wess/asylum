@@ -90,6 +90,33 @@ impl RuntimeKind {
             _ => None,
         }
     }
+
+    /// Whether this runtime is *fully trusted*: it runs with the user's full
+    /// privileges and its manifest capabilities are advisory only. A `process`
+    /// runtime is trusted; a `wasm` runtime is capability-sandboxed. Enabling a
+    /// trusted runtime should require an explicit trust decision.
+    pub fn is_trusted(self) -> bool {
+        matches!(self, RuntimeKind::Process)
+    }
+}
+
+impl Runtime {
+    /// A one-line trust summary for an enable/confirmation dialog: what will run
+    /// and with what authority. A process runtime discloses its exact command;
+    /// a WASM runtime states it is capability-sandboxed.
+    pub fn trust_summary(&self) -> String {
+        match self.kind {
+            RuntimeKind::Process => format!(
+                "Runs `{}` as a normal process with your full user privileges \
+                 (filesystem, network, subprocesses). Its manifest capabilities \
+                 are advisory only. Enable it only if you trust its source.",
+                self.command.trim()
+            ),
+            RuntimeKind::Wasm => "Runs sandboxed in WebAssembly, limited to its declared \
+                 capabilities and bounded CPU/memory."
+                .to_string(),
+        }
+    }
 }
 
 /// `[panel]` - a contributed side-drawer panel rendered from runtime responses.
@@ -222,3 +249,7 @@ impl CommandMode {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/model.rs"]
+mod tests;

@@ -10,7 +10,8 @@
 
 mod query;
 
-use std::process::Command;
+use std::io::Write;
+use std::process::{Command, Stdio};
 
 pub use query::{CREATE_ISSUE, ISSUES, PROJECTS, TEAMS};
 
@@ -65,7 +66,9 @@ fn state_name<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error
         #[serde(default)]
         name: String,
     }
-    Ok(Option::<S>::deserialize(d)?.map(|s| s.name).unwrap_or_default())
+    Ok(Option::<S>::deserialize(d)?
+        .map(|s| s.name)
+        .unwrap_or_default())
 }
 
 /// Extract `data.<key>.nodes` from a GraphQL response and deserialize each node.
@@ -122,25 +125,37 @@ impl Client {
 
     /// Run a GraphQL `query` (with optional `variables`) and return the raw
     /// JSON response body.
+    ///
+    /// The API token is written to curl's stdin as a `--config` header rather
+    /// than passed on the command line, so it never appears in the process's
+    /// argv (and thus not in `ps` or a crash log). Connection and total
+    /// deadlines bound a stalled request, and any token echoed in an error is
+    /// redacted.
     pub fn query(&self, query: &str, variables: serde_json::Value) -> Result<String, Error> {
+        if !is_http_url(&self.endpoint) {
+            return Err(Error::Api(format!(
+                "refusing non-http(s) endpoint: {}",
+                self.endpoint
+            )));
+        }
         let body = serde_json::json!({ "query": query, "variables": variables }).to_string();
-        let out = Command::new("curl")
-            .args([
-                "-s",
-                "-X",
-                "POST",
-                &self.endpoint,
-                "-H",
-                &format!("Authorization: {}", self.api_key),
-                "-H",
-                "Content-Type: application/json",
-                "-d",
-                &body,
-            ])
-            .output()
+        let mut child = Command::new("curl")
+            .args(curl_args(&self.endpoint, &body))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| Error::Spawn(e.to_string()))?;
+        if let Some(mut stdin) = child.stdin.take() {
+            // Dropping stdin at the end of this block signals EOF to curl.
+            let _ = stdin.write_all(auth_config(&self.api_key).as_bytes());
+        }
+        let out = child
+            .wait_with_output()
             .map_err(|e| Error::Spawn(e.to_string()))?;
         if !out.status.success() {
-            return Err(Error::Api(String::from_utf8_lossy(&out.stderr).into_owned()));
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            return Err(Error::Api(redact(&stderr, &self.api_key)));
         }
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     }
@@ -172,6 +187,50 @@ impl Client {
             "input": { "teamId": team_id, "title": title, "description": description }
         });
         self.query(CREATE_ISSUE, vars)
+    }
+}
+
+/// curl argv for a request, deliberately *without* the API token: the auth
+/// header is delivered on stdin (see [`auth_config`]) so it stays out of the
+/// process's argv. Connection and total timeouts bound a stalled request.
+fn curl_args(endpoint: &str, body: &str) -> Vec<String> {
+    vec![
+        "-sS".into(),
+        "--connect-timeout".into(),
+        "10".into(),
+        "--max-time".into(),
+        "30".into(),
+        "-X".into(),
+        "POST".into(),
+        endpoint.into(),
+        "-H".into(),
+        "Content-Type: application/json".into(),
+        "-d".into(),
+        body.into(),
+        // Read remaining options (the Authorization header) from stdin.
+        "--config".into(),
+        "-".into(),
+    ]
+}
+
+/// The curl `--config` line carrying the Authorization header, written to
+/// curl's stdin so the token never lands in argv.
+fn auth_config(api_key: &str) -> String {
+    format!("header = \"Authorization: {api_key}\"\n")
+}
+
+/// Whether `url` is an http(s) endpoint (the only schemes we will call).
+fn is_http_url(url: &str) -> bool {
+    url.starts_with("https://") || url.starts_with("http://")
+}
+
+/// Replace occurrences of `secret` in `text` with `***`, so a token cannot leak
+/// through an error message. A blank secret is a no-op.
+fn redact(text: &str, secret: &str) -> String {
+    if secret.is_empty() {
+        text.to_string()
+    } else {
+        text.replace(secret, "***")
     }
 }
 

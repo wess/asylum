@@ -106,6 +106,34 @@ pub fn now() -> i64 {
         .unwrap_or(0)
 }
 
+/// A git branch name derived from a Linear issue: its identifier plus a short
+/// slug of the title (e.g. `eng-123-add-login`).
+fn linear_branch(issue: &linear::Issue) -> String {
+    let ident = issue.identifier.to_lowercase().replace(['/', ' '], "-");
+    let title: String = issue
+        .title
+        .chars()
+        .map(|ch| {
+            if ch.is_alphanumeric() {
+                ch.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let title = title
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .take(6)
+        .collect::<Vec<_>>()
+        .join("-");
+    if title.is_empty() {
+        ident
+    } else {
+        format!("{ident}-{title}")
+    }
+}
+
 /// The root application state.
 pub struct Root {
     pub db: Db,
@@ -124,6 +152,9 @@ pub struct Root {
     /// GitHub PRs/issues for the Integrations view (loaded on demand).
     pub prs: Vec<github::PullRequest>,
     pub issues: Vec<github::Issue>,
+    /// Linear issues for the Integrations view (loaded on demand when a token
+    /// is configured).
+    pub linear_issues: Vec<linear::Issue>,
     /// Last integration load error, if any.
     pub integration_error: Option<String>,
     /// The file last opened in an editor tab (tracked so Preview can follow it).
@@ -151,6 +182,15 @@ pub struct Root {
     pub context_menu: Option<gpui::Entity<guise::overlay::ContextMenu>>,
     /// The new-task prompt input on the Tasks board (built lazily).
     pub compose: Option<gpui::Entity<guise::TextInput>>,
+    /// The ref new worktrees start from (branch or commit). Empty = the
+    /// project's base branch.
+    pub start_ref: String,
+    /// The start-from-ref input in the advanced compose controls.
+    pub start_ref_input: Option<gpui::Entity<guise::TextInput>>,
+    /// The "add account" input on the Accounts surface (`provider: label`).
+    pub account_input: Option<gpui::Entity<guise::TextInput>>,
+    /// Diff review layout: false = unified, true = side-by-side (old | new).
+    pub diff_split: bool,
     /// Live pty views keyed by their durable run row.
     pub run_terms: std::collections::HashMap<i64, gpui::Entity<TermView>>,
     /// Last unix second a live terminal was snapshotted to SQLite.
@@ -243,6 +283,8 @@ pub struct RunRow {
     pub branch: String,
     pub worktree: String,
     pub status: RunStatus,
+    /// Live semantic activity token (`working`/`blocked`/`done`) while running.
+    pub activity: Option<String>,
     pub selected: bool,
     pub attempt: u32,
     pub started_at: Option<i64>,
@@ -322,6 +364,7 @@ impl Root {
             note: crate::note::State::default(),
             prs: Vec::new(),
             issues: Vec::new(),
+            linear_issues: Vec::new(),
             integration_error: None,
             editor_file: None,
             checking_runs: std::collections::HashSet::new(),
@@ -336,6 +379,10 @@ impl Root {
             expanded: std::collections::HashSet::new(),
             context_menu: None,
             compose: None,
+            start_ref: String::new(),
+            start_ref_input: None,
+            account_input: None,
+            diff_split: false,
             run_terms: std::collections::HashMap::new(),
             run_saved_at: std::collections::HashMap::new(),
             run_save_failed: std::collections::HashSet::new(),
@@ -1166,6 +1213,83 @@ impl Root {
                 }
             }
         }
+        self.load_linear();
+    }
+
+    /// Load Linear issues when an API token is configured. Absent token leaves
+    /// the list empty (the surface then shows how to set one); an API error is
+    /// captured for display, never a crash.
+    pub fn load_linear(&mut self) {
+        let token = self.settings.linear_token.trim();
+        if token.is_empty() {
+            self.linear_issues.clear();
+            return;
+        }
+        match linear::Client::new(token).issues() {
+            Ok(issues) => self.linear_issues = issues,
+            Err(e) => {
+                if self.integration_error.is_none() {
+                    self.integration_error = Some(format!("Linear: {e}"));
+                }
+            }
+        }
+    }
+
+    /// Create a worktree + task from a Linear issue, mirroring the GitHub flow.
+    pub fn create_worktree_from_linear_issue(&mut self, issue: &linear::Issue) {
+        let Some(pid) = self.project_id else {
+            return;
+        };
+        let Ok(project) = self.db.project(pid) else {
+            return;
+        };
+        let repo = std::path::PathBuf::from(&project.path);
+        let branch = linear_branch(issue);
+        let worktree = format!(".asylum/worktrees/{branch}");
+        let absolute = match git::worktree::create(&repo, &worktree, Some(&branch), None) {
+            Ok(path) => path,
+            Err(error) => {
+                self.push_error("Could not open issue worktree", error.to_string());
+                return;
+            }
+        };
+        let prompt = format!("Resolve Linear issue {}: {}", issue.identifier, issue.title);
+        if let Ok(task) = self.db.create_task(pid, &issue.title, &prompt, now()) {
+            self.task_id = Some(task.id);
+            self.push_notice(
+                crate::run::NoticeTone::Success,
+                "Issue worktree ready",
+                absolute.display().to_string(),
+            );
+            self.open_kind(TabKind::Tasks);
+        }
+    }
+
+    /// Add a provider account from the `provider: label` input. The first run
+    /// against an agent verifies the credential; usage fills in when a provider
+    /// reports it. The newly added account becomes active.
+    pub fn add_account_from_input(&mut self, cx: &mut gpui::Context<Self>) {
+        let Some(input) = self.account_input.clone() else {
+            return;
+        };
+        let raw = input.read(cx).text();
+        let (provider, label) = match raw.split_once(':') {
+            Some((provider, label)) => (provider.trim(), label.trim()),
+            None => (raw.trim(), "default"),
+        };
+        if provider.is_empty() {
+            self.push_error("Account needs a provider", "Write it as provider: label.");
+            return;
+        }
+        let label = if label.is_empty() { "default" } else { label };
+        match self.db.add_account(provider, label, now()) {
+            Ok(account) => {
+                let _ = self.db.activate_account(account.id);
+                input.update(cx, |input, cx| input.set_text("", cx));
+                cx.notify();
+            }
+            Err(error) => self.push_error("Could not add account", error.to_string()),
+        }
     }
 
     /// Accounts with their latest usage, grouped for the Accounts view.
@@ -1249,6 +1373,7 @@ impl Root {
                     branch: run.branch,
                     worktree: run.worktree,
                     status: run.status,
+                    activity: run.activity,
                     selected: self.current_run_id() == Some(run.id),
                     attempt: run.attempt,
                     started_at: run.started_at,
@@ -1336,6 +1461,63 @@ impl Root {
     /// The plugins directory path, for display in the Plugins view.
     pub fn plugins_dir(&self) -> String {
         plugin::default_dir().to_string_lossy().into_owned()
+    }
+
+    /// Invoke a plugin command through its declared runtime (process or WASM),
+    /// passing the current project/task as context. Runs synchronously; the
+    /// result (or error) surfaces as a notice.
+    pub fn run_plugin_command(
+        &mut self,
+        plugin_id: &str,
+        method: &str,
+        cx: &mut gpui::Context<Self>,
+    ) {
+        let installed = self.plugins();
+        let Some(plugin) = installed.plugins.iter().find(|p| p.id == plugin_id) else {
+            self.push_error(
+                "Plugin unavailable",
+                format!("{plugin_id} is no longer installed."),
+            );
+            return;
+        };
+        let Some(runtime) = &plugin.runtime else {
+            self.push_error(
+                "Plugin has no runtime",
+                format!(
+                    "{} declares commands but no [runtime] to run them.",
+                    plugin.name
+                ),
+            );
+            return;
+        };
+        let project = self.project_id.and_then(|id| self.db.project(id).ok());
+        let params = serde_json::json!({
+            "command": method,
+            "project": project.as_ref().map(|p| p.path.clone()),
+            "task": self.task_id,
+        });
+        let cwd = project
+            .as_ref()
+            .map(|p| std::path::PathBuf::from(&p.path))
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        let result = match runtime.kind {
+            plugin::RuntimeKind::Process => pluginrt::invoke_once(runtime, &cwd, method, params),
+            plugin::RuntimeKind::Wasm => {
+                pluginrt::invoke_wasm(runtime, &plugin.path, &plugin.capabilities, method, &params)
+            }
+        };
+        match result {
+            Ok(value) => {
+                let summary: String = value.to_string().chars().take(200).collect();
+                self.push_notice(
+                    crate::run::NoticeTone::Success,
+                    format!("{} ran", plugin.name),
+                    summary,
+                );
+            }
+            Err(error) => self.push_error("Plugin command failed", error.to_string()),
+        }
+        cx.notify();
     }
 
     /// Create a task from dropped file paths (drag-drop into the prompt).

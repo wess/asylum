@@ -30,7 +30,11 @@ pub struct State {
     pub preview: Option<Entity<WebView>>,
     pub search: Option<Entity<TextInput>>,
     pub title: Option<Entity<TextInput>>,
+    /// Input for adding a frontmatter property as `name: value`.
+    pub property_input: Option<Entity<TextInput>>,
     pub query: String,
+    /// When set, the note list is filtered to notes carrying this tag.
+    pub tag_filter: Option<String>,
     pub view: Mode,
     pub panel: Panel,
     pub files_open: bool,
@@ -54,7 +58,9 @@ impl Default for State {
             preview: None,
             search: None,
             title: None,
+            property_input: None,
             query: String::new(),
+            tag_filter: None,
             view: Mode::Edit,
             panel: Panel::Write,
             files_open: true,

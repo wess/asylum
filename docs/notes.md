@@ -12,9 +12,9 @@ files into the target and never deletes the source; target conflicts are kept
 and reported.
 
 The Notes file list recursively indexes `.md` files and ignores hidden
-directories such as `.obsidian` and `.git`.
+directories such as `.git`.
 
-## Obsidian syntax
+## Note syntax
 
 YAML frontmatter is exposed as properties. `tags` accepts a YAML list or a
 space/comma-separated value, and inline `#tags` are indexed outside fenced code.

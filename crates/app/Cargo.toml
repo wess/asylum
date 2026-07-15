@@ -29,6 +29,7 @@ agent = { path = "../agent" }
 checks = { path = "../checks" }
 companion = { path = "../companion" }
 config = { path = "../config" }
+control = { path = "../control" }
 designmode = { path = "../designmode" }
 fuzzy = { path = "../fuzzy" }
 git = { path = "../git" }
@@ -43,7 +44,20 @@ remote = { path = "../remote" }
 runner = { path = "../runner" }
 search = { path = "../search" }
 store = { path = "../store" }
+update = { path = "../update" }
 
 anyhow = { workspace = true }
 futures = { workspace = true }
 serde_json = { workspace = true }
+
+# Desktop packaging. `cargo bundle --release` produces Asylum.app (macOS) and a
+# `.deb` (Linux); the release workflow wraps the .app into a signed .dmg. The
+# bundled binary is installed as `asylum` (the dev build stays `asylumdev`).
+[package.metadata.bundle]
+name = "Asylum"
+identifier = "dev.asylum.app"
+short_description = "An Agent Development Environment."
+long_description = "Run a fleet of AI coding agents in parallel, each isolated in its own git worktree, then compare and merge the winner."
+category = "Developer Tool"
+copyright = "Copyright © 2026 Asylum"
+osx_minimum_system_version = "11.0"

@@ -1,0 +1,69 @@
+WEBVTT
+
+1
+00:00:00.200 --> 00:00:06.325
+This is the Tasks surface — the fan-out board, and the home screen of Asylum. Everything starts here.
+
+2
+00:00:06.975 --> 00:00:14.875
+Create a new task. A task is a title and a prompt against the current project. Right now it's just a draft — nothing has run.
+
+3
+00:00:15.525 --> 00:00:27.525
+Make your first prompt small and verifiable. 'Add a version flag to the CLI that prints the version and exits zero.' A clear success criterion means you can actually score the result later.
+
+4
+00:00:28.175 --> 00:00:33.525
+Pick the agents to race. Two is plenty for a first task — claude-code and codex.
+
+5
+00:00:34.175 --> 00:00:38.925
+Now dispatch. This is the fan-out — and here's exactly what Asylum does.
+
+6
+00:00:39.575 --> 00:00:53.550
+One: it allocates a branch and a worktree per agent. Two: it creates each worktree on its branch, an isolated checkout on disk. Three: it records one run per agent and launches that agent in its own terminal pane.
+
+7
+00:00:54.200 --> 00:01:00.700
+Two runs, racing the same prompt in complete isolation. Neither can see or clobber the other's files.
+
+8
+00:01:01.350 --> 00:01:08.175
+Each card shows the agent, a status badge, the branch it's on, elapsed time, and a live terminal you can open.
+
+9
+00:01:08.825 --> 00:01:20.325
+Two different signals tell you what's happening. First, status — the lifecycle of the process. Queued means the worktree's allocated but the agent hasn't started. Running means it's live.
+
+10
+00:01:20.975 --> 00:01:27.550
+When it ends: succeeded if it exited cleanly, failed if it exited non-zero, cancelled if you stopped it.
+
+11
+00:01:28.200 --> 00:01:38.900
+The second signal is activity — what the agent is doing right now, shown as a colored chip. We'll spend the whole next episode on this, because it's how you know which agent needs you.
+
+12
+00:01:39.550 --> 00:01:47.850
+Click a run to watch its live terminal. This is a real pane streaming the agent's output — the same engine as the standalone terminal.
+
+13
+00:01:48.500 --> 00:01:56.775
+As each pty produces output, Asylum snapshots the transcript into its store, so it survives even after the process is gone.
+
+14
+00:01:57.425 --> 00:02:05.525
+The task itself moves through states too — draft, then running as its runs work, then review when they're ready, and merged once you pick a winner.
+
+15
+00:02:06.175 --> 00:02:13.350
+Give them a moment. When a run succeeds, Asylum commits its changes and kicks off that worktree's checks automatically.
+
+16
+00:02:14.000 --> 00:02:18.750
+Two attempts at one prompt, side by side, ready to compare. That's a fan-out.
+
+17
+00:02:19.400 --> 00:02:23.575
+Next: reading the activity chips to spot the agent that needs you.

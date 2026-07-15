@@ -44,7 +44,11 @@ fn hunk_header_and_line_numbers() {
     assert_eq!(first.new_no, Some(1));
 
     // The removed line has only an old number, added lines only new numbers.
-    let removed = hunk.lines.iter().find(|l| l.kind == LineKind::Removed).unwrap();
+    let removed = hunk
+        .lines
+        .iter()
+        .find(|l| l.kind == LineKind::Removed)
+        .unwrap();
     assert_eq!(removed.content, "let y = 2;");
     assert_eq!(removed.old_no, Some(2));
     assert_eq!(removed.new_no, None);

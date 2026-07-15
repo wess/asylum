@@ -32,7 +32,11 @@ fn ignores_malformed_lines() {
 #[test]
 fn live_search_finds_seeded_content() {
     // Use git grep against a throwaway repo so the test is backend-independent.
-    if std::process::Command::new("git").arg("--version").output().is_err() {
+    if std::process::Command::new("git")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
         return;
     }
     let n = SEQ.fetch_add(1, Ordering::Relaxed);
@@ -40,7 +44,11 @@ fn live_search_finds_seeded_content() {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let run = |args: &[&str]| {
-        std::process::Command::new("git").current_dir(&dir).args(args).output().unwrap();
+        std::process::Command::new("git")
+            .current_dir(&dir)
+            .args(args)
+            .output()
+            .unwrap();
     };
     run(&["init", "-q"]);
     run(&["config", "user.email", "t@t.t"]);
@@ -50,7 +58,10 @@ fn live_search_finds_seeded_content() {
     run(&["commit", "-qm", "x"]);
 
     let results = search(&dir, "asylum_marker", &Options::default()).unwrap();
-    assert!(results.iter().any(|m| m.file.contains("code.rs")), "{results:?}");
+    assert!(
+        results.iter().any(|m| m.file.contains("code.rs")),
+        "{results:?}"
+    );
 
     // A pattern that matches nothing yields an empty result, not an error.
     let empty = search(&dir, "no_such_symbol_xyz", &Options::default()).unwrap();

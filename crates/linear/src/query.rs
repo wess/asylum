@@ -4,7 +4,8 @@
 pub const TEAMS: &str = "query { teams { nodes { id key name } } }";
 
 /// Recent issues with their workflow state.
-pub const ISSUES: &str = "query { issues(first: 50) { nodes { id identifier title url priority state { name } } } }";
+pub const ISSUES: &str =
+    "query { issues(first: 50) { nodes { id identifier title url priority state { name } } } }";
 
 /// Projects with their state.
 pub const PROJECTS: &str = "query { projects(first: 50) { nodes { id name state } } }";

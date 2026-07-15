@@ -13,6 +13,16 @@
     // built-in registry (for example: claude-code, opencode, gemini, aider).
     "default_agents": ["claude-code", "codex"],
 
+    // Named fan-out presets. Pick one when composing a task to race a set of
+    // agents in one gesture, instead of ticking boxes each time. "concurrency"
+    // caps how many of the preset's runs are live at once (0 = use
+    // max_parallel_runs). Omit "layouts" to keep the built-in duel/triad/swarm.
+    "layouts": [
+        { "name": "duel",  "description": "Two frontier agents, head to head.", "agents": ["claude-code", "codex"] },
+        { "name": "triad", "description": "Three takes on one prompt.",          "agents": ["claude-code", "codex", "aider"] },
+        { "name": "swarm", "description": "A wide net; three at a time.",         "agents": ["claude-code", "codex", "opencode", "gemini", "aider"], "concurrency": 3 }
+    ],
+
     // Cap on concurrent agent runs across all tasks (0 = unlimited), and stop
     // runs that exceed the timeout in minutes (0 = no timeout).
     "max_parallel_runs": 4,
@@ -40,5 +50,37 @@
     // close_tab, settings, open_settings_file, toggle_theme, switch_account,
     // notifications, quit, tasks, search, integrations, terminal, editor,
     // browser, preview, plugins.
-    "keybindings": []
+    "keybindings": [],
+
+    // Linear API token. Set it to browse Linear teams and issues in the
+    // Integrations surface (and open a worktree from an issue). Empty disables
+    // Linear. Create one at https://linear.app/settings/api. To keep the secret
+    // out of this file, leave it empty and set ASYLUM_LINEAR_TOKEN in your
+    // environment (e.g. sourced from a credential manager) instead.
+    "linear_token": "",
+
+    // Mobile companion server. Bind localhost-only (default) with no token, or
+    // set a token and bind 0.0.0.0:8787 to reach it from a phone on your LAN.
+    // A non-loopback bind WITHOUT a token is refused at startup (it would expose
+    // your store to the network); the refusal appears in the Inbox. To keep the
+    // token out of this file, leave it empty and set ASYLUM_COMPANION_TOKEN in
+    // the environment.
+    "companion": {
+        "enabled": true,
+        "bind": "127.0.0.1:8787",
+        "token": ""
+    },
+
+    // Agent control surface. Lets a running agent orchestrate the fleet from
+    // inside its worktree (spawn a helper, read a sibling, report state, wait).
+    // Loopback-only — a non-loopback bind is refused. Leaving the token empty
+    // provisions a strong per-session token (kept in memory, never written to
+    // disk) that is injected into each agent as ASYLUM_CONTROL_TOKEN; localhost
+    // is not treated as an authentication boundary. Agents learn the API from
+    // `asylum control skill`.
+    "control": {
+        "enabled": true,
+        "bind": "127.0.0.1:8788",
+        "token": ""
+    }
 }

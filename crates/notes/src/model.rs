@@ -7,7 +7,7 @@ pub struct Property {
     pub value: String,
 }
 
-/// An Obsidian-style `[[target|alias]]` link.
+/// A wiki-style `[[target|alias]]` link.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Link {
     pub target: String,

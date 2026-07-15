@@ -37,10 +37,15 @@ pub fn load_project(dir: &Path) -> (ProjectConfig, Vec<Diagnostic>) {
     let path = dir.join(PROJECT_FILE);
     match std::fs::read_to_string(&path) {
         Ok(text) => parse_project(&text),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (ProjectConfig::default(), Vec::new()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            (ProjectConfig::default(), Vec::new())
+        }
         Err(e) => (
             ProjectConfig::default(),
-            vec![Diagnostic::new("", format!("could not read {PROJECT_FILE}: {e}"))],
+            vec![Diagnostic::new(
+                "",
+                format!("could not read {PROJECT_FILE}: {e}"),
+            )],
         ),
     }
 }

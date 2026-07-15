@@ -82,10 +82,7 @@ impl DiffFile {
 /// included (git diff never shows untracked); callers wanting those add them
 /// with `git add -N` first.
 pub fn against(dir: &Path, base: &str) -> Result<Vec<DiffFile>, Error> {
-    let out = git(
-        dir,
-        &["diff", "--no-color", "--find-renames", base],
-    )?;
+    let out = git(dir, &["diff", "--no-color", "--find-renames", base])?;
     Ok(parse(&out))
 }
 
@@ -230,9 +227,17 @@ fn parse_hunk_header(head: &str) -> (u32, u32, String) {
         let ranges = &head[2..2 + idx];
         for tok in ranges.split_whitespace() {
             if let Some(rest) = tok.strip_prefix('-') {
-                old_start = rest.split(',').next().and_then(|s| s.parse().ok()).unwrap_or(0);
+                old_start = rest
+                    .split(',')
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0);
             } else if let Some(rest) = tok.strip_prefix('+') {
-                new_start = rest.split(',').next().and_then(|s| s.parse().ok()).unwrap_or(0);
+                new_start = rest
+                    .split(',')
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0);
             }
         }
     }

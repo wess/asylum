@@ -27,6 +27,73 @@ fn request_response_serde_roundtrip() {
     assert_eq!(resp.result.unwrap()["ok"], true);
 }
 
+fn unique_dir(tag: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "asylum-modpath-{tag}-{}-{:p}",
+        std::process::id(),
+        &tag
+    ));
+    let _ = std::fs::create_dir_all(&dir);
+    dir
+}
+
+#[test]
+fn contained_module_path_accepts_relative_modules() {
+    let dir = unique_dir("ok");
+    std::fs::write(dir.join("plugin.wasm"), b"x").unwrap();
+    std::fs::create_dir_all(dir.join("sub")).unwrap();
+    std::fs::write(dir.join("sub/plugin.wasm"), b"x").unwrap();
+
+    let a = contained_module_path(&dir, "plugin.wasm").unwrap();
+    assert!(a.ends_with("plugin.wasm"));
+    // `./` and a subdirectory are fine.
+    assert!(contained_module_path(&dir, "./plugin.wasm").is_ok());
+    assert!(contained_module_path(&dir, "sub/plugin.wasm").is_ok());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn contained_module_path_rejects_absolute_and_parent() {
+    let dir = unique_dir("esc");
+    std::fs::write(dir.join("plugin.wasm"), b"x").unwrap();
+    // Absolute path.
+    assert!(matches!(
+        contained_module_path(&dir, "/etc/hosts"),
+        Err(Error::Spawn(_))
+    ));
+    // Parent traversal.
+    assert!(matches!(
+        contained_module_path(&dir, "../plugin.wasm"),
+        Err(Error::Spawn(_))
+    ));
+    assert!(matches!(
+        contained_module_path(&dir, "sub/../../plugin.wasm"),
+        Err(Error::Spawn(_))
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[cfg(unix)]
+#[test]
+fn contained_module_path_rejects_symlink_escape() {
+    let dir = unique_dir("sym");
+    // A secret outside the plugin directory, and a symlink to it inside.
+    let outside = unique_dir("secret");
+    let secret = outside.join("secret.wasm");
+    std::fs::write(&secret, b"top secret").unwrap();
+    let link = dir.join("link.wasm");
+    let _ = std::fs::remove_file(&link);
+    std::os::unix::fs::symlink(&secret, &link).unwrap();
+
+    // The symlink resolves outside the plugin root, so it is refused.
+    assert!(matches!(
+        contained_module_path(&dir, "link.wasm"),
+        Err(Error::Spawn(_))
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(&outside);
+}
+
 #[test]
 fn wasm_runtime_is_unsupported() {
     let rt = Runtime {
@@ -44,6 +111,45 @@ fn spawn_failure_is_reported() {
     let rt = process_runtime("this-binary-does-not-exist-xyz");
     let err = invoke_once(&rt, std::path::Path::new("."), "x", json!({})).unwrap_err();
     assert!(matches!(err, Error::Spawn(_)));
+}
+
+#[test]
+fn filter_allowed_keeps_only_the_allowlist() {
+    let vars = vec![
+        ("PATH".to_string(), "/bin".to_string()),
+        ("HOME".to_string(), "/home/me".to_string()),
+        ("ASYLUM_CONTROL_TOKEN".to_string(), "secret".to_string()),
+        ("AWS_SECRET_ACCESS_KEY".to_string(), "shh".to_string()),
+        ("GITHUB_TOKEN".to_string(), "ghp_x".to_string()),
+    ];
+    let kept = filter_allowed(vars.into_iter(), ENV_ALLOWLIST);
+    let keys: Vec<&str> = kept.iter().map(|(k, _)| k.as_str()).collect();
+    assert!(keys.contains(&"PATH"));
+    assert!(keys.contains(&"HOME"));
+    assert!(!keys.contains(&"ASYLUM_CONTROL_TOKEN"));
+    assert!(!keys.contains(&"AWS_SECRET_ACCESS_KEY"));
+    assert!(!keys.contains(&"GITHUB_TOKEN"));
+}
+
+#[test]
+fn scrubbed_env_drops_non_allowlisted_vars() {
+    // Read-only: cargo sets CARGO_* during tests; none may survive scrubbing,
+    // and every surviving key must be on the allowlist.
+    let env = scrubbed_env();
+    for leaked in ["CARGO", "CARGO_PKG_NAME", "CARGO_MANIFEST_DIR"] {
+        if std::env::var(leaked).is_ok() {
+            assert!(
+                !env.iter().any(|(k, _)| k == leaked),
+                "{leaked} leaked through scrubbing"
+            );
+        }
+    }
+    for (k, _) in &env {
+        assert!(
+            ENV_ALLOWLIST.contains(&k.as_str()),
+            "unexpected env key: {k}"
+        );
+    }
 }
 
 #[cfg(unix)]

@@ -64,7 +64,9 @@ fn login<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
         #[serde(default)]
         login: String,
     }
-    Ok(Option::<Author>::deserialize(d)?.map(|a| a.login).unwrap_or_default())
+    Ok(Option::<Author>::deserialize(d)?
+        .map(|a| a.login)
+        .unwrap_or_default())
 }
 
 /// gh nests labels as `[{ "name": "..." }]`; flatten to the names.
@@ -74,7 +76,10 @@ fn label_names<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D:
         #[serde(default)]
         name: String,
     }
-    Ok(Vec::<Label>::deserialize(d)?.into_iter().map(|l| l.name).collect())
+    Ok(Vec::<Label>::deserialize(d)?
+        .into_iter()
+        .map(|l| l.name)
+        .collect())
 }
 
 /// Parse `gh pr list --json ...` output.
@@ -92,13 +97,33 @@ const ISSUE_FIELDS: &str = "number,title,author,state,labels,url";
 
 /// List open pull requests for the repo at `dir`.
 pub fn pull_requests(dir: &Path, limit: u32) -> Result<Vec<PullRequest>, Error> {
-    let out = gh(dir, &["pr", "list", "--json", PR_FIELDS, "--limit", &limit.to_string()])?;
+    let out = gh(
+        dir,
+        &[
+            "pr",
+            "list",
+            "--json",
+            PR_FIELDS,
+            "--limit",
+            &limit.to_string(),
+        ],
+    )?;
     parse_prs(&out)
 }
 
 /// List open issues for the repo at `dir`.
 pub fn issues(dir: &Path, limit: u32) -> Result<Vec<Issue>, Error> {
-    let out = gh(dir, &["issue", "list", "--json", ISSUE_FIELDS, "--limit", &limit.to_string()])?;
+    let out = gh(
+        dir,
+        &[
+            "issue",
+            "list",
+            "--json",
+            ISSUE_FIELDS,
+            "--limit",
+            &limit.to_string(),
+        ],
+    )?;
     parse_issues(&out)
 }
 
@@ -117,7 +142,13 @@ pub fn create_pr(
         ],
     )?;
     // gh prints the PR URL as the last non-empty line.
-    Ok(out.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("").trim().to_string())
+    Ok(out
+        .lines()
+        .rev()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or("")
+        .trim()
+        .to_string())
 }
 
 /// Slug for a branch/worktree derived from an issue: `issue-<n>-<title-slug>`.

@@ -1,9 +1,11 @@
 //! Run a worktree's checks - type-check, lint, test - and report PASS/FAIL.
 //!
-//! A run's health is shown with PASS/FAIL indicators from declared Bun scripts
-//! and Cargo commands. This crate detects the appropriate checks for a project,
-//! runs them, and classifies each by exit status. Detection and classification
-//! are pure and tested; running shells out.
+//! A run's health is shown with PASS/FAIL indicators derived from the project's
+//! ecosystem: JavaScript/TypeScript package scripts (run through the detected
+//! package manager - bun, npm, pnpm, or yarn), Cargo commands, Python (ruff +
+//! pytest), and Go (build/vet/test). This crate detects the appropriate checks
+//! for a project, runs them, and classifies each by exit status. Detection and
+//! classification are pure and tested; running shells out.
 
 use std::path::Path;
 use std::process::Command;
@@ -65,13 +67,15 @@ pub struct CheckResult {
 }
 
 /// Detect the checks appropriate for the project rooted at `dir`, from the
-/// files it contains. Bun projects run only scripts the package declares;
-/// Rust projects get check/clippy/test. Both may apply in a polyglot repo.
+/// files it contains. JavaScript projects run only scripts the package declares
+/// (through the detected package manager); Rust, Python, and Go projects get
+/// their standard trio. Any combination may apply in a polyglot repo.
 pub fn detect(dir: &Path) -> Vec<Check> {
     let mut checks = Vec::new();
     let has = |name: &str| dir.join(name).exists();
 
     if has("package.json") {
+        let manager = package_manager(dir);
         let scripts = std::fs::read_to_string(dir.join("package.json"))
             .ok()
             .and_then(|source| serde_json::from_str::<Value>(&source).ok())
@@ -83,7 +87,12 @@ pub fn detect(dir: &Path) -> Vec<Check> {
             ("test", "Tests"),
         ] {
             if scripts.get(id).is_some_and(Value::is_string) {
-                checks.push(Check::new(&format!("bun/{id}"), label, "bun", &["run", id]));
+                checks.push(Check::new(
+                    &format!("{manager}/{id}"),
+                    label,
+                    manager,
+                    &["run", id],
+                ));
             }
         }
     }
@@ -102,7 +111,36 @@ pub fn detect(dir: &Path) -> Vec<Check> {
         ));
         checks.push(Check::new("cargo/test", "cargo test", "cargo", &["test"]));
     }
+    if has("pyproject.toml") || has("requirements.txt") || has("setup.py") {
+        checks.push(Check::new("python/lint", "Ruff", "ruff", &["check", "."]));
+        checks.push(Check::new("python/test", "pytest", "pytest", &["-q"]));
+    }
+    if has("go.mod") {
+        checks.push(Check::new(
+            "go/build",
+            "go build",
+            "go",
+            &["build", "./..."],
+        ));
+        checks.push(Check::new("go/vet", "go vet", "go", &["vet", "./..."]));
+        checks.push(Check::new("go/test", "go test", "go", &["test", "./..."]));
+    }
     checks
+}
+
+/// Pick the JavaScript package manager to run scripts with, from the lockfile
+/// present in `dir`. Defaults to bun when no lockfile disambiguates.
+fn package_manager(dir: &Path) -> &'static str {
+    let has = |name: &str| dir.join(name).exists();
+    if has("pnpm-lock.yaml") {
+        "pnpm"
+    } else if has("yarn.lock") {
+        "yarn"
+    } else if has("package-lock.json") {
+        "npm"
+    } else {
+        "bun"
+    }
 }
 
 /// Run a single check in `dir`.

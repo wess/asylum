@@ -14,6 +14,10 @@ pub struct SpawnSpec {
     pub cwd: String,
     /// Present when the prompt is delivered over stdin.
     pub stdin: Option<String>,
+    /// Environment overrides applied on top of the inherited environment - the
+    /// host uses this to inject the control-surface variables (`ASYLUM_RUN_ID`,
+    /// `ASYLUM_CONTROL_URL`, …) so an agent can orchestrate the fleet.
+    pub env: Vec<(String, String)>,
 }
 
 /// The `{prompt}` substitution token in an agent's argument template.
@@ -62,10 +66,17 @@ pub fn build(agent: &Agent, prefs: Option<&AgentPrefs>, prompt: &str, cwd: &str)
         args,
         cwd: cwd.to_string(),
         stdin,
+        env: Vec::new(),
     }
 }
 
 impl SpawnSpec {
+    /// Attach environment overrides (chainable), replacing any already set.
+    pub fn with_env(mut self, env: Vec<(String, String)>) -> Self {
+        self.env = env;
+        self
+    }
+
     /// A shell-ish preview of the command, for display in the UI (not for
     /// execution - the host runs `program`/`args` directly, no shell).
     pub fn preview(&self) -> String {

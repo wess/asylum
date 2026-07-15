@@ -205,6 +205,7 @@ dependencies = [
  "checks",
  "companion",
  "config",
+ "control",
  "designmode",
  "futures",
  "fuzzy",
@@ -225,6 +226,7 @@ dependencies = [
  "search",
  "serde_json",
  "store",
+ "update",
 ]
 
 [[package]]
@@ -1101,9 +1103,13 @@ name = "cli"
 version = "0.1.0"
 dependencies = [
  "agent",
+ "config",
+ "control",
  "git",
+ "plugin",
  "runner",
  "search",
+ "serde_json",
 ]
 
 [[package]]
@@ -1253,6 +1259,7 @@ dependencies = [
 name = "config"
 version = "0.1.0"
 dependencies = [
+ "getrandom 0.3.4",
  "serde",
  "serde_json",
  "toml 0.8.23",
@@ -1292,6 +1299,17 @@ dependencies = [
  "getrandom 0.2.17",
  "once_cell",
  "tiny-keccak",
+]
+
+[[package]]
+name = "control"
+version = "0.1.0"
+dependencies = [
+ "hmac",
+ "serde_json",
+ "sha2 0.10.9",
+ "store",
+ "subtle",
 ]
 
 [[package]]
@@ -7204,6 +7222,15 @@ name = "unsafe-libyaml"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
+
+[[package]]
+name = "update"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "url"

@@ -18,10 +18,14 @@ use rusqlite::Connection;
 
 pub mod account;
 pub mod annotation;
+pub mod control;
+pub mod event;
+pub mod followup;
 pub mod model;
-pub mod notification;
 pub mod note;
+pub mod notification;
 pub mod project;
+mod queue;
 pub mod run;
 pub mod runcheck;
 mod schema;
@@ -29,8 +33,9 @@ pub mod search;
 pub mod task;
 
 pub use model::{
-    Account, Annotation, NoteAttachment, NoteVault, NoteVaultMode, Notification, Project, Run,
-    RunCheck, RunStatus, SearchKind, SearchRecord, Side, Task, TaskStatus, Usage,
+    Account, Annotation, ControlRequest, Event, Followup, NoteAttachment, NoteVault, NoteVaultMode,
+    Notification, Project, QueueStatus, Run, RunCheck, RunStatus, SearchKind, SearchRecord, Side,
+    Task, TaskStatus, Usage,
 };
 
 /// A store error: either the SQLite layer failed or a lookup found nothing.

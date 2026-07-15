@@ -49,3 +49,41 @@ fn client_endpoint_override() {
     // No network call here - just confirm the builder is wired.
     let _ = c;
 }
+
+#[test]
+fn token_is_kept_off_the_argv() {
+    // The command line must never carry the token; it goes on stdin instead.
+    let args = curl_args("https://api.linear.app/graphql", r#"{"query":"x"}"#);
+    assert!(
+        !args.iter().any(|a| a.contains("lin_api_secret")),
+        "token leaked into argv: {args:?}"
+    );
+    assert!(args.iter().any(|a| a == "--config"));
+    // The auth header is delivered via the stdin config instead.
+    let cfg = auth_config("lin_api_secret");
+    assert!(cfg.contains("Authorization: lin_api_secret"));
+    assert!(cfg.starts_with("header = "));
+}
+
+#[test]
+fn errors_redact_the_token() {
+    let leaked = "curl failed using key lin_api_secret over the wire";
+    assert_eq!(
+        redact(leaked, "lin_api_secret"),
+        "curl failed using key *** over the wire"
+    );
+    // A blank key is a no-op.
+    assert_eq!(redact("nothing to hide", ""), "nothing to hide");
+}
+
+#[test]
+fn non_http_endpoints_are_refused() {
+    let c = Client::new("k").with_endpoint("file:///etc/passwd");
+    assert!(matches!(
+        c.query("q", serde_json::Value::Null),
+        Err(Error::Api(_))
+    ));
+    assert!(is_http_url("https://api.linear.app/graphql"));
+    assert!(is_http_url("http://localhost:9999"));
+    assert!(!is_http_url("ftp://x"));
+}

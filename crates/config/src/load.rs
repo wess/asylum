@@ -26,8 +26,13 @@ pub fn default_path() -> PathBuf {
 
 /// Load settings from `path`. A missing file yields the defaults with no
 /// diagnostics; a present-but-broken file yields the defaults plus diagnostics.
+///
+/// Durable secrets can be kept out of `settings.json` entirely: any secret field
+/// left empty is filled from an environment variable (`ASYLUM_LINEAR_TOKEN`,
+/// `ASYLUM_COMPANION_TOKEN`), so the token can come from the user's shell or a
+/// credential manager rather than a plaintext config file.
 pub fn load(path: &std::path::Path) -> Loaded {
-    match std::fs::read_to_string(path) {
+    let mut loaded = match std::fs::read_to_string(path) {
         Ok(src) => load_str(&src),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Loaded {
             settings: Settings::default(),
@@ -37,6 +42,32 @@ pub fn load(path: &std::path::Path) -> Loaded {
             settings: Settings::default(),
             diagnostics: vec![Diagnostic::new("", format!("could not read settings: {e}"))],
         },
+    };
+    resolve_secrets(
+        &mut loaded.settings,
+        std::env::var("ASYLUM_LINEAR_TOKEN").ok(),
+        std::env::var("ASYLUM_COMPANION_TOKEN").ok(),
+    );
+    loaded
+}
+
+/// Fill any empty secret field from its environment override. A configured
+/// (non-empty) value always wins; a blank override is ignored. Pure over its
+/// inputs so it is testable without touching the process environment.
+pub(crate) fn resolve_secrets(
+    settings: &mut Settings,
+    linear_token: Option<String>,
+    companion_token: Option<String>,
+) {
+    if settings.linear_token.trim().is_empty() {
+        if let Some(v) = linear_token.filter(|v| !v.trim().is_empty()) {
+            settings.linear_token = v;
+        }
+    }
+    if settings.companion.token.trim().is_empty() {
+        if let Some(v) = companion_token.filter(|v| !v.trim().is_empty()) {
+            settings.companion.token = v;
+        }
     }
 }
 

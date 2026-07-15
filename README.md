@@ -6,7 +6,8 @@ merge the winner.
 
 Asylum is a native Rust application. The GPU-accelerated UI is built on the
 `gpui` library, with the [guise-ui](https://github.com/wess/guise) component
-library, `libsinclair` for embedded terminals, and SQLite for persistence.
+library, terminals powered by
+[libsinclair](https://github.com/wess/sinclair), and SQLite for persistence.
 Plugins use a `plugin.toml` manifest model.
 
 ## Why
@@ -24,10 +25,20 @@ Each feature is backed by tested logic and a working UI or CLI surface. See
 
 - **Fan-out orchestration** — one prompt across N agents, each in an isolated
   worktree; run execution on a real pty; compare, then merge the winner or open a
-  PR (`agent`, `runner`, `git`, `github`).
+  PR (`agent`, `runner`, `git`, `github`). Reusable **fan-out layouts** race a
+  named set of agents in one pick (`duel`, `triad`, `swarm`, or your own).
+- **Semantic agent states** — every run shows a live activity —
+  **working / blocked / done / idle** — classified from its output, so the board
+  tells you at a glance which of your parallel agents is *blocked waiting on you*
+  (`agent::activity`).
+- **Agent control surface** — a running agent can orchestrate the fleet from
+  inside its worktree: spawn a helper run, read a sibling, run checks, report its
+  own state, and wait on another run, over a local JSON API it learns from a
+  skill (`control`, `asylum control`).
 - **Annotatable diff review** — inline comments shipped back to agents, plus
   PASS/FAIL checks and branch chips (`git`, `store`, `checks`).
-- **Embedded terminal** (splittable, `libsinclair`), **code editor** + file tree,
+- **Embedded terminal** (splittable, powered by
+  [libsinclair](https://github.com/wess/sinclair)), **code editor** + file tree,
   **markdown/image/PDF preview**, and an **embedded browser with design mode**
   (click an element → its HTML/CSS to an agent).
 - **GitHub / Linear** integration, **cross-worktree search**, **command palette**
@@ -37,9 +48,12 @@ Each feature is backed by tested logic and a working UI or CLI surface. See
   properties, `[[wiki links]]`, backlinks, tags, templates, live preview, and
   durable task/run/check/PR links. Attached notes become agent context.
 - **Plugins** — manifest system with a process runtime *and* a sandboxed WASM
-  runtime (`wasmi`, capability-gated).
-- **CLI** (`asylum`) with computer-use automation, and a **mobile companion**
-  server (live on `:8787`).
+  runtime (`wasmi`, capability-gated). Install from GitHub with
+  `asylum plugin install <owner/repo>` and discover community plugins by topic.
+- **CLI** (`asylum`) with computer-use automation and fleet control
+  (`control`, `wait`, `plugin`, `layout`), a **mobile companion** server (live on
+  `:8787`), and an **event stream** both expose so a phone or an agent can follow
+  the fleet without polling.
 
 ## Build & run
 
@@ -49,7 +63,9 @@ cargo test                # run the suite
 cargo clippy --all-targets
 ```
 
-`guise-ui` and `libsinclair` are git dependencies; the first build fetches them.
+[guise-ui](https://github.com/wess/guise) and
+[libsinclair](https://github.com/wess/sinclair) are git dependencies; the first
+build fetches them.
 See [`docs/gpui.md`](docs/gpui.md) for the dependency recipe.
 
 ## Website
@@ -86,10 +102,11 @@ crates/
   notify    desktop notifications
   designmode click an element → capture HTML/CSS/selector for an agent
   fuzzy     subsequence match + ranking (command palette, quick-open)
-  companion mobile companion HTTP server + mobile web page
-  plugin    plugin.toml manifest parsing
+  companion mobile companion HTTP server + mobile web page + event stream
+  control   agent control surface: spawn/read/report/wait over a local JSON API
+  plugin    plugin.toml manifest parsing + GitHub install/discovery
   pluginrt  process runtime (JSON over stdio) + WASM runtime (wasmi)
-  cli       the `asylum` binary (worktree/run/search/computer-use)
+  cli       the `asylum` binary (worktree/run/search/control/wait/plugin/layout)
   app       the gpui application (asylumdev) - 13 surfaces
 ```
 

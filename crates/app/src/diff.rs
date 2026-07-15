@@ -27,6 +27,7 @@ pub fn review(
     target: Target,
     branches: Vec<git::Branch>,
     runs: Vec<RunRow>,
+    split: bool,
     note: Entity<guise::TextInput>,
     handle: Entity<Root>,
     _window: &mut Window,
@@ -49,7 +50,33 @@ pub fn review(
             .gap_2()
             .justify_between()
             .child(Title::new("Review changes").order(2))
-            .child(checks_bar(check_results, checking, handle.clone())),
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_2()
+                    .child({
+                        let toggle = handle.clone();
+                        Button::new(
+                            "diff-view-toggle",
+                            if split {
+                                "Unified view"
+                            } else {
+                                "Side-by-side"
+                            },
+                        )
+                        .size(Size::Xs)
+                        .variant(Variant::Subtle)
+                        .on_click(move |_, _, cx| {
+                            toggle.update(cx, |root, cx| {
+                                root.diff_split = !root.diff_split;
+                                cx.notify();
+                            });
+                        })
+                    })
+                    .child(checks_bar(check_results, checking, handle.clone())),
+            ),
     );
 
     if !branches.is_empty() {
@@ -127,7 +154,11 @@ pub fn review(
     }
 
     for file in files {
-        col = col.child(file_block(file, &annotations, &target, handle.clone()));
+        col = if split {
+            col.child(file_block_split(file))
+        } else {
+            col.child(file_block(file, &annotations, &target, handle.clone()))
+        };
     }
     col
 }
@@ -315,6 +346,131 @@ fn file_block(
             .child(Divider::new())
             .child(body),
     )
+}
+
+/// A read-only side-by-side rendering of one file: removed lines on the left,
+/// added lines on the right, context spanning both. Annotating stays in the
+/// unified view, which owns the click-to-comment interaction.
+fn file_block_split(file: DiffFile) -> impl IntoElement {
+    let (added, removed) = file.line_stats();
+    let header = div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap_2()
+        .child(Text::new(SharedString::from(file.path.clone())).bold())
+        .child(
+            Badge::new(format!("+{added}"))
+                .color(ColorName::Green)
+                .variant(Variant::Light),
+        )
+        .child(
+            Badge::new(format!("-{removed}"))
+                .color(ColorName::Red)
+                .variant(Variant::Light),
+        );
+
+    let mut body = div()
+        .flex()
+        .flex_col()
+        .w_full()
+        .font_family("monospace")
+        .text_size(px(12.0));
+
+    for hunk in &file.hunks {
+        body = body.child(
+            div().px(px(8.0)).py(px(2.0)).text_size(px(11.0)).child(
+                Text::new(SharedString::from(format!(
+                    "@@ -{} +{} @@ {}",
+                    hunk.old_start, hunk.new_start, hunk.header
+                )))
+                .dimmed(),
+            ),
+        );
+        // Pair each run of removed lines with the following added lines so a
+        // change shows old and new side by side; context flushes the pairing.
+        let mut removed_run: Vec<&git::DiffLine> = Vec::new();
+        let mut added_run: Vec<&git::DiffLine> = Vec::new();
+        let flush = |body: gpui::Div,
+                     removed_run: &mut Vec<&git::DiffLine>,
+                     added_run: &mut Vec<&git::DiffLine>| {
+            let rows = removed_run.len().max(added_run.len());
+            let mut body = body;
+            for i in 0..rows {
+                body = body.child(split_row(
+                    removed_run.get(i).copied(),
+                    added_run.get(i).copied(),
+                ));
+            }
+            removed_run.clear();
+            added_run.clear();
+            body
+        };
+        for line in &hunk.lines {
+            match line.kind {
+                LineKind::Removed => removed_run.push(line),
+                LineKind::Added => added_run.push(line),
+                LineKind::Context => {
+                    body = flush(body, &mut removed_run, &mut added_run);
+                    body = body.child(split_row(Some(line), Some(line)));
+                }
+            }
+        }
+        body = flush(body, &mut removed_run, &mut added_run);
+    }
+
+    Card::new().padding(Size::Md).child(
+        div()
+            .flex()
+            .flex_col()
+            .w_full()
+            .gap_2()
+            .child(header)
+            .child(Divider::new())
+            .child(body),
+    )
+}
+
+/// One row of the side-by-side view: an old cell and a new cell.
+fn split_row(left: Option<&git::DiffLine>, right: Option<&git::DiffLine>) -> impl IntoElement {
+    let cell = |line: Option<&git::DiffLine>, removed: bool| {
+        let (bg, no, content) = match line {
+            Some(l) if removed && l.kind == LineKind::Removed => {
+                (rgba(0xf8514926), l.old_no, l.content.clone())
+            }
+            Some(l) if !removed && l.kind == LineKind::Added => {
+                (rgba(0x2ea04326), l.new_no, l.content.clone())
+            }
+            Some(l) if l.kind == LineKind::Context => (
+                rgba(0x00000000),
+                if removed { l.old_no } else { l.new_no },
+                l.content.clone(),
+            ),
+            _ => (rgba(0x00000000), None, String::new()),
+        };
+        let gutter = match no {
+            Some(v) => format!("{v:>4}"),
+            None => "    ".to_string(),
+        };
+        div()
+            .flex()
+            .flex_row()
+            .w_1_2()
+            .bg(bg)
+            .child(
+                div()
+                    .px(px(6.0))
+                    .child(Text::new(SharedString::from(gutter)).dimmed()),
+            )
+            .child(Text::new(SharedString::from(content)))
+    };
+    div()
+        .flex()
+        .flex_row()
+        .w_full()
+        .gap_2()
+        .child(cell(left, true))
+        .child(cell(right, false))
 }
 
 /// Which (line number, side) a comment on this line anchors to.

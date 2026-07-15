@@ -27,6 +27,16 @@ enum FanoutResult {
     },
 }
 
+/// Outcome of draining one queued unit of work that did not succeed. Determines
+/// whether the store row is failed terminally or retried with backoff.
+enum DrainFail {
+    /// The request can never succeed as written (malformed, unknown target);
+    /// record a terminal failure without retrying.
+    Permanent(String),
+    /// A temporary condition (no live run yet, a busy worktree); retry later.
+    Transient(String),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoticeTone {
     Info,
@@ -276,6 +286,30 @@ impl Root {
         }
     }
 
+    /// Apply a named fan-out layout: replace the current selection with the
+    /// preset's agents (those that resolve in the catalog). A no-op for an
+    /// unknown name.
+    pub fn apply_layout(&mut self, name: &str) {
+        let Some(layout) = self.settings.layout(name) else {
+            return;
+        };
+        self.fanout = layout
+            .agents
+            .iter()
+            .filter(|id| agent::registry::resolve(id, &self.settings.custom_agents).is_some())
+            .cloned()
+            .collect();
+    }
+
+    /// The names of the configured fan-out layouts, for the composer picker.
+    pub fn layout_names(&self) -> Vec<String> {
+        self.settings
+            .layouts
+            .iter()
+            .map(|l| l.name.clone())
+            .collect()
+    }
+
     pub fn agent_reports(&self) -> Vec<(agent::registry::Agent, agent::doctor::Report)> {
         let verified = self.db.successful_agents().unwrap_or_default();
         agent::registry::catalog(&self.settings.custom_agents)
@@ -358,10 +392,16 @@ impl Root {
         for diagnostic in diagnostics {
             self.push_error("Project settings", diagnostic.message);
         }
-        let base = project_config
-            .base_branch
-            .as_deref()
-            .unwrap_or(&project.base_branch);
+        // Worktrees start from the user's chosen ref when set, else the base.
+        let base = if self.start_ref.trim().is_empty() {
+            project_config
+                .base_branch
+                .as_deref()
+                .unwrap_or(&project.base_branch)
+                .to_string()
+        } else {
+            self.start_ref.trim().to_string()
+        };
         let plans = agent::plan::fanout(
             task_id,
             &task.title,
@@ -580,11 +620,12 @@ impl Root {
         let mut prompt = run.prompt.clone().unwrap_or(task.prompt);
         prompt.push_str(&self.note_context_for_run(run_id));
         let prefs = self.settings.agents.get(&run.agent);
-        let spec = agent::command::build(&agent, prefs, &prompt, &run.worktree);
+        let mut spec = agent::command::build(&agent, prefs, &prompt, &run.worktree);
         if agent::doctor::find_program(&spec.program).is_none() {
             self.fail_launch(run_id, &format!("{} was not found on PATH.", spec.program));
             return;
         }
+        spec.env = self.control_env(run.task_id, run_id);
         let project_config = config::load_project(Path::new(&project.path)).0;
         let term = match make_term(spec.clone(), project_config.env, window, cx) {
             Ok(term) => term,
@@ -615,6 +656,14 @@ impl Root {
             );
             return;
         }
+        let _ = self.db.set_run_activity(run_id, Some("working"));
+        let _ = self.db.record_event(
+            "run_started",
+            Some(run.task_id),
+            Some(run_id),
+            &format!("{{\"agent\":\"{}\"}}", run.agent),
+            now(),
+        );
         cx.subscribe(&term, move |root, term, event: &Event, cx| match event {
             Event::Wakeup => root.snapshot_run(run_id, &term, cx),
             Event::Exit(code) => root.finish_run(run_id, *code, &term, cx),
@@ -643,7 +692,9 @@ impl Root {
             return;
         }
         self.run_saved_at.insert(run_id, second);
-        match self.db.save_run_output(run_id, &terminal_text(term, cx)) {
+        let text = terminal_text(term, cx);
+        self.update_activity(run_id, &text);
+        match self.db.save_run_output(run_id, &text) {
             Ok(()) => {
                 self.run_save_failed.remove(&run_id);
             }
@@ -655,6 +706,203 @@ impl Root {
             }
             Err(_) => {}
         }
+    }
+
+    /// Environment variables that let a launched agent reach the control
+    /// surface and know which run/task it is. Empty when the control server is
+    /// disabled, so no orchestration is offered.
+    fn control_env(&self, task_id: i64, run_id: i64) -> Vec<(String, String)> {
+        if !self.settings.control.enabled {
+            return Vec::new();
+        }
+        let port = self
+            .settings
+            .control
+            .bind
+            .rsplit(':')
+            .next()
+            .unwrap_or("8788");
+        // Mint a scoped token bound to this run's task and signed with the
+        // per-session key (see `secrets`), so an agent can orchestrate its own
+        // fleet but a request for another task is refused. An empty key means
+        // the control server runs unauthenticated (auth disabled).
+        let key = crate::secrets::control_token();
+        let token = if key.is_empty() {
+            String::new()
+        } else {
+            // Comfortably longer than any run; the key rotates each session.
+            let expires_at = now() + 7 * 24 * 60 * 60;
+            ::control::token::mint(&key, task_id, run_id, expires_at)
+        };
+        vec![
+            (
+                ::control::ENV_URL.to_string(),
+                format!("http://127.0.0.1:{port}"),
+            ),
+            (::control::ENV_TOKEN.to_string(), token),
+            (::control::ENV_TASK.to_string(), task_id.to_string()),
+            (::control::ENV_RUN.to_string(), run_id.to_string()),
+        ]
+    }
+
+    /// Classify a run's live output into a semantic activity and persist it when
+    /// it changes, emitting a `run_activity` event so the board, the phone, and
+    /// sibling agents see the transition. A `None` classification keeps the
+    /// prior state (avoids flapping to idle between bursts of output).
+    fn update_activity(&mut self, run_id: i64, text: &str) {
+        let Ok(run) = self.db.run(run_id) else { return };
+        let Some(activity) = agent::Activity::detect(&run.agent, text) else {
+            return;
+        };
+        let token = activity.as_str();
+        if run.activity.as_deref() == Some(token) {
+            return;
+        }
+        let _ = self.db.set_run_activity(run_id, Some(token));
+        let _ = self.db.record_event(
+            "run_activity",
+            Some(run.task_id),
+            Some(run_id),
+            &format!("{{\"activity\":\"{token}\"}}"),
+            now(),
+        );
+    }
+
+    /// Deliver any control requests an agent queued through the control surface.
+    /// `spawn` starts a helper run on the same task; `check` runs verification in
+    /// the run's worktree. Each is claimed before it runs and its outcome is
+    /// recorded (succeeded / retried with backoff / failed), so a failure is
+    /// never silently represented as success. Rows stranded `running` by a crash
+    /// are recovered first. Mirrors [`Self::drain_followups`].
+    pub fn drain_control_requests(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let now = now();
+        let _ = self.db.recover_stale_control_requests(now);
+        let claimed = self.db.claim_control_requests(now).unwrap_or_default();
+        for request in claimed {
+            let id = request.id;
+            match self.execute_control_request(&request, window, cx) {
+                Ok(()) => {
+                    let _ = self.db.complete_control_request(id, now);
+                }
+                Err(DrainFail::Permanent(msg)) => {
+                    let _ = self.db.fail_control_request_permanent(id, now, &msg);
+                    self.push_notice(NoticeTone::Warning, "Control request failed", msg);
+                }
+                Err(DrainFail::Transient(msg)) => {
+                    let will_retry = self.db.fail_control_request(id, now, &msg).unwrap_or(false);
+                    if !will_retry {
+                        self.push_notice(NoticeTone::Warning, "Control request gave up", msg);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Perform one claimed control request. A malformed request (missing agent,
+    /// unknown agent/kind, no run) is a [`DrainFail::Permanent`] failure that
+    /// will never succeed; a git/pty side-effect that fails is
+    /// [`DrainFail::Transient`] and retried with backoff.
+    fn execute_control_request(
+        &mut self,
+        request: &store::ControlRequest,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<(), DrainFail> {
+        match request.kind.as_str() {
+            "spawn" => {
+                let agent = json_str(&request.payload, "agent").ok_or_else(|| {
+                    DrainFail::Permanent("spawn request is missing an agent".into())
+                })?;
+                if agent::registry::resolve(&agent, &self.settings.custom_agents).is_none() {
+                    return Err(DrainFail::Permanent(format!(
+                        "{agent} is not in the configured catalog"
+                    )));
+                }
+                let prompt = json_str(&request.payload, "prompt");
+                self.spawn_helper_run(request.task_id, &agent, prompt, window, cx)
+                    .map_err(DrainFail::Transient)
+            }
+            "check" => {
+                let run_id = request
+                    .run_id
+                    .ok_or_else(|| DrainFail::Permanent("check request has no run".into()))?;
+                self.run_checks_for(run_id, cx);
+                Ok(())
+            }
+            other => Err(DrainFail::Permanent(format!(
+                "unknown control request kind: {other}"
+            ))),
+        }
+    }
+
+    /// Create and queue a helper run for `task_id` on `agent`, in a fresh
+    /// worktree, optionally with a one-shot `prompt` override. Reuses the normal
+    /// launch queue so parallel limits still apply.
+    fn spawn_helper_run(
+        &mut self,
+        task_id: i64,
+        agent: &str,
+        prompt: Option<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<(), String> {
+        let task = self.db.task(task_id).map_err(|e| e.to_string())?;
+        let project = self
+            .db
+            .project(task.project_id)
+            .map_err(|e| e.to_string())?;
+        if agent::registry::resolve(agent, &self.settings.custom_agents).is_none() {
+            return Err(format!("{agent} is not in the configured catalog"));
+        }
+        // A unique branch/worktree so a helper never collides with a sibling.
+        let existing = self.db.runs(task_id).map(|r| r.len()).unwrap_or(0);
+        let slug = agent::plan::slugify(&task.title);
+        let base_name = if slug.is_empty() {
+            format!("task-{task_id}")
+        } else {
+            format!("{slug}-{task_id}")
+        };
+        let branch = format!("asylum/{base_name}-{agent}-h{existing}");
+        let worktree_path = format!(
+            "{}/{base_name}-{agent}-h{existing}",
+            self.settings.worktree_dir
+        );
+
+        let project_config = config::load_project(Path::new(&project.path)).0;
+        let base = project_config
+            .base_branch
+            .as_deref()
+            .unwrap_or(&project.base_branch)
+            .to_string();
+        let worktree = git::worktree::create(
+            Path::new(&project.path),
+            &worktree_path,
+            Some(&branch),
+            Some(&base),
+        )
+        .map_err(|e| e.to_string())?;
+        run_setup(&worktree, &project_config)?;
+
+        let run = self
+            .db
+            .create_run(task_id, agent, &worktree.to_string_lossy(), &branch)
+            .map_err(|e| e.to_string())?;
+        self.inherit_task_notes(task_id, run.id);
+        if let Some(prompt) = prompt.filter(|p| !p.trim().is_empty()) {
+            let _ = self.db.queue_run_with_prompt(run.id, &prompt);
+        }
+        let _ = self.db.record_event(
+            "run_spawned",
+            Some(task_id),
+            Some(run.id),
+            &format!("{{\"agent\":\"{agent}\"}}"),
+            now(),
+        );
+        if !matches!(self.db.task(task_id), Ok(t) if t.status == TaskStatus::Running) {
+            let _ = self.db.set_task_status(task_id, TaskStatus::Running, now());
+        }
+        self.launch_queued(window, cx);
+        Ok(())
     }
 
     fn finish_run(
@@ -672,6 +920,7 @@ impl Root {
         {
             return;
         }
+        let task_id = self.db.run(run_id).ok().map(|run| run.task_id);
         let output = terminal_text(term, cx);
         match code {
             Some(0) => {
@@ -715,6 +964,14 @@ impl Root {
                     self.run_terms.remove(&run_id);
                     return;
                 }
+                let _ = self.db.set_run_activity(run_id, Some("done"));
+                let _ = self.db.record_event(
+                    "run_finished",
+                    task_id,
+                    Some(run_id),
+                    "{\"code\":0}",
+                    now(),
+                );
                 self.refresh_setup();
                 self.push_notice(
                     NoticeTone::Success,
@@ -735,6 +992,14 @@ impl Root {
                     self.run_terms.remove(&run_id);
                     return;
                 }
+                let _ = self.db.set_run_activity(run_id, None);
+                let _ = self.db.record_event(
+                    "run_failed",
+                    task_id,
+                    Some(run_id),
+                    &format!("{{\"code\":{code}}}"),
+                    now(),
+                );
                 self.push_notice(
                     NoticeTone::Error,
                     "Run failed",
@@ -939,6 +1204,63 @@ impl Root {
             .map_err(|error| error.to_string())?;
         self.launch_queued(window, cx);
         Ok(())
+    }
+
+    /// Deliver any follow-ups queued from the mobile companion. Each is claimed,
+    /// sent to an active run of its task (a live stdin agent, else a fresh
+    /// attempt), and recorded as delivered. If no run can take it yet the row is
+    /// retried with backoff rather than silently dropped, and only after
+    /// exhausting attempts becomes a durable `failed` row. Crash-stranded rows
+    /// are recovered first.
+    pub fn drain_followups(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let now = now();
+        let _ = self.db.recover_stale_followups(now);
+        let claimed = self.db.claim_followups(now).unwrap_or_default();
+        for followup in claimed {
+            let id = followup.id;
+            match self.deliver_followup(&followup, window, cx) {
+                Ok(()) => {
+                    let _ = self.db.complete_followup(id, now);
+                }
+                Err(DrainFail::Permanent(msg)) => {
+                    let _ = self.db.fail_followup_permanent(id, now, &msg);
+                    self.push_notice(NoticeTone::Warning, "Mobile follow-up not delivered", msg);
+                }
+                Err(DrainFail::Transient(msg)) => {
+                    let will_retry = self.db.fail_followup(id, now, &msg).unwrap_or(false);
+                    if !will_retry {
+                        self.push_notice(NoticeTone::Warning, "Mobile follow-up gave up", msg);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Deliver one claimed follow-up to a run of its task. No run to take it yet
+    /// is a [`DrainFail::Transient`] condition (a run may start soon); a delivery
+    /// error from the run is likewise transient and retried with backoff.
+    fn deliver_followup(
+        &mut self,
+        followup: &store::Followup,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Result<(), DrainFail> {
+        let runs = self.db.runs(followup.task_id).unwrap_or_default();
+        // Prefer a running run (a live agent can take it now), else the most
+        // recent run (a finished run starts a new attempt in its worktree).
+        let target = runs
+            .iter()
+            .rev()
+            .find(|run| run.status == RunStatus::Running)
+            .or_else(|| runs.last());
+        let Some(run) = target else {
+            return Err(DrainFail::Transient(
+                "no run available to deliver the follow-up yet".into(),
+            ));
+        };
+        let run_id = run.id;
+        self.send_followup(run_id, followup.message.clone(), window, cx)
+            .map_err(DrainFail::Transient)
     }
 
     fn refresh_task_for_run(&mut self, run_id: i64) {
@@ -1286,6 +1608,16 @@ fn run_setup(worktree: &Path, config: &config::ProjectConfig) -> Result<(), Stri
     Ok(())
 }
 
+/// Pull a top-level string field from a JSON object body (control-request
+/// payloads). `None` when absent, non-string, or the body does not parse.
+fn json_str(body: &str, key: &str) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()?
+        .get(key)?
+        .as_str()
+        .map(str::to_string)
+}
+
 fn base_status(repo: &Path, worktree_dir: &str) -> Result<Vec<git::Entry>, git::Error> {
     git::status::status(repo)
         .map(|entries| git::status::excluding_prefix(entries, Path::new(worktree_dir)))
@@ -1301,6 +1633,8 @@ fn make_term(
         SessionOptions::command(std::iter::once(spec.program).chain(spec.args).collect());
     options.spawn.cwd = Some(PathBuf::from(spec.cwd));
     options.spawn.env.extend(env);
+    // Control-surface variables (ASYLUM_RUN_ID, …) so the agent can orchestrate.
+    options.spawn.env.extend(spec.env);
     let (session, events) = libsinclair::Session::spawn(options)?;
     let session = std::sync::Arc::new(session);
     Ok(cx.new(|cx| TermView::new(session, events, TermOptions::default(), window, cx)))

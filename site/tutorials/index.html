@@ -14,8 +14,9 @@
       <a class="brand" href="../" aria-label="Asylum home"><span class="brandmark" aria-hidden="true"></span><span>ASYLUM</span></a>
       <nav class="primarynav" aria-label="Primary navigation" data-nav>
         <a href="../">Overview</a>
+        <a href="../book/">Book</a>
+        <a href="../videos/">Videos</a>
         <a href="../docs/">Docs</a>
-        <a class="active" href="./">Tutorials</a>
         <a href="https://github.com/wess/asylum" target="_blank" rel="noreferrer">GitHub <i data-lucide="arrow-up-right" aria-hidden="true"></i></a>
       </nav>
       <button class="navtoggle" type="button" aria-label="Open navigation" aria-expanded="false" data-navtoggle><i data-lucide="menu" aria-hidden="true"></i></button>
@@ -33,6 +34,39 @@
           <div><dt>9</dt><dd>complete tutorials</dd></div>
           <div><dt>0</dt><dd>demo-only steps</dd></div>
         </dl>
+      </section>
+
+      <section class="cinema shellwide" aria-labelledby="cinematitle">
+        <div class="cinemahead">
+          <div><p class="eyebrow">Original cinematic trailer</p><h2 id="cinematitle">One task. A fleet of answers.</h2></div>
+          <p>See the complete Asylum loop in thirty-two seconds: isolate, dispatch, verify, compare, and merge.</p>
+        </div>
+        <div class="cinemaframe">
+          <video controls preload="metadata" poster="../videos/palette.png">
+            <source src="../videos/trailer.mp4" type="video/mp4" />
+            <track kind="captions" src="../videos/trailer.vtt" srclang="en" label="English" default />
+            Your browser does not support HTML video. <a href="../videos/trailer.mp4">Open the trailer directly.</a>
+          </video>
+        </div>
+      </section>
+
+      <section class="videocourse shell" aria-labelledby="videotitle">
+        <div class="coursehead">
+          <div><p class="eyebrow">Beginner to expert video course</p><h2 id="videotitle">Learn the complete operating model.</h2></div>
+          <p>Ten narrated lessons, closed captions, and full transcripts. Start at episode one or jump directly to the workflow you need.</p>
+        </div>
+        <div class="courseepisodes">
+          <article class="courseepisode"><video controls preload="none" poster="../videos/palette.png"><source src="../videos/episode01.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode01.vtt" srclang="en" label="English" default /></video><div><span>01 · Beginner · 1:02</span><h3>What Asylum is</h3><p>Understand the ADE model, why isolated parallel attempts matter, and the project–task–run vocabulary.</p><a href="../videos/transcripts/episode01.md">Read transcript</a></div></article>
+          <article class="courseepisode"><video controls preload="none" poster="../videos/palette.png"><source src="../videos/episode02.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode02.vtt" srclang="en" label="English" default /></video><div><span>02 · Beginner · 1:39</span><h3>Install and first launch</h3><p>Build the app, complete the setup doctor, and understand what Asylum verifies before important work.</p><a href="../videos/transcripts/episode02.md">Read transcript</a></div></article>
+          <article class="courseepisode"><video controls preload="none" poster="../videos/palette.png"><source src="../videos/episode03.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode03.vtt" srclang="en" label="English" default /></video><div><span>03 · Beginner · 2:25</span><h3>Projects, tasks, agents, and worktrees</h3><p>Open a repository, choose agents deliberately, and see how branches and worktrees keep every attempt isolated.</p><a href="../videos/transcripts/episode03.md">Read transcript</a></div></article>
+          <article class="courseepisode"><video controls preload="none" poster="../videos/palette.png"><source src="../videos/episode04.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode04.vtt" srclang="en" label="English" default /></video><div><span>04 · Beginner · 2:24</span><h3>Run your first fan-out</h3><p>Write a verifiable prompt, launch independent runs, and read the board while the fleet works.</p><a href="../videos/transcripts/episode04.md">Read transcript</a></div></article>
+          <article class="courseepisode"><video controls preload="none" poster="../videos/palette.png"><source src="../videos/episode05.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode05.vtt" srclang="en" label="English" default /></video><div><span>05 · Intermediate · 4:35</span><h3>Agent activity and terminals</h3><p>Interpret semantic activity, inspect live output, and use the terminal, editor, preview, and browser surfaces together.</p><a href="../videos/transcripts/episode05.md">Read transcript</a></div></article>
+          <article class="courseepisode"><video controls preload="none" poster="../videos/palette.png"><source src="../videos/episode06.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode06.vtt" srclang="en" label="English" default /></video><div><span>06 · Intermediate · 2:50</span><h3>Diffs, checks, and annotations</h3><p>Compare the evidence, understand verification results, and send precise line-level feedback to a run.</p><a href="../videos/transcripts/episode06.md">Read transcript</a></div></article>
+          <article class="courseepisode"><video controls preload="none" poster="../videos/palette.png"><source src="../videos/episode07.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode07.vtt" srclang="en" label="English" default /></video><div><span>07 · Intermediate · 1:54</span><h3>Select and merge the winner</h3><p>Use merge preflight, resolve blockers, preserve the base branch, and finish a tournament safely.</p><a href="../videos/transcripts/episode07.md">Read transcript</a></div></article>
+          <article class="courseepisode"><video controls preload="none" poster="../videos/palette.png"><source src="../videos/episode08.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode08.vtt" srclang="en" label="English" default /></video><div><span>08 · Intermediate · 4:52</span><h3>Notes, context, and reusable workflows</h3><p>Turn Markdown into durable project memory, attach context to work, and reuse layouts without losing judgment.</p><a href="../videos/transcripts/episode08.md">Read transcript</a></div></article>
+          <article class="courseepisode"><video controls preload="none" poster="../videos/palette.png"><source src="../videos/episode09.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode09.vtt" srclang="en" label="English" default /></video><div><span>09 · Advanced · 11:30</span><h3>CLI, integrations, companion, and plugins</h3><p>Operate beyond the main window: automation, GitHub and Linear, remote observation, event streams, and extension points.</p><a href="../videos/transcripts/episode09.md">Read transcript</a></div></article>
+          <article class="courseepisode"><video controls preload="none" poster="../videos/palette.png"><source src="../videos/episode10.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode10.vtt" srclang="en" label="English" default /></video><div><span>10 · Expert · 8:07</span><h3>Expert orchestration and security</h3><p>Coordinate sub-fleets, control cost and concurrency, secure local services, and make evidence-driven operating decisions.</p><a href="../videos/transcripts/episode10.md">Read transcript</a></div></article>
+        </div>
       </section>
 
       <section class="tutorialcatalog shell" aria-labelledby="catalogtitle">
@@ -333,8 +367,8 @@
     <footer class="sitefooter">
       <div class="shell">
         <a class="brand" href="../"><span class="brandmark" aria-hidden="true"></span><span>ASYLUM</span></a>
-        <p>Agent Development Environment. Native Rust, durable state, isolated work.</p>
-        <nav aria-label="Footer navigation"><a href="../docs/">Docs</a><a href="./">Tutorials</a><a href="https://github.com/wess/asylum">GitHub</a></nav>
+        <p>Agent Development Environment. Native Rust, durable state, isolated work. Terminals powered by <a href="https://github.com/wess/sinclair">libsinclair</a>.</p>
+        <nav aria-label="Footer navigation"><a href="../book/">Book</a><a href="../videos/">Videos</a><a href="../docs/">Docs</a></nav>
       </div>
     </footer>
     <script type="module" src="/src/tutorials.ts"></script>

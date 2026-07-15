@@ -10,9 +10,12 @@ use crate::control::Button;
 use crate::state::Root;
 use github::{Issue, PullRequest};
 
+#[allow(clippy::too_many_arguments)]
 pub fn integrations_view(
     prs: Vec<PullRequest>,
     issues: Vec<Issue>,
+    linear_issues: Vec<linear::Issue>,
+    linear_configured: bool,
     error: Option<String>,
     handle: Entity<Root>,
     _window: &mut Window,
@@ -77,13 +80,62 @@ pub fn integrations_view(
 
     // Linear.
     col = col.child(Title::new("Linear").order(4));
-    col = col.child(
-        Text::new("Set a Linear API token in settings to browse teams, projects, and issues.")
+    if !linear_configured {
+        col = col.child(
+            Text::new(
+                "Set \"linear_token\" in settings to browse Linear issues and open a worktree from one.",
+            )
             .size(Size::Sm)
             .dimmed(),
-    );
+        );
+    } else if linear_issues.is_empty() {
+        col = col.child(
+            Text::new("No Linear issues loaded. Refresh to fetch them.")
+                .size(Size::Sm)
+                .dimmed(),
+        );
+    } else {
+        let mut list = div().flex().flex_col().gap_2();
+        for issue in linear_issues {
+            list = list.child(linear_row(issue, handle.clone()));
+        }
+        col = col.child(list);
+    }
 
     col
+}
+
+fn linear_row(issue: linear::Issue, handle: Entity<Root>) -> impl IntoElement {
+    let for_click = issue.clone();
+    Card::new().padding(Size::Sm).child(
+        div()
+            .flex()
+            .flex_row()
+            .items_center()
+            .gap_2()
+            .child(Text::new(SharedString::from(issue.identifier.clone())).dimmed())
+            .child(Text::new(SharedString::from(issue.title.clone())).bold())
+            .child(
+                Text::new(SharedString::from(issue.state.clone()))
+                    .size(Size::Xs)
+                    .dimmed(),
+            )
+            .child(
+                Button::new(
+                    SharedString::from(format!("linear-wt-{}", issue.identifier)),
+                    "Open worktree",
+                )
+                .size(Size::Xs)
+                .variant(Variant::Light)
+                .on_click(move |_, _, cx| {
+                    let issue = for_click.clone();
+                    handle.update(cx, |root, cx| {
+                        root.create_worktree_from_linear_issue(&issue);
+                        cx.notify();
+                    });
+                }),
+            ),
+    )
 }
 
 fn pr_row(pr: PullRequest) -> impl IntoElement {

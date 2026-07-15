@@ -86,7 +86,10 @@ pub fn to_prompt_many(annotations: &[Annotation]) -> String {
             out.push_str(&format!("\nHTML:\n```html\n{}\n```\n", a.capture.html));
         }
         if !a.capture.css.is_empty() {
-            out.push_str(&format!("\nComputed CSS:\n```css\n{}\n```\n", a.capture.css));
+            out.push_str(&format!(
+                "\nComputed CSS:\n```css\n{}\n```\n",
+                a.capture.css
+            ));
         }
     }
     out
