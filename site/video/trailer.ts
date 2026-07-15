@@ -122,7 +122,7 @@ await run([
   "-f", "lavfi", "-i", `anoisesrc=color=pink:amplitude=.24:sample_rate=48000:duration=${cursor}`,
   "-f", "lavfi", "-i", `aevalsrc=sin(2*PI*48*t)*exp(-15*(t-floor(t/2.25)*2.25)):s=48000:d=${cursor}`,
   "-filter_complex",
-  `[1:a]volume=.20,lowpass=f=135,tremolo=f=2:d=.66[bass];[2:a]volume=.12,lowpass=f=1250,tremolo=f=4:d=.78[pulse];[3:a]volume=.075,highpass=f=160,tremolo=f=8:d=.84[seq];[4:a]highpass=f=420,lowpass=f=8500,tremolo=f=4:d=.91,volume=.14[perc];[5:a]lowpass=f=175,volume=.34[hit];[bass][pulse][seq][perc][hit]amix=inputs=5:normalize=0,acompressor=threshold=.15:ratio=3:attack=12:release=210,afade=t=in:st=0:d=1.0,afade=t=out:st=${endfade}:d=4,volume=.90[music];[0:a]volume=1.14,asplit=2[voice][key];[music][key]sidechaincompress=threshold=.025:ratio=5:attack=12:release=320[ducked];[voice][ducked]amix=inputs=2:duration=first:weights='1 1.52',loudnorm=I=-14.5:LRA=9:TP=-1.2,alimiter=limit=.94[a]`,
+  `[1:a]volume=.20,lowpass=f=135,tremolo=f=2:d=.66[bass];[2:a]volume=.12,lowpass=f=1250,tremolo=f=4:d=.78[pulse];[3:a]volume=.075,highpass=f=160,tremolo=f=8:d=.84[seq];[4:a]highpass=f=420,lowpass=f=8500,tremolo=f=4:d=.91,volume=.14[perc];[5:a]lowpass=f=175,volume=.34[hit];[bass][pulse][seq][perc][hit]amix=inputs=5:normalize=0,acompressor=threshold=.15:ratio=3:attack=12:release=210,afade=t=in:st=0:d=1.0,afade=t=out:st=${endfade}:d=4,volume=.675[music];[0:a]volume=1.14,asplit=2[voice][key];[music][key]sidechaincompress=threshold=.025:ratio=5:attack=12:release=320[ducked];[voice][ducked]amix=inputs=2:duration=first:weights='1 1.52',loudnorm=I=-14.5:LRA=9:TP=-1.2,alimiter=limit=.94[a]`,
   "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", "256k", "-movflags", "+faststart", output,
 ], "score");
 
