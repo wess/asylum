@@ -1,14 +1,14 @@
 {
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "An Agent Development Environment for running a fleet of AI coding agents in parallel.",
     "homepage": "https://github.com/wess/asylum",
     "license": "Apache-2.0",
     "notes": "Windows builds are beta and currently unsigned.",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/wess/asylum/releases/download/v0.1.0/asylum-0.1.0-windows-x86_64.zip",
-            "hash": "41e6dd55920646e89a96dc476a4297c8f6c67afac8a80c14ef614c9852707fe5",
-            "extract_dir": "asylum-0.1.0-windows-x86_64"
+            "url": "https://github.com/wess/asylum/releases/download/v0.1.1/asylum-0.1.1-windows-x86_64.zip",
+            "hash": "4ae515611e9e0c1efd49384549955b754ce69004daa0eaf0ea89ae82b81ac659",
+            "extract_dir": "asylum-0.1.1-windows-x86_64"
         }
     },
     "bin": "asylum.exe",
