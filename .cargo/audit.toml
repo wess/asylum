@@ -1,0 +1,24 @@
+# `cargo audit` configuration.
+
+[advisories]
+# Two quick-xml DoS advisories with no reachable fix and no exposure here.
+#
+# Both are patched in quick-xml >= 0.41, and nothing in this tree can get
+# there: the only two consumers are transitive under the pinned gpui rev and
+# cap the major themselves - `wayland-scanner` requires `^0.39` and `xcb`
+# requires `^0.30.0`, so neither range admits 0.41. Unpinning gpui to chase
+# them is not worth it, because neither is exposed:
+#
+#   RUSTSEC-2026-0194 - quadratic attribute-name checking
+#   RUSTSEC-2026-0195 - unbounded namespace-declaration allocation
+#
+# Both require parsing *untrusted* XML. `wayland-scanner` and `xcb` parse the
+# protocol description XML that ships inside those crates, at build time, on
+# the build machine. Asylum never feeds either parser runtime input.
+#
+# Recheck when the gpui rev moves (see docs/gpui.md): if the wayland/xcb stack
+# has bumped quick-xml, delete these.
+ignore = [
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+]
