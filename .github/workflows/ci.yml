@@ -26,11 +26,25 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      # Kept in step with release.yml's `verify` and `build-linux` jobs. Note
+      # `libxkbcommon-x11-dev`: clippy never links, so a missing link-time
+      # library only surfaces when the test binaries are linked.
       - name: Linux build deps (gpui)
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libxcb1-dev \
-            libxkbcommon-dev libssl-dev libwayland-dev
+          sudo apt-get install -y \
+            clang \
+            libasound2-dev \
+            libfontconfig-dev \
+            libgtk-3-dev \
+            libssl-dev \
+            libvulkan1 \
+            libwayland-dev \
+            libwebkit2gtk-4.1-dev \
+            libx11-xcb-dev \
+            libxcb1-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev
 
       - name: Formatting
         run: cargo fmt --all -- --check
