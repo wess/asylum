@@ -82,6 +82,11 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
+      # `typescript` is held at 5.9.x in site/package.json on purpose. The 7.0
+      # native compiler never terminates on this project - it spins at ~100% CPU
+      # past 6 GB resident until the runner is OOM-killed, which surfaces here as
+      # the opaque "runner has received a shutdown signal". 5.9.3 checks the same
+      # 9 files clean in ~3s. Retry 7.x only by watching this step's memory.
       - name: Typecheck
         run: bunx tsc --noEmit
 
