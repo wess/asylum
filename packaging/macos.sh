@@ -24,16 +24,30 @@ if [ -n "${MACOS_SIGN_IDENTITY:-}" ]; then
     echo "$MACOS_CERT_P12" | base64 --decode > cert.p12
     security create-keychain -p "$password" "$keychain"
     security default-keychain -s "$keychain"
+    # codesign searches the keychain *search list*, not the default keychain -
+    # setting only the default leaves the identity unfindable.
+    security list-keychains -d user -s "$keychain" login.keychain
     security unlock-keychain -p "$password" "$keychain"
+    # A new keychain relocks after 300s of idle by default, which lands in the
+    # middle of the `notarytool --wait` below.
+    security set-keychain-settings -lut 7200 "$keychain"
     security import cert.p12 -k "$keychain" -P "$password" -T /usr/bin/codesign
     security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain"
     rm -f cert.p12
   fi
   echo "signing $app"
-  codesign --deep --force --options runtime \
+  # `--timestamp` is required: notarization rejects any signature without a
+  # secure timestamp. `--deep` is not used - Apple discourages it for signing,
+  # and it skips the nested code that needs signing first anyway.
+  find "$app/Contents" -type f \( -perm -u+x -o -name '*.dylib' -o -name '*.so' \) \
+    -exec codesign --force --timestamp --options runtime \
+      --sign "$MACOS_SIGN_IDENTITY" {} + 2>/dev/null || true
+  codesign --force --timestamp --options runtime \
     --sign "$MACOS_SIGN_IDENTITY" "$app"
+  codesign --verify --strict --verbose=2 "$app"
 else
   echo "no signing identity set; producing an unsigned bundle"
+  echo "note: Gatekeeper will refuse this build; users must clear the quarantine attribute" >&2
 fi
 
 # Build a compressed dmg from a staging folder holding the app + /Applications.
@@ -42,6 +56,12 @@ cp -R "$app" "$staging/"
 ln -s /Applications "$staging/Applications"
 hdiutil create -volname "Asylum" -srcfolder "$staging" -ov -format UDZO "$dmg"
 rm -rf "$staging"
+
+# Sign the container too, so the thing users actually download carries a
+# signature and can be stapled after notarization.
+if [ -n "${MACOS_SIGN_IDENTITY:-}" ]; then
+  codesign --force --timestamp --sign "$MACOS_SIGN_IDENTITY" "$dmg"
+fi
 
 # Notarize when credentials are present (Apple ID + app-specific password).
 if [ -n "${MACOS_SIGN_IDENTITY:-}" ] && [ -n "${AC_USERNAME:-}" ] && [ -n "${AC_PASSWORD:-}" ]; then

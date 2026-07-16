@@ -50,10 +50,68 @@ Each feature is backed by tested logic and a working UI or CLI surface. See
 - **Plugins** — manifest system with a process runtime *and* a sandboxed WASM
   runtime (`wasmi`, capability-gated). Install from GitHub with
   `asylum plugin install <owner/repo>` and discover community plugins by topic.
-- **CLI** (`asylum`) with computer-use automation and fleet control
-  (`control`, `wait`, `plugin`, `layout`), a **mobile companion** server (live on
-  `:8787`), and an **event stream** both expose so a phone or an agent can follow
-  the fleet without polling.
+- **CLI** (`asylum`) with computer-use automation, fleet control
+  (`control`, `wait`, `plugin`, `layout`), and masked secrets (`keep` stores a
+  credential encrypted; `call` spends it through the proxy so an agent uses a key
+  it never sees), a **mobile companion** server (live on `:8787`), and an
+  **event stream** both expose so a phone or an agent can follow the fleet
+  without polling.
+
+## Install
+
+Asylum is a packaged desktop app — running it needs no Rust toolchain. Every
+release builds and publishes these artifacts to the
+[releases page](https://github.com/wess/asylum/releases):
+
+| Platform | Artifacts |
+|---|---|
+| macOS (Apple Silicon) | `Asylum.dmg` |
+| Linux (x64 + arm64) | `.deb`, `.tar.gz`, `.AppImage` |
+| Windows (x64) | `.msi`, `.zip` |
+
+Package managers, once a release is published:
+
+```sh
+brew install --cask wess/packages/asylum        # macOS
+scoop install https://raw.githubusercontent.com/wess/asylum/main/packaging/scoop/asylum.json   # Windows
+```
+
+A Chocolatey `.nupkg` is built and attached to each release; it is not pushed to
+the community feed (that needs moderation), so install it from the downloaded
+package. 0.1.0 is the first release — until it is published, build from source
+as below.
+
+The installed binary is `asylum`; a local `cargo run -p app` stays `asylumdev`,
+so a dev build never collides with an installed release.
+
+### macOS: unsigned, so Gatekeeper blocks it
+
+The `.dmg` is **not signed or notarized**. The pipeline signs and notarizes only
+when Developer ID secrets are present, and they are not provisioned yet, so
+published builds carry no signature at all. macOS 15+ therefore refuses to open
+the app, sometimes claiming it is damaged — it isn't, macOS just can't identify
+the publisher. Control-click → Open **no longer** bypasses this. Either:
+
+- Open it once, let it be blocked, then go to **System Settings → Privacy &
+  Security → Open Anyway**, or
+- clear the quarantine attribute:
+
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/Asylum.app
+  ```
+
+Once real signing certificates are wired in, this step goes away.
+
+### Windows: beta
+
+The Windows binaries compile and link in CI but have **not been runtime-tested on
+a real machine** — treat them as beta. The installers are also unsigned, so
+SmartScreen shows an "unknown publisher" prompt until an Authenticode
+certificate is added. The `.zip` is the guaranteed deliverable; the `.msi` is
+best-effort.
+
+See [`packaging/readme.md`](packaging/readme.md) for the full pipeline, local
+builds, and the signing setup.
 
 ## Build & run
 
@@ -99,17 +157,38 @@ crates/
   notes     Markdown vault CRUD, properties, links/backlinks, templates, search
   preview   markdown → HTML, image / PDF / text classification
   remote    SSH remote-worktree + port-forward command builders
+  update    launch update check against GitHub Releases (via curl)
   notify    desktop notifications
   designmode click an element → capture HTML/CSS/selector for an agent
   fuzzy     subsequence match + ranking (command palette, quick-open)
   companion mobile companion HTTP server + mobile web page + event stream
   control   agent control surface: spawn/read/report/wait over a local JSON API
+  proxy     secrets proxy: masked outbound API calls for agents (keys never seen)
+  keep      encrypted, project-scoped secret store (AES-256-GCM)
   plugin    plugin.toml manifest parsing + GitHub install/discovery
   pluginrt  process runtime (JSON over stdio) + WASM runtime (wasmi)
-  cli       the `asylum` binary (worktree/run/search/control/wait/plugin/layout)
+  cli       the `asylum` binary (worktree/run/search/control/wait/plugin/
+            layout/keep/call)
   app       the gpui application (asylumdev) - 13 surfaces
 ```
 
-See [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md) for the architecture and
-conventions. Start with [`docs/gettingstarted.md`](docs/gettingstarted.md) for
-the first-run workflow, then use [`docs/`](docs/) for subsystem detail.
+## Docs
+
+- **[The Asylum book](docs/book/index.md)** — fifteen chapters, start to finish:
+  first task, fan-out, diffs and checks, notes, the CLI, agent orchestration,
+  plugins, and a full [configuration reference](docs/book/14-configuration-reference.md).
+- [`docs/gettingstarted.md`](docs/gettingstarted.md) — the first-run workflow.
+- [`docs/beginners.md`](docs/beginners.md) — the plain-English version, if you are
+  not a developer.
+- [`docs/`](docs/) — subsystem detail ([architecture](docs/architecture.md),
+  [plugins](docs/plugins.md), [secrets](docs/secrets.md),
+  [roadmap](docs/roadmap.md), [parity](docs/parity.md)).
+- [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md) — architecture and
+  conventions for agents working in this repo.
+- [`packaging/readme.md`](packaging/readme.md) — how releases are built and signed.
+
+The marketing/docs site is built from `site/` (see [Website](#website) above).
+
+## License
+
+Apache-2.0. See [`LICENSE`](LICENSE).

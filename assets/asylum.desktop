@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Asylum
+GenericName=Agent Development Environment
+Comment=Run a fleet of AI coding agents in parallel, each in its own git worktree
+Exec=asylum
+Icon=asylum
+Terminal=false
+Categories=Development;IDE;Utility;
+Keywords=agents;ai;coding;worktree;git;ade;
+StartupWMClass=asylum

@@ -1,93 +1,423 @@
-name: release
+name: Release
 
 on:
   push:
-    tags: ["v*"]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Tag to build (e.g. v0.2.0)"
-        required: true
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+  workflow_dispatch: {}
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    name: build ${{ matrix.label }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-14
-            label: macos-arm64
-            target: aarch64-apple-darwin
-            bundle: osx
-          - os: macos-13
-            label: macos-x64
-            target: x86_64-apple-darwin
-            bundle: osx
-          - os: ubuntu-latest
-            label: linux-x64
-            target: x86_64-unknown-linux-gnu
-            bundle: deb
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Release when the workspace version has no matching tag yet. Idempotent
+      # for both push and manual dispatch (a HEAD~1 diff would miss dispatches
+      # and re-released versions).
+      - name: Read workspace version
+        id: version
+        run: |
+          VERSION=$(sed -n 's/^version = "\([0-9][^"]*\)".*/\1/p' Cargo.toml | head -1)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether to release
+        id: diff
+        run: |
+          NEW="${{ steps.version.outputs.version }}"
+          if git ls-remote --tags origin "refs/tags/v${NEW}" | grep -q .; then
+            echo "v${NEW} already released — skipping."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # The release gate. `ci.yml` also runs on pushes to main, but it is a separate
+  # workflow: nothing makes the release wait for it, so a red suite would still
+  # tag and publish. Re-running the gates here is the only thing that actually
+  # blocks a broken release, and a tag is forever.
+  verify:
+    name: verify (fmt, clippy, test)
+    runs-on: ubuntu-latest
+    needs: check-version
+    if: needs.check-version.outputs.changed == 'true'
     steps:
       - uses: actions/checkout@v7
 
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Linux build deps
-        if: matrix.bundle == 'deb'
+      - name: Linux build deps (gpui)
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libxcb1-dev \
             libxkbcommon-dev libssl-dev libwayland-dev
 
+      - name: Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (warnings denied)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --workspace
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [check-version, verify]
+    if: needs.check-version.outputs.changed == 'true'
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Create git tag
+        run: |
+          git tag "v${{ needs.check-version.outputs.version }}"
+          git push origin "v${{ needs.check-version.outputs.version }}"
+
+      # Draft until every platform's artifacts are uploaded (see `publish`).
+      # The tag and release are created before the builds run, so publishing
+      # here would put an empty release in front of users for the length of a
+      # build - or permanently, if a build fails.
+      - name: Create draft GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ needs.check-version.outputs.version }}"
+          generate_release_notes: true
+          draft: true
+
+  build:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.changed == 'true'
+    runs-on: macos-latest
+    # Signing is optional: with a Developer ID the app is signed with a hardened
+    # runtime and the dmg is notarized. Without the secrets the bundle ships
+    # genuinely unsigned - Gatekeeper on macOS 15+ refuses it, and Control-click
+    # -> Open no longer bypasses that, so a user has to clear the quarantine
+    # attribute by hand. The release notes say so (see `publish`).
+    env:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+      AC_USERNAME: ${{ secrets.AC_USERNAME }}
+      AC_PASSWORD: ${{ secrets.AC_PASSWORD }}
+      AC_TEAM_ID: ${{ secrets.AC_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: "v${{ needs.check-version.outputs.version }}"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
       - name: Install cargo-bundle
         run: cargo install cargo-bundle --locked
 
-      - name: Bundle
+      - name: Bundle Asylum.app
         working-directory: crates/app
-        run: cargo bundle --release --format ${{ matrix.bundle }} --target ${{ matrix.target }}
+        run: cargo bundle --release --format osx --target aarch64-apple-darwin
 
-      # Package the macOS .app into a .dmg. Signing/notarization run only when
-      # the signing secrets are present, so forks and untagged runs still build.
-      - name: Package macOS dmg
-        if: matrix.bundle == 'osx'
-        run: bash packaging/macos.sh "${{ matrix.target }}" "${{ matrix.label }}"
-        env:
-          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
-          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
-          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
-
-      - name: Collect Linux artifact
-        if: matrix.bundle == 'deb'
+      - name: Package + sign + notarize .dmg
         run: |
-          mkdir -p dist
-          cp target/${{ matrix.target }}/release/bundle/deb/*.deb dist/asylum-${{ matrix.label }}.deb
+          packaging/macos.sh aarch64-apple-darwin macos-arm64
+          mv dist/asylum-macos-arm64.dmg dist/Asylum.dmg
 
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ${{ matrix.label }}
-          path: dist/*
+      - name: Verify bundle
+        run: |
+          app="target/aarch64-apple-darwin/release/bundle/osx/Asylum.app"
+          test -x "$app/Contents/MacOS/asylum" || test -x "$app/Contents/MacOS/asylumdev"
+          if [ -n "${MACOS_SIGN_IDENTITY}" ]; then
+            # A signed build that fails verification must not ship, so no `|| true`.
+            codesign --verify --strict --verbose=2 "$app"
+          else
+            echo "::warning::Unsigned build - Gatekeeper will block it on install; the release notes carry the workaround."
+          fi
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
+      - name: Upload DMG
+        run: gh release upload "v${{ needs.check-version.outputs.version }}" dist/Asylum.dmg --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build-linux:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/checkout@v7
         with:
-          path: dist
-          merge-multiple: true
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
+          ref: "v${{ needs.check-version.outputs.version }}"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            curl \
+            file \
+            libgtk-3-dev \
+            libssl-dev \
+            libwayland-dev \
+            libwebkit2gtk-4.1-dev \
+            libxcb1-dev \
+            libxkbcommon-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb --locked
+
+      - name: Build + package
+        run: packaging/linux.sh ${{ matrix.arch }}
+
+      - name: Upload to release
+        run: gh release upload "v${{ needs.check-version.outputs.version }}" dist/linux/*.tar.gz dist/linux/*.deb dist/linux/*.AppImage --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  # Every artifact is uploaded and every build is green: flip the draft live.
+  # Nothing downstream (casks, manifests) can resolve a public download URL
+  # before this runs, so this job is what makes the release real.
+  publish:
+    runs-on: ubuntu-latest
+    needs: [check-version, build, build-linux, build-windows]
+    if: needs.check-version.outputs.changed == 'true'
+    steps:
+      # Every line stays indented inside this block scalar on purpose: an
+      # unindented `---` would read as a YAML document separator and silently
+      # drop every job defined below this one.
+      - name: Note unsigned-build caveats
+        run: |
+          V="${{ needs.check-version.outputs.version }}"
+          BODY=$(gh release view "v${V}" --repo "${{ github.repository }}" --json body -q .body)
+          NOTE=$(printf '%s\n' \
+            '' \
+            '---' \
+            '' \
+            '### Installing' \
+            '' \
+            '**macOS** - the app is not signed or notarized, so Gatekeeper will' \
+            'refuse to open it, and on macOS 15+ the Control-click -> Open trick no' \
+            'longer works. Open **System Settings -> Privacy & Security** and choose' \
+            '**Open Anyway**, or clear the quarantine flag directly:' \
+            '' \
+            '```sh' \
+            'xattr -dr com.apple.quarantine /Applications/Asylum.app' \
+            '```' \
+            '' \
+            '**Windows** - builds are beta and unsigned; SmartScreen will warn about' \
+            'an unknown publisher. The `.zip` is the guaranteed deliverable.')
+          case "${BODY}" in
+            *"### Installing"*)
+              echo "Release notes already carry the install caveats."
+              ;;
+            *)
+              gh release edit "v${V}" --repo "${{ github.repository }}" \
+                --notes "${BODY}${NOTE}"
+              ;;
+          esac
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Publish the release
+        run: |
+          gh release edit "v${{ needs.check-version.outputs.version }}" \
+            --repo "${{ github.repository }}" --draft=false
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  update-homebrew:
+    runs-on: ubuntu-latest
+    needs: [check-version, publish]
+    if: needs.check-version.outputs.changed == 'true'
+    # A missing HOMEBREW_TAP_TOKEN (or tap repo) must not fail a release that
+    # has already published its artifacts - the cask can be refreshed by hand.
+    continue-on-error: true
+    steps:
+      - name: Download DMG and compute SHA
+        id: shas
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          URL="https://github.com/wess/asylum/releases/download/v${VERSION}/Asylum.dmg"
+          for i in $(seq 1 30); do
+            if curl -fsSL -o /tmp/Asylum.dmg "${URL}" 2>/dev/null; then
+              break
+            fi
+            echo "Waiting for Asylum.dmg... ($i/30)"
+            sleep 10
+          done
+          SHA=$(sha256sum /tmp/Asylum.dmg | cut -d' ' -f1)
+          echo "sha_darwin_arm64=${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout homebrew tap
+        uses: actions/checkout@v7
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          files: dist/*
-          generate_release_notes: true
+          repository: wess/homebrew-packages
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Update cask
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          mkdir -p tap/Casks
+          cat > tap/Casks/asylum.rb << 'RUBY'
+          cask "asylum" do
+            version "VERSION_PLACEHOLDER"
+            sha256 "SHA_DARWIN_ARM64_PLACEHOLDER"
+
+            url "https://github.com/wess/asylum/releases/download/v#{version}/Asylum.dmg"
+            name "Asylum"
+            desc "Agent Development Environment: run a fleet of AI coding agents in parallel"
+            homepage "https://github.com/wess/asylum"
+
+            depends_on arch: :arm64
+            depends_on macos: :big_sur
+
+            app "Asylum.app"
+
+            zap trash: [
+              "~/Library/Application Support/Asylum",
+              "~/Library/Preferences/dev.asylum.app.plist",
+              "~/.config/asylum",
+            ]
+
+            caveats <<~EOS
+              Asylum is not yet signed or notarized, so Gatekeeper will refuse to
+              open it. Either open System Settings -> Privacy & Security and
+              choose "Open Anyway", or clear the quarantine flag:
+
+                xattr -dr com.apple.quarantine "#{appdir}/Asylum.app"
+            EOS
+          end
+          RUBY
+          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" tap/Casks/asylum.rb
+          sed -i "s/SHA_DARWIN_ARM64_PLACEHOLDER/${{ steps.shas.outputs.sha_darwin_arm64 }}/g" tap/Casks/asylum.rb
+
+      - name: Push updated cask
+        run: |
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/asylum.rb
+          if git diff --cached --quiet; then
+            echo "Cask unchanged — skipping push."
+          else
+            git commit -m "Update asylum to v${{ needs.check-version.outputs.version }}"
+            git push
+          fi
+
+  # Windows is beta: artifacts are compile/link-verified in CI but not yet
+  # runtime-tested, and the MSI is unsigned. See packaging/readme.md.
+  build-windows:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.changed == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: "v${{ needs.check-version.outputs.version }}"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build + package (.zip + .msi)
+        shell: pwsh
+        run: packaging/windows.ps1 -Arch x86_64
+
+      - name: Pack Chocolatey (.nupkg)
+        shell: pwsh
+        run: |
+          $version = "${{ needs.check-version.outputs.version }}"
+          $zip = "dist/windows/asylum-$version-windows-x86_64.zip"
+          $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          (Get-Content packaging/chocolatey/asylum.nuspec) -replace '0\.0\.0', $version |
+            Set-Content packaging/chocolatey/asylum.nuspec
+          (Get-Content packaging/chocolatey/tools/chocolateyinstall.ps1) -replace '0\.0\.0', $version -replace '0{64}', $sha |
+            Set-Content packaging/chocolatey/tools/chocolateyinstall.ps1
+          choco pack packaging/chocolatey/asylum.nuspec --outputdirectory dist/windows
+
+      - name: Upload to release
+        shell: pwsh
+        run: |
+          $v = "${{ needs.check-version.outputs.version }}"
+          $assets = Get-ChildItem -Path dist/windows/* -Include *.zip, *.msi, *.nupkg
+          gh release upload "v$v" $assets.FullName --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  # Refresh the in-repo Scoop manifest with the released zip's URL + SHA-256.
+  # Non-fatal: if pushing to a protected main is blocked, the release still
+  # succeeds and the manifest can be updated by hand (see packaging/readme.md).
+  update-scoop:
+    runs-on: ubuntu-latest
+    needs: [check-version, publish]
+    if: needs.check-version.outputs.changed == 'true'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Update Scoop manifest
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          URL="https://github.com/wess/asylum/releases/download/v${VERSION}/asylum-${VERSION}-windows-x86_64.zip"
+          for i in $(seq 1 30); do
+            if curl -fsSL -o /tmp/p.zip "${URL}" 2>/dev/null; then break; fi
+            echo "Waiting for windows zip... ($i/30)"; sleep 10
+          done
+          SHA=$(sha256sum /tmp/p.zip | cut -d' ' -f1)
+          python3 - "$VERSION" "$SHA" << 'PY'
+          import json, sys
+          version, sha = sys.argv[1], sys.argv[2]
+          path = "packaging/scoop/asylum.json"
+          with open(path) as f:
+              m = json.load(f)
+          m["version"] = version
+          a = m["architecture"]["64bit"]
+          a["url"] = f"https://github.com/wess/asylum/releases/download/v{version}/asylum-{version}-windows-x86_64.zip"
+          a["hash"] = sha
+          a["extract_dir"] = f"asylum-{version}-windows-x86_64"
+          with open(path, "w") as f:
+              json.dump(m, f, indent=4)
+              f.write("\n")
+          PY
+
+      - name: Commit manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add packaging/scoop/asylum.json
+          if git diff --cached --quiet; then
+            echo "Scoop manifest unchanged."
+          else
+            git commit -m "Update Scoop manifest to v${{ needs.check-version.outputs.version }}"
+            git push
+          fi

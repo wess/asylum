@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>asylum</id>
+    <version>0.0.0</version>
+    <title>Asylum</title>
+    <authors>Wess Cope</authors>
+    <owners>Wess Cope</owners>
+    <projectUrl>https://github.com/wess/asylum</projectUrl>
+    <projectSourceUrl>https://github.com/wess/asylum</projectSourceUrl>
+    <packageSourceUrl>https://github.com/wess/asylum/tree/main/packaging/chocolatey</packageSourceUrl>
+    <licenseUrl>https://github.com/wess/asylum/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Asylum — an Agent Development Environment. Run a fleet of AI coding agents in parallel, each in its own git worktree, then compare and merge the winner. Windows builds are beta and currently unsigned.</description>
+    <summary>An Agent Development Environment for running a fleet of AI coding agents in parallel.</summary>
+    <tags>agents ai coding worktree git ade developer-tool</tags>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
