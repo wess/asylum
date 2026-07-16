@@ -4,9 +4,17 @@
 
 use gpui::prelude::*;
 use gpui::{
-    div, px, App, Entity, IntoElement, MouseButton, PathPromptOptions, SharedString, Window,
-    WindowControlArea,
+    div, px, App, DragMoveEvent, Empty, Entity, IntoElement, MouseButton, PathPromptOptions,
+    SharedString, Window, WindowControlArea,
 };
+
+/// Min/max width (px) the left navigation can be dragged to.
+const SIDEBAR_MIN: f32 = 180.0;
+const SIDEBAR_MAX: f32 = 560.0;
+
+/// Drag payload for the sidebar resize divider. A distinct type so `on_drag_move`
+/// only reacts to this drag.
+struct SidebarDrag;
 
 /// Left clearance in the titlebar for the macOS traffic lights.
 #[cfg(target_os = "macos")]
@@ -442,30 +450,55 @@ impl Render for Root {
                     )
                 }
             })
-            .navbar(if self.sidebar_collapsed { 52.0 } else { 280.0 }, {
-                let handle = handle.clone();
-                let collapsed = self.sidebar_collapsed;
-                move |window, cx| {
-                    sidebar::navbar(
-                        active_view,
-                        unread,
-                        tree.clone(),
-                        project_id,
-                        task_id,
-                        collapsed,
-                        handle.clone(),
-                        window,
-                        cx,
-                    )
-                }
-            })
+            .navbar(
+                if self.sidebar_collapsed {
+                    52.0
+                } else {
+                    self.sidebar_width
+                },
+                {
+                    let handle = handle.clone();
+                    let collapsed = self.sidebar_collapsed;
+                    move |window, cx| {
+                        sidebar::navbar(
+                            active_view,
+                            unread,
+                            tree.clone(),
+                            project_id,
+                            task_id,
+                            collapsed,
+                            handle.clone(),
+                            window,
+                            cx,
+                        )
+                    }
+                },
+            )
             .footer(28.0, move |_window, _cx| footer(counts, unread))
             .child(main)
             .child(palette)
             .child(quickopen);
 
-        // Wrap so the context menu can overlay the whole window.
-        let mut root = div().relative().size_full().child(shell);
+        // Wrap so the context menu can overlay the whole window. The wrapper also
+        // hosts the sidebar resize divider and follows its drag.
+        let mut root = div()
+            .relative()
+            .size_full()
+            .on_drag_move(
+                cx.listener(|this, ev: &DragMoveEvent<SidebarDrag>, _window, cx| {
+                    let x = f32::from(ev.event.position.x - ev.bounds.left());
+                    let next = x.clamp(SIDEBAR_MIN, SIDEBAR_MAX);
+                    if (next - this.sidebar_width).abs() > f32::EPSILON {
+                        this.sidebar_width = next;
+                        cx.notify();
+                    }
+                }),
+            )
+            .child(shell);
+        // A thin draggable divider on the navbar's right edge (expanded only).
+        if !self.sidebar_collapsed {
+            root = root.child(sidebar_resizer(self.sidebar_width));
+        }
         if !self.notices.is_empty() {
             root = root.child(notice_stack(self.notices.clone(), handle.clone()));
         }
@@ -477,6 +510,22 @@ impl Render for Root {
         }
         root.into_any_element()
     }
+}
+
+/// The draggable divider on the expanded navbar's right edge. Sits between the
+/// header and footer at `x = width`; dragging it is followed by the root
+/// wrapper's `on_drag_move`, which updates `Root::sidebar_width`.
+fn sidebar_resizer(width: f32) -> impl IntoElement {
+    div()
+        .id("sidebar-resizer")
+        .absolute()
+        .top(px(40.0))
+        .bottom(px(28.0))
+        .left(px(width - 3.0))
+        .w(px(6.0))
+        .cursor_col_resize()
+        .hover(|s| s.bg(gpui::hsla(0.0, 0.0, 1.0, 0.12)))
+        .on_drag(SidebarDrag, |_, _, _, cx| cx.new(|_| Empty))
 }
 
 /// A render-time snapshot of a pane (owned; the workspace borrow is released).

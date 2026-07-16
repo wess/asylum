@@ -1,13 +1,13 @@
 # Asylum audit backlog
 
-Last reviewed: 2026-07-15. Last worked: 2026-07-15.
+Last reviewed: 2026-07-16. Last worked: 2026-07-16.
 
 This document is a handoff for implementing the performance, stability,
 security, maintainability, testing, documentation, and website findings from a
 source-level repository audit. It describes the current working tree, including
 uncommitted work present at the time of review.
 
-## Status summary (2026-07-15)
+## Status summary (2026-07-16)
 
 All **P0** and all **P1** items are **RESOLVED**, each with regression tests and
 its behavior documented (see the per-item "Status:" notes below). The concrete
@@ -19,11 +19,17 @@ provenance, untrusted-workspace mode, module splits, off-thread search, and
 incremental transcript persistence); each is marked **DEFERRED** with rationale
 and a note on what remains.
 
+**The 2026-07-15 pass did not cover `keep` or `proxy`** - both landed after it,
+so the "all P0/P1 resolved" line above never spoke for the secrets subsystem.
+They were reviewed on 2026-07-16; see "P0: secrets subsystem" below. Read that
+section before trusting the summary above for anything secrets-related.
+
 ## Current verification baseline
 
-- `cargo test --workspace`: passes (253 baseline + the new security/regression
-  tests across `config`, `store`, `companion`, `control`, `pluginrt`, `plugin`,
-  `preview`, `remote`, `linear`, `update`).
+- `cargo test --workspace`: passes (369 tests: the 253 baseline, the 2026-07-15
+  security/regression tests across `config`, `store`, `companion`, `control`,
+  `pluginrt`, `plugin`, `preview`, `remote`, `linear`, `update`, and the
+  2026-07-16 additions to `keep`, `proxy`, and `config`).
 - `cargo clippy --workspace --all-targets -- -D warnings`: passes.
 - `cargo fmt --all -- --check`: **passes** (formatting failures fixed).
 - `cd site && bun install --frozen-lockfile && bun run build`: passes; the home
@@ -44,6 +50,103 @@ and a note on what remains.
 - Add regression tests with each behavioral or security fix.
 - Do not weaken a security check merely to preserve compatibility with an
   unsafe configuration.
+
+## P0: secrets subsystem (`keep`, `proxy`) - reviewed 2026-07-16
+
+Both crates postdate the 2026-07-15 pass. Reviewed at source level: crypto,
+scoping, token signing, SSRF/host-pinning, and the agent-facing edges. The
+design held - loopback-only binding, HMAC-signed scoped tokens verified in
+constant time, curl invoked without `-L` (so a hostile upstream cannot bounce
+the `Authorization` header off-host), project→global-only resolution, and the
+`--config -` stdin trick that keeps the key off argv all check out. The findings
+were at the edges.
+
+### Scrub the keep passphrase unconditionally
+
+**Status: RESOLVED (2026-07-16).** `main` now reads `ASYLUM_KEEP_PASSPHRASE`
+into a `Zeroizing<String>` and calls `remove_var` **before** the
+`proxy.enabled` branch, while still single-threaded.
+
+Problem: the scrub sat *inside* `if loaded.settings.proxy.enabled`. Agents
+inherit the app's environment (`libsinclair` applies overrides on top of the
+inherited env; there is no `env_clear`), and `proxy.enabled` defaults to
+`false` while `docs/secrets.md` instructs the user to export the passphrase. So
+in the default, documented configuration every spawned agent inherited
+`ASYLUM_KEEP_PASSPHRASE` and could run `asylum keep list` to read every secret
+in every scope - defeating both "never in the agent's environment" and the
+per-project scoping the proxy exists to enforce.
+
+Evidence: `crates/app/src/main.rs:57` (was), `crates/config/src/model.rs:215`,
+`docs/secrets.md:41,91`.
+
+### Make the keep's save atomic
+
+**Status: RESOLVED (2026-07-16).** `Keep::save` writes to a randomly-named
+sibling temp created 0600 via `create_new`, `sync_all`s it, renames it over the
+target, then fsyncs the directory. Tests cover the 0600 mode, temp cleanup
+across repeated saves, wholesale replacement, and parent-directory creation.
+
+Problem: `save` was `std::fs::write`, which truncates before writing. The keep
+has no backup and no journal, so a crash, a full disk, or a power loss partway
+through a save destroyed every secret it held, unrecoverably.
+
+Evidence: `crates/keep/src/lib.rs:145` (was).
+
+### Contain the proxy's spool files
+
+**Status: RESOLVED (2026-07-16).** Request/response bodies now go in a private
+per-request directory (`Spool`), created 0700 under a random name and removed on
+`Drop` so cleanup survives an error path.
+
+Problem: spool files were `/tmp/asylum-proxy-<pid>-<seq>.{body,hdr,out}` at the
+default umask, with a fully predictable name (pid is public, `SEQ` starts at 0).
+macOS contains this via a per-user `$TMPDIR`, but on Linux - which
+`packaging/linux.sh` ships - `/tmp` is world-writable: another local user could
+read every payload crossing the proxy, or pre-plant a symlink at the path curl
+was about to write through.
+
+Evidence: `crates/proxy/src/forward.rs:37-41,89` (was).
+
+### Smaller edges closed in the same pass
+
+- **Transport failures answered `HTTP/1.1 0 OK`.** curl reports `000` on DNS/TLS
+  failure; `forward` parsed that as a status. It now returns a transport error
+  (so the caller's existing 502 path fires) and surfaces curl's diagnostic
+  instead of discarding it. `forward.rs`.
+- **Reason phrases did not match statuses.** Upstream codes pass through this
+  server, so an unlisted code fell through to `"OK"` - `HTTP/1.1 404 OK`.
+  Now table-driven with a class-based fallback. `http.rs`.
+- **`Content-Length` parsing accepted a leading `+`.** RFC 7230 defines it as
+  `1*DIGIT`; `usize::from_str` is looser. A length this server read as 5 while a
+  stricter parser rejected outright is the disagreement request smuggling is
+  built on. Now digits-only. `http.rs`.
+- **A failed task lookup downgraded a run to global scope.** `run.rs` minted a
+  project-0 token on `unwrap_or(0)`; it now mints none, so proxy access is
+  granted rather than defaulted into.
+- **`curl_config_escape` did not escape newlines**, and `header_name` was
+  interpolated unescaped. Config-controlled, not agent-reachable, but it is the
+  only thing between a secret's bytes and curl's option parser.
+- **`list_upstreams` stripped quotes but not backslashes**, so a name ending in
+  `\` emitted unparseable JSON. Now a real JSON escape.
+- **Plaintext lingered in freed heap.** Decrypt/serialize buffers are now
+  `Zeroizing`, `to_bytes` borrows instead of deep-cloning every secret on each
+  save, and `Keep` wipes its values on `Drop`.
+- **`ASYLUM_SECRET_<NAME>` was dead guidance.** Referenced by the Settings
+  surface and a model doc comment but read by nothing - and it told users to put
+  secrets in the app's environment, which is exactly the leak above. Replaced
+  with the keep.
+
+**Crypto specifics (no change needed):** PBKDF2 at 600k rounds matches current
+OWASP guidance for HMAC-SHA256 (Argon2id is the modern pick, worth revisiting
+post-0.1.0). Nonces are fresh per encryption and salts fresh per keep - both now
+pinned by tests, the nonce one because a repeat under the same key is
+catastrophic for GCM. Authentication *is* verified on decrypt.
+
+**Remaining (not blocking 0.1.0):** the rate limiter is a single global fixed
+window, so one agent can starve the fleet; `asylum call` puts the proxy token
+(not the secret) on curl's argv, visible in `ps`; MAGIC/salt/nonce are not bound
+as AEAD AAD (not exploitable - a swapped salt simply fails decryption - but it
+is free integrity).
 
 ## P0: blocking security work
 

@@ -20,13 +20,42 @@ explanation.
 
 ## Getting set up (once)
 
-1. **Install Asylum.** Download the `.dmg` (macOS) or `.deb` (Linux) from the
-   releases page and open it — no developer tools required.
-2. **Install at least one agent.** Asylum runs coding agents you already have
+1. **Install Asylum.** Go to the
+   [releases page](https://github.com/wess/asylum/releases) and download the file
+   for your computer — no developer tools required:
+   - **macOS**: `Asylum.dmg`. Open it and drag Asylum to Applications.
+   - **Linux**: the `.deb` (Debian/Ubuntu), the `.AppImage` (any distribution —
+     make it executable and run it), or the `.tar.gz`.
+   - **Windows**: the `.msi` installer or the `.zip`. Windows support is still
+     **beta** — it builds, but it has not been tested on a real Windows machine
+     yet, so expect rough edges. Windows will also warn about an "unknown
+     publisher" because the installer is not signed yet; that warning is expected.
+
+2. **Get past the macOS security warning.** *(macOS only — do this once.)* Asylum
+   is not yet signed with an Apple certificate, so macOS blocks it the first time
+   and may say the app is damaged or cannot be opened. It isn't damaged; macOS
+   just doesn't recognize the publisher. Control-clicking the app no longer gets
+   around this on recent macOS versions. Do this instead:
+   - Try to open Asylum once, and let it be blocked.
+   - Open **System Settings → Privacy & Security**, scroll to the **Security**
+     section, find the message about Asylum, and click **Open Anyway**.
+   - Confirm when it asks again.
+
+   If that doesn't work, open the **Terminal** app and paste this line, then press
+   Return:
+
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/Asylum.app
+   ```
+
+   Then open Asylum normally. You only have to do this once.
+
+3. **Install at least one agent.** Asylum runs coding agents you already have
    access to (Claude Code, Codex, and others). The **setup doctor** on the Tasks
    screen tells you which are installed and shows a copy-paste install command
    for the ones that aren't. Paste it into a terminal once.
-3. **Open a project.** Click *Open a folder…* and choose a code folder. If it
+
+4. **Open a project.** Click *Open a folder…* and choose a code folder. If it
    isn't yet tracked by git, Asylum asks first before setting it up — nothing
    happens without your say-so.
 

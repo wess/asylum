@@ -18,6 +18,8 @@ members = [
     "crates/designmode",
     "crates/companion",
     "crates/control",
+    "crates/proxy",
+    "crates/keep",
     "crates/fuzzy",
     "crates/plugin",
     "crates/pluginrt",

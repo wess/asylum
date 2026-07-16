@@ -40,6 +40,13 @@ pub struct Settings {
     pub companion: CompanionPrefs,
     /// Agent control-surface server preferences.
     pub control: ControlPrefs,
+    /// Secrets-proxy server preferences (masked outbound API access for agents).
+    pub proxy: ProxyPrefs,
+    /// Named upstreams the secrets proxy can forward to, each binding a stored
+    /// secret to a fixed destination. Secret *values* are never here - each
+    /// `secret` names an entry in the encrypted keep (`asylum keep set <name>`),
+    /// resolved at request time and injected server-side.
+    pub upstreams: Vec<Upstream>,
 }
 
 impl Default for Settings {
@@ -58,6 +65,8 @@ impl Default for Settings {
             linear_token: String::new(),
             companion: CompanionPrefs::default(),
             control: ControlPrefs::default(),
+            proxy: ProxyPrefs::default(),
+            upstreams: Vec::new(),
         }
     }
 }
@@ -182,6 +191,59 @@ impl Default for ControlPrefs {
             token: String::new(),
         }
     }
+}
+
+/// Secrets-proxy server preferences. The proxy lets a running agent make
+/// outbound API calls through named [`Upstream`]s without ever seeing the
+/// credentials: the agent hits `http://127.0.0.1:<port>/<upstream>/<path>`, the
+/// proxy injects the real secret server-side and forwards only to that
+/// upstream's host. Loopback-only and always authenticated, like the control
+/// surface.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ProxyPrefs {
+    /// Whether the secrets proxy runs at all. Off by default - it only does
+    /// something once you define `upstreams`.
+    pub enabled: bool,
+    /// Address to bind. Loopback only - a non-loopback bind is refused at
+    /// startup. Agents reach it at `127.0.0.1:<port>`.
+    pub bind: String,
+}
+
+impl Default for ProxyPrefs {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            bind: "127.0.0.1:8789".to_string(),
+        }
+    }
+}
+
+/// A named upstream the secrets proxy can forward to. It binds a stored secret
+/// to a fixed destination and describes how to inject the secret - so an agent
+/// can *use* the credential but never learn it, and the secret only ever travels
+/// to `base_url`'s host (no exfiltration).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Upstream {
+    /// The name the agent addresses (`/<name>/...`). Lowercase slug.
+    pub name: String,
+    /// The upstream base URL, e.g. `https://api.openai.com`. Requests are
+    /// forwarded to `base_url` + the path after `/<name>`. Only this host ever
+    /// receives the secret.
+    pub base_url: String,
+    /// Which secret to inject: the value is resolved from the encrypted keep
+    /// (never from this file), scoped to the calling agent's project.
+    pub secret: String,
+    /// The header the secret is injected into (default `Authorization`).
+    pub header: String,
+    /// How the header value is formatted; `{secret}` is replaced with the
+    /// resolved secret value (default `Bearer {secret}`).
+    pub format: String,
+    /// The project this upstream belongs to (a project id), or `0` for a global
+    /// upstream available to every project. A project-scoped upstream overrides a
+    /// global one of the same name for that project.
+    pub project: i64,
 }
 
 /// Per-agent user overrides.

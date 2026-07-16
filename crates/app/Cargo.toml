@@ -34,30 +34,51 @@ designmode = { path = "../designmode" }
 fuzzy = { path = "../fuzzy" }
 git = { path = "../git" }
 github = { path = "../github" }
+keep = { path = "../keep" }
 linear = { path = "../linear" }
 notify = { path = "../notify" }
 notes = { path = "../notes" }
 plugin = { path = "../plugin" }
 pluginrt = { path = "../pluginrt" }
 preview = { path = "../preview" }
+proxy = { path = "../proxy" }
 remote = { path = "../remote" }
 runner = { path = "../runner" }
 search = { path = "../search" }
 store = { path = "../store" }
 update = { path = "../update" }
+zeroize = "1"
 
 anyhow = { workspace = true }
 futures = { workspace = true }
 serde_json = { workspace = true }
 
-# Desktop packaging. `cargo bundle --release` produces Asylum.app (macOS) and a
-# `.deb` (Linux); the release workflow wraps the .app into a signed .dmg. The
-# bundled binary is installed as `asylum` (the dev build stays `asylumdev`).
+# macOS packaging. `cargo bundle --release --format osx` produces Asylum.app; the
+# release workflow wraps it into a signed/notarized .dmg (packaging/macos.sh).
+# The bundled binary is installed as `asylum` (the dev build stays `asylumdev`).
 [package.metadata.bundle]
 name = "Asylum"
 identifier = "dev.asylum.app"
+icon = ["../../assets/icon.icns", "../../assets/icon512.png"]
 short_description = "An Agent Development Environment."
 long_description = "Run a fleet of AI coding agents in parallel, each isolated in its own git worktree, then compare and merge the winner."
 category = "Developer Tool"
 copyright = "Copyright © 2026 Asylum"
 osx_minimum_system_version = "11.0"
+
+# Linux .deb packaging (see packaging/linux.sh). An explicit `assets` list
+# disables cargo-deb's automatic binary inclusion, so the binary is listed here
+# too; cargo-deb remaps the `target/release/` prefix to the actual
+# --target/profile path. The `asylumdev` bin is installed as `asylum`.
+[package.metadata.deb]
+name = "asylum"
+maintainer = "Wess Cope <me@wess.io>"
+license-file = ["../../LICENSE", "0"]
+section = "devel"
+priority = "optional"
+extended-description = "Asylum is an Agent Development Environment: run a fleet of AI coding agents in parallel, each isolated in its own git worktree, then compare and merge the winner."
+assets = [
+    ["target/release/asylumdev", "usr/bin/asylum", "755"],
+    ["../../assets/asylum.desktop", "usr/share/applications/asylum.desktop", "644"],
+    ["../../assets/icon512.png", "usr/share/pixmaps/asylum.png", "644"],
+]

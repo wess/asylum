@@ -215,6 +215,8 @@ pub struct Root {
     pub show_all_agents: bool,
     /// Whether the left navigation is reduced to its icon rail.
     pub sidebar_collapsed: bool,
+    /// Width of the expanded left navigation, in px (drag the divider to resize).
+    pub sidebar_width: f32,
     pub setup_open: bool,
     pub setup_checks: Vec<crate::setup::Check>,
     /// The tabbed, splittable main-area layout.
@@ -396,6 +398,7 @@ impl Root {
             composer_advanced: false,
             show_all_agents: false,
             sidebar_collapsed: false,
+            sidebar_width: 280.0,
             setup_open,
             setup_checks: Vec::new(),
             workspace: crate::workspace::Workspace::new(0),

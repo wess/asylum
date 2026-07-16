@@ -82,5 +82,33 @@
         "enabled": true,
         "bind": "127.0.0.1:8788",
         "token": ""
-    }
+    },
+
+    // Secrets proxy: masked outbound API access for agents. An agent calls a
+    // named upstream (`asylum call openai POST /v1/chat/...`) and Asylum injects
+    // the real credential server-side — the agent never sees the key, and it can
+    // only ever reach the upstream's configured host. Loopback-only, always
+    // authenticated with a per-session token. Off until you define `upstreams`.
+    "proxy": {
+        "enabled": false,
+        "bind": "127.0.0.1:8789"
+    },
+
+    // Upstreams the proxy can forward to. Secret VALUES never live here — they
+    // live in the encrypted keep (~/.config/asylum/keep.enc), unlocked with
+    // ASYLUM_KEEP_PASSPHRASE and managed with `asylum keep set <name>`. `secret`
+    // below names the keep entry. `project` (0 = global; a project id scopes it
+    // to that project, overriding a global of the same name). `header` defaults
+    // to "Authorization" and `format` to "Bearer {secret}".
+    "upstreams": [
+        // Example: `asylum keep set openai` then set proxy.enabled = true:
+        // {
+        //     "name": "openai",
+        //     "base_url": "https://api.openai.com",
+        //     "secret": "openai",
+        //     "project": 0,
+        //     "header": "Authorization",
+        //     "format": "Bearer {secret}"
+        // }
+    ]
 }

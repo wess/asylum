@@ -1,6 +1,7 @@
 # Chapter 14: Configuration Reference
 
-This chapter documents every key in `settings.json`. It is a reference — read the
+This chapter documents every key in `settings.json`, plus the two environment
+variables that can stand in for a secret key. It is a reference — read the
 sections you need. The file is JSON *with comments* (JSONC), lives at
 `$XDG_CONFIG_HOME/asylum/settings.json`, is live-reloaded on save, and is edited
 in place (comments preserved) by the in-app Settings surface (`cmd-,`). Every key
@@ -71,7 +72,17 @@ if malformed, is reported as a diagnostic rather than aborting the load.
     "enabled": true,
     "bind": "127.0.0.1:8788",
     "token": ""
-  }
+  },
+
+  // Secrets proxy: masked outbound API access for agents.
+  "proxy": {
+    "enabled": false,
+    "bind": "127.0.0.1:8789"
+  },
+
+  // Named upstreams the proxy forwards to. Secret VALUES live in the encrypted
+  // keep, never here; `secret` names the keep entry.
+  "upstreams": []
 }
 ```
 
@@ -194,11 +205,13 @@ See [Chapter 12](12-the-mobile-companion-and-events.md).
 
 - **`enabled`** (bool, default `true`) — whether the server runs.
 - **`bind`** (string, default `"127.0.0.1:8787"`) — the bind address. Use
-  `"0.0.0.0:8787"` to reach it from a phone on the LAN — only meaningful with a
-  token set.
-- **`token`** (string, default empty) — bearer token. Empty means localhost-only,
-  no auth; a non-empty token is required as `Authorization: Bearer <token>` and
-  unlocks non-localhost binds.
+  `"0.0.0.0:8787"` to reach it from a phone on the LAN, **which requires a
+  token**: a non-loopback bind with an empty token is refused at startup and the
+  server does not run (it would expose your store to the network). The refusal
+  appears in the Inbox rather than failing silently.
+- **`token`** (string, default empty) — bearer token. Empty is allowed only on a
+  loopback bind, and means no auth. A non-empty token is required as
+  `Authorization: Bearer <token>` and is what unlocks a non-loopback bind.
 
 ## `control` — agent control surface
 
@@ -207,11 +220,86 @@ running agent orchestrate the fleet from inside its worktree.
 
 - **`enabled`** (bool, default `true`) — whether the control server runs. When
   off, `asylum control` commands report that they are not inside a worktree.
-- **`bind`** (string, default `"127.0.0.1:8788"`) — the bind address. Keep it on
-  localhost; agents reach it at `127.0.0.1:<port>`. The surface can spawn runs, so
-  do not expose it to the network.
-- **`token`** (string, default empty) — bearer token. Empty means localhost-only,
-  no auth. The app injects this into each agent as `ASYLUM_CONTROL_TOKEN`.
+- **`bind`** (string, default `"127.0.0.1:8788"`) — the bind address.
+  **Loopback-only, enforced**: a non-loopback bind is refused at startup and the
+  server does not run — the refusal appears in the Inbox. The surface can spawn
+  runs, so it is never exposed to the network. Agents reach it at
+  `127.0.0.1:<port>`.
+- **`token`** (string, default empty) — bearer token. **The control surface is
+  always authenticated.** Empty does *not* mean "no auth": when you leave it
+  empty the app provisions a strong per-session token, kept in memory and never
+  written to disk. Either way, the token is injected into each agent as
+  `ASYLUM_CONTROL_TOKEN`, and requests must present it. Localhost is not treated
+  as an authentication boundary here, because anything running on your machine
+  could otherwise spawn runs. Set the key explicitly only if you need a stable
+  token across sessions (for a script outside the fleet); a per-session token is
+  the better default.
+
+## `proxy` — secrets proxy
+
+Masked outbound API access for agents ([Chapter 11](11-agent-orchestration-and-the-control-surface.md);
+`docs/secrets.md`). An agent calls a named upstream (`asylum call openai POST
+/v1/chat/...`), Asylum resolves the credential from the encrypted keep and
+injects it server-side, and forwards only to that upstream's host — so the agent
+uses a key it never sees and cannot redirect.
+
+- **`enabled`** (bool, default `false`) — whether the proxy runs. Off by default;
+  it only does something once you define `upstreams`.
+- **`bind`** (string, default `"127.0.0.1:8789"`) — the bind address.
+  **Loopback-only, enforced**: a non-loopback bind is refused at startup. Like
+  the control surface, the proxy is always authenticated — each run gets a signed
+  token naming its project, injected as `ASYLUM_PROXY_TOKEN` alongside
+  `ASYLUM_PROXY_URL`.
+
+## `upstreams` — what the proxy may forward to
+
+An array of named upstreams. Each binds a stored secret to a fixed destination.
+Secret *values* never appear in `settings.json` — they live in the encrypted keep
+(`~/.config/asylum/keep.enc`, managed with `asylum keep set <name>` and unlocked
+with `ASYLUM_KEEP_PASSPHRASE`); `secret` only names the keep entry.
+
+- **`name`** (string) — the name the agent addresses (`/<name>/...`). Lowercase
+  slug.
+- **`base_url`** (string) — the upstream base URL, e.g.
+  `"https://api.openai.com"`. Requests forward to `base_url` + the path after
+  `/<name>`, and only this host ever receives the secret.
+- **`secret`** (string) — which keep entry to inject, resolved against the calling
+  agent's project.
+- **`header`** (string, default `"Authorization"`) — the header the secret goes
+  into.
+- **`format`** (string, default `"Bearer {secret}"`) — how the header value is
+  formatted; `{secret}` is replaced with the resolved value.
+- **`project`** (integer, default `0`) — the project this upstream belongs to, or
+  `0` for a global upstream available to every project. A project-scoped upstream
+  overrides a global one of the same name for that project.
+
+```jsonc
+"upstreams": [
+  {
+    "name": "openai",
+    "base_url": "https://api.openai.com",
+    "secret": "openai",
+    "header": "Authorization",
+    "format": "Bearer {secret}",
+    "project": 0
+  }
+]
+```
+
+## Environment overrides
+
+Two secret keys can be filled from the environment instead of the file, so the
+value never has to be committed or synced. A configured (non-empty) value in
+`settings.json` always wins; a blank override is ignored.
+
+| Key | Environment variable |
+|---|---|
+| `linear_token` | `ASYLUM_LINEAR_TOKEN` |
+| `companion.token` | `ASYLUM_COMPANION_TOKEN` |
+
+Leave the key empty in the file and export the variable to use it. Related but
+separate: `ASYLUM_KEEP_PASSPHRASE` unlocks the encrypted keep, and is not a
+`settings.json` key at all.
 
 ## A minimal, opinionated starting config
 
@@ -227,8 +315,8 @@ matters:
 }
 ```
 
-Everything else — layouts, companion, control, editor — takes sensible defaults.
-Add keys as you hit a reason to.
+Everything else — layouts, companion, control, proxy, editor — takes sensible
+defaults. Add keys as you hit a reason to.
 
 ## Try it
 
@@ -247,8 +335,14 @@ Add keys as you hit a reason to.
   `max_parallel_runs`, `run_timeout_minutes`, `linear_token`.
 - `agents` overrides per agent (`program`, `extra_args`, `enabled`);
   `custom_agents` adds your own (`id`/`program`/`args`/`delivery`).
-- `editor`, `keybindings` (chord=action, empty unbinds), `companion`, and
-  `control` round out the file.
+- `editor`, `keybindings` (chord=action, empty unbinds), `companion`, `control`,
+  `proxy`, and `upstreams` round out the file.
+- The control surface and the proxy are loopback-only (enforced) and *always*
+  authenticated — an empty `control.token` provisions a per-session token, it
+  does not disable auth. The companion refuses a non-loopback bind without a
+  token.
+- `linear_token` and `companion.token` fall back to `ASYLUM_LINEAR_TOKEN` and
+  `ASYLUM_COMPANION_TOKEN` when left empty.
 
 ## Next
 

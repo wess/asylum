@@ -1,8 +1,10 @@
 # Chapter 10: The CLI
 
 The `asylum` command-line tool scripts the ADE from a shell — or from inside an
-agent's worktree. This chapter documents every subcommand with real examples. It
-is a reference; skim it once, then come back when you need a specific command.
+agent's worktree. This chapter documents every subcommand with real examples —
+`worktree`, `run`, `search`, `control`, `wait`, `plugin`, `layout`, `keep`,
+`call`, and the computer-use trio. It is a reference; skim it once, then come
+back when you need a specific command.
 
 ## Invoking the CLI
 
@@ -145,6 +147,65 @@ asylum layout list
 asylum layout show swarm
 ```
 
+## `keep` — manage the encrypted secret store
+
+The keep holds the credential values the secrets proxy injects on an agent's
+behalf. It lives beside `settings.json` (`~/.config/asylum/keep.enc`), is
+encrypted at rest, and is unlocked with a passphrase read from
+`ASYLUM_KEEP_PASSPHRASE` — every `keep` command needs that variable set.
+
+```sh
+# Store a secret. Omit --value and it is read from stdin, so it stays out of
+# your shell history and off the process list.
+export ASYLUM_KEEP_PASSPHRASE='…'
+asylum keep set openai --value sk-…
+printf 'sk-…' | asylum keep set openai
+
+# Scope a secret to one project instead of globally.
+asylum keep set openai --project 3
+
+# List secret names in a scope (names only - values never print).
+asylum keep list
+asylum keep list --project 3
+
+# Remove one.
+asylum keep rm openai
+```
+
+Secrets are scoped `Global` or `Project(<id>)`; a project-scoped secret overrides
+a global one of the same name for that project. `list` prints names only — the
+keep never prints a value back, and neither does the proxy.
+
+## `call` — masked outbound API calls
+
+Make an HTTP request to a configured upstream *through* the secrets proxy. You
+name the upstream; Asylum resolves the credential from the keep and injects it
+server-side, then forwards only to that upstream's fixed host. The command never
+handles the secret itself, so an agent can use a key it never sees.
+
+This only works from inside a run: it reads `ASYLUM_PROXY_URL` and
+`ASYLUM_PROXY_TOKEN` from the environment the app injects, and errors out
+elsewhere. It also needs `proxy.enabled` and at least one upstream configured
+([Chapter 14](14-configuration-reference.md)).
+
+```sh
+# List the upstreams this run may address.
+asylum call
+
+# GET / POST an upstream by name; the path is everything after the name.
+asylum call openai GET /v1/models
+asylum call openai POST /v1/chat/completions --data '{"model":"gpt-4o"}'
+
+# --data also reads a file, curl-style.
+asylum call openai POST /v1/chat/completions --data @body.json
+
+# Print the skill doc that teaches an agent this API.
+asylum call --skill
+```
+
+The method defaults to `GET` and the path to `/`. A `--data` body is sent as
+`application/json`. Requests go out over `curl`.
+
 ## Computer use: `snapshot`, `click`, `fill`
 
 Three low-level OS automation commands for driving the desktop itself — the
@@ -172,10 +233,13 @@ text. These are platform-aware and shell out to the OS's automation tooling.
 ## Recap
 
 - The CLI mirrors the ADE: `worktree`, `run`, `search`, `control`, `wait`,
-  `plugin`, `layout`, plus computer-use `snapshot`/`click`/`fill`.
+  `plugin`, `layout`, `keep`, `call`, plus computer-use
+  `snapshot`/`click`/`fill`.
 - `run` echoes the exact launch command — the fastest PATH check.
 - `control` and `wait` are the agent-facing orchestration commands, detailed
   next.
+- `keep` stores credentials encrypted; `call` spends them through the proxy
+  without ever revealing them to the agent.
 
 ## Next
 

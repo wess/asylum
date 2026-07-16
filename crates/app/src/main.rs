@@ -32,6 +32,7 @@ mod workspace;
 
 use gpui::AppContext as _;
 use gpui::{point, px, size, App, Bounds, TitlebarOptions, WindowBounds, WindowOptions};
+use zeroize::Zeroizing;
 
 use state::Root;
 
@@ -46,12 +47,54 @@ fn main() {
         return;
     }
 
+    let db_path = state::Root::db_path();
+
+    // Read + scrub the keep passphrase while still single-threaded (before any
+    // thread starts), so it never lingers in `/proc/<pid>/environ`.
+    //
+    // The scrub is unconditional, and must stay that way: agents inherit this
+    // process's environment, so a passphrase left set when the proxy is off
+    // would hand every spawned agent the keys to the whole keep (`asylum keep
+    // list` would print it). The proxy defaults to off, so the branch that
+    // skipped the scrub was the common one.
+    let passphrase = std::env::var("ASYLUM_KEEP_PASSPHRASE")
+        .ok()
+        .filter(|p| !p.is_empty())
+        .map(Zeroizing::new);
+    std::env::remove_var("ASYLUM_KEEP_PASSPHRASE");
+
+    // Once unlocked, secret values live only in memory (the shared keep handle)
+    // and the proxy resolves from them; the values never reach an agent.
+    let keep_handle: proxy::SharedKeep = std::sync::Arc::new(std::sync::Mutex::new(None));
+    if loaded.settings.proxy.enabled {
+        if let Some(pass) = passphrase.as_deref() {
+            let path = keep_path();
+            let opened = if path.exists() {
+                keep::Keep::open(&path, pass)
+            } else {
+                keep::Keep::create(pass)
+            };
+            match opened {
+                Ok(k) => *keep_handle.lock().unwrap() = Some(k),
+                Err(e) => report_server_problem(
+                    &db_path,
+                    "Secrets keep locked",
+                    &format!(
+                        "Could not unlock the keep: {e}. Proxy calls will fail until unlocked."
+                    ),
+                ),
+            }
+        }
+    }
+    drop(passphrase);
+    secrets::set_keep(keep_handle.clone());
+    secrets::refresh_redaction_values();
+
     // Launch the mobile companion server on a background thread, serving the
     // same on-disk store the app uses. Bind, token, and enablement come from
     // settings. A non-loopback bind without a token is refused (it would expose
     // the store to the network); the refusal and any bind error are surfaced in
     // the Inbox rather than silently swallowed.
-    let db_path = state::Root::db_path();
     let companion = loaded.settings.companion.clone();
     if companion.enabled {
         match config::bind::guard(
@@ -133,6 +176,43 @@ fn main() {
         }
     }
 
+    // Launch the secrets proxy on its own thread: masked outbound API access for
+    // agents. An agent calls a named upstream and the proxy resolves the secret
+    // from the (per-project-scoped) keep and injects it server-side, so the key
+    // is never exposed. Bind is loopback-only; each run gets a signed token
+    // naming its project (minted from the session key).
+    let proxy_prefs = loaded.settings.proxy.clone();
+    if proxy_prefs.enabled {
+        let key = config::token::generate().unwrap_or_default();
+        if !key.is_empty() {
+            secrets::set_proxy_key(key.clone());
+            match config::bind::guard(&proxy_prefs.bind, &key, config::bind::Policy::LoopbackOnly) {
+                Ok(()) => {
+                    let bind = proxy_prefs.bind.clone();
+                    let upstreams = loaded.settings.upstreams.clone();
+                    let report_path = db_path.clone();
+                    let proxy = proxy::Proxy {
+                        key,
+                        upstreams,
+                        keep: keep_handle.clone(),
+                    };
+                    std::thread::spawn(move || {
+                        if let Err(error) = proxy::serve(bind.as_str(), proxy) {
+                            report_server_problem(
+                                &report_path,
+                                "Secrets proxy stopped",
+                                &format!("The secrets proxy failed: {error}"),
+                            );
+                        }
+                    });
+                }
+                Err(refusal) => {
+                    report_server_problem(&db_path, "Secrets proxy disabled", &format!("{refusal}"))
+                }
+            }
+        }
+    }
+
     // Check GitHub Releases for a newer version and, once, drop an Inbox
     // notification pointing at the download. Non-blocking and opt-out.
     if std::env::var_os("ASYLUM_NO_UPDATE_CHECK").is_none() {
@@ -176,6 +256,14 @@ fn main() {
 
             cx.activate(true);
         });
+}
+
+/// Path to the encrypted secrets keep, alongside `settings.json`.
+fn keep_path() -> std::path::PathBuf {
+    config::default_path()
+        .parent()
+        .map(|dir| dir.join("keep.enc"))
+        .unwrap_or_else(|| std::path::PathBuf::from("keep.enc"))
 }
 
 /// Post a server startup/runtime problem to the Inbox so a refused bind or a

@@ -118,6 +118,12 @@ what actually reaches the user, not just what compiles.
 | `asylum worktree create/list/remove` | ✅ | n/a |
 | `asylum run <agent> <prompt>` | ✅ | n/a |
 | `asylum search` | ✅ | n/a |
+| `asylum control <status/read/spawn/activity/check/skill>` | ✅ | n/a |
+| `asylum wait run <id>` (status / activity / timeout) | ✅ | n/a |
+| `asylum call` (masked upstream API calls) | ✅ | n/a |
+| `asylum keep <set/rm/list>` (encrypted secret store) | ✅ | n/a |
+| `asylum plugin <install/search/list>` | ✅ | ✅ |
+| `asylum layout <list/show>` | ✅ | ✅ |
 | `asylum snapshot / click / fill` (computer use) | ✅ | n/a |
 
 ## Account/session, layout, platform, config

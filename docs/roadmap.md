@@ -46,8 +46,24 @@
   invocation and a runnable example plugin.
 - Linear issue browsing and issue → worktree (with an API token).
 - Mobile companion with bearer-token auth and follow-up delivery into a live run.
-- Desktop packaging (`.dmg` / `.deb`), a tagged release workflow, and a launch
-  update check against GitHub Releases.
+- Desktop packaging across all three platforms: macOS `.dmg`, Linux `.deb` /
+  `.tar.gz` / AppImage (x64 + arm64), and Windows `.zip` / `.msi` — Windows
+  compiles and links in CI but is **beta**: not runtime-tested on a real machine,
+  and its installers are unsigned.
+- A version-driven release workflow (bump the version, push to `main`, and it
+  tags, builds every platform, and uploads the artifacts) and a launch update
+  check against GitHub Releases.
+- Package-manager distribution: a Homebrew cask refreshed per release in
+  `wess/homebrew-packages`, plus Scoop and Chocolatey manifests rewritten with
+  each release's version and checksum. Chocolatey community-feed publishing needs
+  an API key and moderation, so it stays manual.
+- App icon (`assets/icon.svg` plus generated raster/`.icns`, regenerated with
+  `packaging/icon.sh`).
+- macOS code-signing and notarization wired into `packaging/macos.sh` and the
+  release workflow, gated on repository secrets — a build without them still
+  succeeds, producing an unsigned bundle. The certificates themselves are not yet
+  provisioned, so today's builds are unsigned and Gatekeeper blocks them on
+  install (see the README for the workaround).
 - Provider account add + hot-swap and an install-guidance setup doctor.
 
 ## Next
@@ -55,9 +71,15 @@
 - Per-hunk staging in the side-by-side diff.
 - Background/cancellable project setup commands with per-command output.
 - Provider-specific sign-in probes and live usage feeds for the account meter.
-- Plugin trigger auto-dispatch on ADE events and plugin-contributed app panels.
-- App icon, code signing/notarization credentials, Homebrew cask, and AUR
-  package for a one-command install.
+- Host dispatch for the four unwired plugin contribution types: trigger
+  auto-dispatch on ADE events, plugin-contributed panels and webviews, and
+  plugin tools offered to the agents. All four parse and validate today;
+  `[[command]]` is the only one the app acts on.
+- Provisioning real signing certificates: a Developer ID for macOS (the pipeline
+  is already wired for it) and an Authenticode certificate for the Windows
+  installers, which an EV certificate would clear SmartScreen for.
+- Runtime-testing Windows on real hardware to take it out of beta.
+- An AUR package for a one-command install on Arch.
 
 ## Later
 

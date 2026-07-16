@@ -1,0 +1,17 @@
+[package]
+autotests = false
+name = "keep"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "An encrypted, scoped secret keep: AES-256-GCM over a PBKDF2 passphrase key, with global and per-project scopes. Values live only in memory once unlocked."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+aes-gcm = "0.10"
+pbkdf2 = "0.12"
+sha2 = "0.10"
+getrandom = "0.3"
+zeroize = "1"

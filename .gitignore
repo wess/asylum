@@ -44,7 +44,7 @@ lcov.info
 .apdisk
 # Finder custom-folder-icon file, literally named "Icon\r". The old `Icon?`
 # pattern also matched the `icons` directory on case-insensitive filesystems.
-Icon
+Icon
 
 # ---------------------------------------------------------------------------
 # Linux
@@ -127,7 +127,11 @@ cscope.*
 .envrc
 .direnv/
 *.local
+# Secret *data* dropped next to the code, not the source and docs that
+# implement the keep/proxy - `secrets.rs` and `secrets.md` are real files.
 secrets.*
+!secrets.rs
+!secrets.md
 *.pem
 *.key
 *.p12

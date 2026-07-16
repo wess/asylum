@@ -74,6 +74,12 @@ pub(crate) fn resolve_secrets(
 /// Parse settings from a JSON(-with-comments) string. Never fails: a parse
 /// error returns defaults plus one diagnostic pointing at the failure. A field
 /// with the wrong type surfaces as a diagnostic naming that key.
+///
+/// A bad key costs only that key. `deny_unknown_fields` means one typo makes
+/// serde reject the whole document, so falling back to `Settings::default()`
+/// wholesale would silently throw away every *good* setting alongside it -
+/// theme, keybindings, agent paths - which is a rough thing to happen while
+/// someone is editing their settings in the app's own editor.
 pub fn load_str(src: &str) -> Loaded {
     let cleaned = jsonc::strip(src);
     let trimmed = cleaned.trim();
@@ -88,12 +94,58 @@ pub fn load_str(src: &str) -> Loaded {
             settings,
             diagnostics: Vec::new(),
         },
+        Err(e) => salvage(&cleaned, e),
+    }
+}
+
+/// Keep every top-level key that stands on its own, and turn the rest into
+/// diagnostics.
+///
+/// Each key is checked in isolation against `Settings`, which works because the
+/// struct is `#[serde(default)]`: a document naming one key deserializes if and
+/// only if that key is good.
+fn salvage(cleaned: &str, err: serde_json::Error) -> Loaded {
+    // The document has to be a JSON object before any of it can be salvaged.
+    // Anything else (a syntax error, a bare array) is unrecoverable as settings.
+    let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(cleaned)
+    else {
+        return Loaded {
+            settings: Settings::default(),
+            diagnostics: vec![Diagnostic::new(
+                extract_key(&err.to_string()),
+                err.to_string(),
+            )],
+        };
+    };
+
+    let mut good = serde_json::Map::new();
+    let mut diagnostics = Vec::new();
+    for (key, value) in map {
+        let mut probe = serde_json::Map::new();
+        probe.insert(key.clone(), value.clone());
+        match serde_json::from_value::<Settings>(serde_json::Value::Object(probe)) {
+            Ok(_) => {
+                good.insert(key, value);
+            }
+            Err(e) => diagnostics.push(Diagnostic::new(key, e.to_string())),
+        }
+    }
+
+    match serde_json::from_value::<Settings>(serde_json::Value::Object(good)) {
+        Ok(settings) => Loaded {
+            settings,
+            diagnostics,
+        },
+        // Every key passed alone but they fail together, so there is no subset
+        // to trust. Report the original error against clean defaults.
         Err(e) => {
-            // Try to name the offending key from serde's message when possible.
-            let key = extract_key(&e.to_string());
+            diagnostics.insert(
+                0,
+                Diagnostic::new(extract_key(&e.to_string()), e.to_string()),
+            );
             Loaded {
                 settings: Settings::default(),
-                diagnostics: vec![Diagnostic::new(key, e.to_string())],
+                diagnostics,
             }
         }
     }

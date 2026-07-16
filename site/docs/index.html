@@ -293,9 +293,9 @@ asylum plugin search                        # community plugins, by topic</code>
           <p class="doclead">The <code>asylum</code> binary exposes worktree operations, headless runs, search, and computer-use commands.</p>
           <div class="codeblock">
             <div><span>Terminal</span><button type="button" data-copy aria-label="Copy CLI examples"><i data-lucide="copy" aria-hidden="true"></i></button></div>
-            <pre><code>asylum worktree list /path/to/repo
+            <pre><code>asylum worktree list --repo /path/to/repo
 asylum run opencode "Add a health endpoint"
-asylum search /path/to/repo "cache key"
+asylum search "cache key" --dir /path/to/repo
 asylum control status                 # fleet control from inside a worktree
 asylum wait run 42 --activity blocked
 asylum plugin install acme/asylum-reviewr

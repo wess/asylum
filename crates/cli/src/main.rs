@@ -7,6 +7,8 @@
 //! asylum run <agent> <prompt...> [--cwd <dir>]
 //! asylum search <pattern> [--dir <dir>]
 //! asylum control <status|read|spawn|activity|check|skill>   # orchestrate the fleet
+//! asylum call [<upstream> <METHOD> <path> [--data <body>]] [--skill]  # masked API calls
+//! asylum keep <set <name> [--project <id>] [--value <v>] | rm <name> | list>
 //! asylum wait run <id> [--status <s>] [--activity <a>] [--timeout <secs>]
 //! asylum plugin <install <owner/repo> | search | list>
 //! asylum layout <list | show <name>>
@@ -15,8 +17,10 @@
 //! asylum fill <text...>                # computer use: type text
 //! ```
 
+mod call;
 mod computer;
 mod ctl;
+mod keepcmd;
 mod layouts;
 mod plugins;
 
@@ -34,6 +38,8 @@ fn main() {
         "run" => run_agent(rest),
         "search" => do_search(rest),
         "control" => ctl::control(rest),
+        "call" => call::call(rest),
+        "keep" => keepcmd::keep(rest),
         "wait" => ctl::wait(rest),
         "plugin" => plugins::plugin(rest),
         "layout" => layouts::layout(rest),
@@ -214,6 +220,8 @@ fn print_help() {
          \x20 asylum run <agent> <prompt...> [--cwd <dir>]\n\
          \x20 asylum search <pattern> [--dir <dir>]\n\
          \x20 asylum control <status|read <id>|spawn <agent> <prompt>|activity <state>|check|skill>\n\
+         \x20 asylum call [<upstream> <METHOD> <path> [--data <body>]] [--skill]\n\
+         \x20 asylum keep <set <name> [--project <id>] [--value <v>] | rm <name> | list>\n\
          \x20 asylum wait run <id> [--status <s>] [--activity <a>] [--timeout <secs>]\n\
          \x20 asylum plugin <install <owner/repo> | search [--limit n] | list>\n\
          \x20 asylum layout <list | show <name>>\n\

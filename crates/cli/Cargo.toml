@@ -15,7 +15,9 @@ agent = { path = "../agent" }
 config = { path = "../config" }
 control = { path = "../control" }
 git = { path = "../git" }
+keep = { path = "../keep" }
 plugin = { path = "../plugin" }
+proxy = { path = "../proxy" }
 runner = { path = "../runner" }
 search = { path = "../search" }
 serde_json = { workspace = true }

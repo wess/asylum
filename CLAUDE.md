@@ -135,9 +135,21 @@ and the gpui-free core crates never import gpui.
   the app, so `route()` stays pure. An agent learns the API from the `SKILL` doc
   (`asylum control skill`) and reaches it through injected env vars
   (`ASYLUM_CONTROL_URL` / `ASYLUM_TASK_ID` / `ASYLUM_RUN_ID`).
+- **`keep`** — the encrypted, scoped secret store. AES-256-GCM over a
+  PBKDF2-HMAC-SHA256 passphrase key; unlocked into memory. Secrets are scoped
+  `Global` or `Project(id)`, and `resolve(project, name)` overlays a project's
+  keep on the global one. Pure and gpui-free (`~/.config/asylum/keep.enc`).
+- **`proxy`** — the secrets proxy: masked outbound API access for agents. An
+  agent calls a named upstream (`asylum call openai POST /v1/chat/...`) and the
+  proxy resolves the secret from the `keep` (scoped to the run's project) and
+  injects it server-side, forwarding only to that upstream's fixed host — so the
+  agent uses a key it never sees and can't redirect or escalate scope. Bind is
+  loopback-only; each run gets a signed token naming its project
+  (`ASYLUM_PROXY_URL` / `ASYLUM_PROXY_TOKEN`). See `docs/secrets.md`.
 - **`cli`** — the `asylum` binary: `worktree` ops, `run <agent> <prompt>`,
-  `search`, `control` / `wait` (fleet orchestration), `plugin install` / `search`,
-  `layout`, and computer-use `snapshot` / `click` / `fill`.
+  `search`, `control` / `wait` (fleet orchestration), `call` (masked API calls),
+  `plugin install` / `search`, `layout`, and computer-use `snapshot` / `click`
+  / `fill`.
 - **`app`** — the gpui application. Owns the window, the guise theme bridge, and
   the ADE shell composed with guise's `AppShell`: a header (with the command
   palette + quick-open overlays), a collapsible activity switcher + project/task navbar

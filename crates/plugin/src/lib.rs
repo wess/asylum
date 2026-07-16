@@ -10,10 +10,16 @@
 //!   (`run_finished`, `worktree_created`, …; see [`TRIGGER_EVENTS`]).
 //! - `[[tool]]` - tools exposed to the coding agents themselves.
 //!
+//! Of those five, only `[[command]]` reaches the user today: the host (`app`)
+//! invokes commands through the runtime. `[panel]`, `[webview]`, `[[trigger]]`,
+//! and `[[tool]]` are parsed and validated here, but the host does not yet
+//! render the surfaces, dispatch triggers on ADE events, or expose tools to the
+//! agents. They are manifest-level today - a plugin can declare them, and the
+//! vocabulary is stable, but nothing fires them.
+//!
 //! Plugins declare `capabilities` (see [`CAPABILITIES`]) - advisory under the
-//! process runtime (`pluginrt`), and the vocabulary the future WASM runtime
-//! enforces. This crate is pure parsing + validation; the host (`app`) drives
-//! the runtime, renders the surfaces, and dispatches triggers.
+//! process runtime (`pluginrt`), and the vocabulary the WASM runtime enforces.
+//! This crate is pure parsing + validation; the host drives the runtime.
 //!
 //! Submodules:
 //! - [`model`] - the parsed manifest types and fixed vocabularies.

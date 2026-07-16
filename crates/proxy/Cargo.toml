@@ -1,0 +1,15 @@
+[package]
+autotests = false
+name = "proxy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The secrets proxy: masked outbound API access for agents. An agent calls a named upstream and Asylum injects the real credential server-side, so the key is never exposed to the agent."
+
+[dependencies]
+config = { path = "../config" }
+keep = { path = "../keep" }
+getrandom = "0.3"
+hmac = "0.12"
+sha2 = "0.10"
+subtle = "2"

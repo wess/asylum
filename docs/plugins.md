@@ -42,12 +42,14 @@ command = "bun run server.ts"
 persistent = true
 
 # A side-drawer panel rendered from the runtime's responses.
+# Parsed and validated; the app does not render it yet.
 [panel]
 id = "issues"
 title = "Issues"
 icon = "◪"
 
 # A native web surface (panel | tab | window). Source is url | entry | service.
+# Parsed and validated; the app does not render it yet.
 [webview]
 id = "board"
 title = "Board"
@@ -62,17 +64,30 @@ run = "sync"
 keybind = "cmd-shift-l"
 
 # A hook on an ADE event. Action is `notify` or `invoke` (a runtime method).
+# Parsed and validated; the app does not dispatch triggers yet.
 [[trigger]]
 on = "run_finished"
 when = "nonzero"
 invoke = "on_run_failed"
 
 # A tool exposed to the coding agents themselves.
+# Parsed and validated; the app does not expose tools to agents yet.
 [[tool]]
 id = "create_issue"
 description = "Create a Linear issue from the current task."
 param = [{ name = "title", type = "string", required = true }]
 ```
+
+## What reaches the user today
+
+Of the five contribution types, only **`[[command]]`** is wired end to end: the
+Plugins surface lists an installed plugin and the app invokes its commands
+through the runtime. `[panel]`, `[webview]`, `[[trigger]]`, and `[[tool]]` parse
+and validate — the manifest vocabulary is stable and a plugin can declare them
+today — but nothing in the app renders a panel or webview, fires a trigger on an
+ADE event, or offers a tool to an agent. Host dispatch is on the roadmap
+(`docs/roadmap.md`). Write them into your manifest if you want to be ready; do
+not expect them to run yet.
 
 ## Capabilities
 
@@ -91,8 +106,13 @@ runs with full user privileges); the enforced gate list under the WASM runtime.
 
 ## Trigger events
 
+A `[[trigger]]` may name any of these events, and the parser validates the name:
+
 `task_created`, `run_started`, `run_finished`, `run_failed`,
 `worktree_created`, `worktree_removed`, `diff_ready`, `task_merged`.
+
+The app does not emit these events to plugins yet, so a declared trigger never
+fires. The list is the vocabulary a manifest can target, not a working hook.
 
 ## Runtime protocol
 

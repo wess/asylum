@@ -692,7 +692,9 @@ impl Root {
             return;
         }
         self.run_saved_at.insert(run_id, second);
-        let text = terminal_text(term, cx);
+        // Mask any known secret value that leaked into the terminal (e.g. an
+        // upstream that echoes a credential) before it is persisted.
+        let text = crate::secrets::redact(&terminal_text(term, cx));
         self.update_activity(run_id, &text);
         match self.db.save_run_output(run_id, &text) {
             Ok(()) => {
@@ -708,41 +710,73 @@ impl Root {
         }
     }
 
-    /// Environment variables that let a launched agent reach the control
-    /// surface and know which run/task it is. Empty when the control server is
-    /// disabled, so no orchestration is offered.
+    /// Environment variables injected into a launched agent: the control surface
+    /// (orchestrate the fleet) and the secrets proxy (masked outbound API calls).
+    /// Each is added only when its server is enabled.
     fn control_env(&self, task_id: i64, run_id: i64) -> Vec<(String, String)> {
-        if !self.settings.control.enabled {
-            return Vec::new();
-        }
-        let port = self
-            .settings
-            .control
-            .bind
-            .rsplit(':')
-            .next()
-            .unwrap_or("8788");
-        // Mint a scoped token bound to this run's task and signed with the
-        // per-session key (see `secrets`), so an agent can orchestrate its own
-        // fleet but a request for another task is refused. An empty key means
-        // the control server runs unauthenticated (auth disabled).
-        let key = crate::secrets::control_token();
-        let token = if key.is_empty() {
-            String::new()
-        } else {
-            // Comfortably longer than any run; the key rotates each session.
-            let expires_at = now() + 7 * 24 * 60 * 60;
-            ::control::token::mint(&key, task_id, run_id, expires_at)
-        };
-        vec![
-            (
+        let mut env = Vec::new();
+
+        if self.settings.control.enabled {
+            let port = self
+                .settings
+                .control
+                .bind
+                .rsplit(':')
+                .next()
+                .unwrap_or("8788");
+            // Mint a scoped token bound to this run's task and signed with the
+            // per-session key (see `secrets`), so an agent can orchestrate its own
+            // fleet but a request for another task is refused. An empty key means
+            // the control server runs unauthenticated (auth disabled).
+            let key = crate::secrets::control_token();
+            let token = if key.is_empty() {
+                String::new()
+            } else {
+                // Comfortably longer than any run; the key rotates each session.
+                let expires_at = now() + 7 * 24 * 60 * 60;
+                ::control::token::mint(&key, task_id, run_id, expires_at)
+            };
+            env.push((
                 ::control::ENV_URL.to_string(),
                 format!("http://127.0.0.1:{port}"),
-            ),
-            (::control::ENV_TOKEN.to_string(), token),
-            (::control::ENV_TASK.to_string(), task_id.to_string()),
-            (::control::ENV_RUN.to_string(), run_id.to_string()),
-        ]
+            ));
+            env.push((::control::ENV_TOKEN.to_string(), token));
+            env.push((::control::ENV_TASK.to_string(), task_id.to_string()));
+            env.push((::control::ENV_RUN.to_string(), run_id.to_string()));
+        }
+
+        // The secrets proxy: the agent reaches it at 127.0.0.1:<port> and calls
+        // named upstreams without ever seeing the credentials (`asylum call`).
+        // The token is signed with the session key and names this run's project,
+        // so the proxy resolves secrets from the project's keep (overlaid on
+        // global) and can't be tricked into another project's scope.
+        if self.settings.proxy.enabled {
+            let port = self
+                .settings
+                .proxy
+                .bind
+                .rsplit(':')
+                .next()
+                .unwrap_or("8789");
+            let key = crate::secrets::proxy_key();
+            // A run whose task will not resolve gets no token rather than a
+            // project-0 one: falling back to global scope would quietly hand it
+            // the global keep. Proxy access is granted, never defaulted into.
+            let token = match self.db.task(task_id) {
+                Ok(t) if !key.is_empty() => {
+                    let expires_at = now() + 7 * 24 * 60 * 60;
+                    proxy::token::mint(&key, t.project_id, expires_at)
+                }
+                _ => String::new(),
+            };
+            env.push((
+                proxy::ENV_URL.to_string(),
+                format!("http://127.0.0.1:{port}"),
+            ));
+            env.push((proxy::ENV_TOKEN.to_string(), token));
+        }
+
+        env
     }
 
     /// Classify a run's live output into a semantic activity and persist it when

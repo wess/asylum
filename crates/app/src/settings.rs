@@ -20,6 +20,7 @@ use crate::state::Root;
 pub struct Inputs {
     pub worktree: Entity<guise::TextInput>,
     pub font: Entity<guise::TextInput>,
+    pub proxy_bind: Entity<guise::TextInput>,
     pub programs: std::collections::BTreeMap<String, Entity<guise::TextInput>>,
 }
 
@@ -55,6 +56,24 @@ pub fn ensure_inputs(root: &mut Root, cx: &mut Context<Root>) {
             write_editor(root, editor, cx);
         },
     );
+    let proxy_bind = text_input(
+        cx,
+        &root.settings.proxy.bind,
+        "127.0.0.1:8789",
+        |root, text, cx| {
+            let bind = if text.trim().is_empty() {
+                config::ProxyPrefs::default().bind
+            } else {
+                text.trim().to_string()
+            };
+            write(
+                root,
+                "proxy",
+                json!({ "enabled": root.settings.proxy.enabled, "bind": bind }),
+                cx,
+            );
+        },
+    );
     let mut programs = std::collections::BTreeMap::new();
     for agent in agent::registry::catalog(&root.settings.custom_agents) {
         let id = agent.id.clone();
@@ -86,6 +105,7 @@ pub fn ensure_inputs(root: &mut Root, cx: &mut Context<Root>) {
     root.settings_inputs = Some(Inputs {
         worktree,
         font,
+        proxy_bind,
         programs,
     });
 }
@@ -119,6 +139,7 @@ pub fn sync_inputs(root: &mut Root, settings: &config::Settings, cx: &mut Contex
     for (input, value) in [
         (inputs.worktree.clone(), settings.worktree_dir.clone()),
         (inputs.font.clone(), settings.editor.font_family.clone()),
+        (inputs.proxy_bind.clone(), settings.proxy.bind.clone()),
     ] {
         input.update(cx, |i, cx| {
             if i.text() != value {
@@ -482,6 +503,95 @@ pub fn settings_view(
                 .into_any_element(),
             border,
         ));
+    }
+
+    // ── Secrets proxy ──
+    col = col.child(heading("Secrets proxy", dimmed, border));
+    col = col.child(
+        Text::new(
+            "Let agents call external APIs without seeing the keys. Define upstreams below \
+             and store each key in the encrypted keep with `asylum keep set <name>`. \
+             See docs/secrets.md.",
+        )
+        .size(Size::Xs)
+        .dimmed(),
+    );
+    {
+        let h = handle.clone();
+        let enabled = settings.proxy.enabled;
+        let bind = settings.proxy.bind.clone();
+        col = col.child(row(
+            "Enable",
+            "Run the loopback secrets proxy; agents reach it via `asylum call`.",
+            enabled != defaults.proxy.enabled,
+            None,
+            Switch::new("proxy-enabled")
+                .checked(enabled)
+                .aria_label("Enable the secrets proxy")
+                .size(Size::Sm)
+                .on_change(move |_, _, cx| {
+                    let bind = bind.clone();
+                    h.update(cx, |root, cx| {
+                        write(
+                            root,
+                            "proxy",
+                            json!({ "enabled": !enabled, "bind": bind }),
+                            cx,
+                        );
+                    });
+                })
+                .into_any_element(),
+            border,
+        ));
+    }
+    col = col.child(row(
+        "Bind address",
+        "Loopback only — a non-loopback bind is refused. Press enter to apply.",
+        settings.proxy.bind != defaults.proxy.bind,
+        None,
+        div()
+            .w(px(280.0))
+            .flex_none()
+            .child(inputs.proxy_bind.clone())
+            .into_any_element(),
+        border,
+    ));
+    // Upstreams (edit the list in settings.json). Each shows whether its secret
+    // is currently provided in the environment.
+    if settings.upstreams.is_empty() {
+        col = col.child(
+            Text::new(
+                "No upstreams yet. Add them under \"upstreams\" in settings.json \
+                 (Edit in settings.json, above).",
+            )
+            .size(Size::Xs)
+            .dimmed(),
+        );
+    } else {
+        for u in &settings.upstreams {
+            let present = crate::secrets::has_secret(&u.secret, u.project);
+            let (label, color) = if present {
+                ("secret set", ColorName::Green)
+            } else {
+                ("secret missing", ColorName::Red)
+            };
+            let scope = if u.project == 0 {
+                "global keep".to_string()
+            } else {
+                format!("project {} keep", u.project)
+            };
+            col = col.child(row(
+                SharedString::from(u.name.clone()),
+                SharedString::from(format!("{} · {} · {}", u.base_url, u.secret, scope)),
+                false,
+                None,
+                Badge::new(label)
+                    .color(color)
+                    .variant(Variant::Light)
+                    .into_any_element(),
+                border,
+            ));
+        }
     }
 
     // ── Keybindings ──

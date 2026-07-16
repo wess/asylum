@@ -94,15 +94,27 @@ worktree per run, isolation preserved across the network.
 
 ## Plugin-extended pipelines
 
-Plugins ([Chapter 13](13-plugins.md)) let you wire the ADE into the rest of your
-world:
+Plugins ([Chapter 13](13-plugins.md)) are how the ADE is meant to wire into the
+rest of your world. Today one extension point is wired end to end — a
+**`[[command]]`** in the palette, invoked through the plugin's runtime — and
+that is what you can build a workflow on right now. Install a plugin, give it a
+command, and drive it from the palette.
 
-- A **`[[trigger]]` on `run_finished` or `task_merged`** can notify a channel,
-  kick a deploy, or file a follow-up — turning a merge into the first step of a
-  pipeline rather than the last.
-- A **`[[tool]]`** exposes an internal capability (ticketing, a knowledge base, a
-  deploy hook) to the agents themselves, so a run can act on your systems within
-  the capabilities you grant it.
+The rest of the manifest is declared but not yet dispatched by the app, so treat
+it the way you treat remote worktrees above: real at the manifest level, not a
+working button.
+
+- A **`[[trigger]]` on `run_finished` or `task_merged`** is designed to notify a
+  channel, kick a deploy, or file a follow-up — turning a merge into the first
+  step of a pipeline rather than the last. The app does not fire triggers yet; a
+  trigger you write parses and validates but never runs. Until host dispatch
+  lands, get the same effect by invoking the plugin command yourself, or by
+  driving your pipeline from CI on the merged branch.
+- A **`[[tool]]`** is designed to expose an internal capability (ticketing, a
+  knowledge base, a deploy hook) to the agents themselves. The app does not offer
+  plugin tools to agents yet. An agent that needs to reach your systems today
+  goes through the control surface ([Chapter 11](11-agent-orchestration-and-the-control-surface.md))
+  or a masked upstream via `asylum call`.
 - Prefer the **WASM runtime** for anything shared or untrusted — capabilities are
   enforced there, not merely advisory.
 

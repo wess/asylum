@@ -67,24 +67,39 @@ param = [{ name = "title", type = "string", required = true }]
 
 ### Extension points
 
-- **`[[command]]`** — a command-palette action. Its `mode` decides what running
-  it does: `invoke` calls a runtime method, `panel` opens the plugin's panel,
-  `webview` opens its web surface. It can carry a `keybind`.
+A manifest describes five contribution types. One of them runs today; be clear
+on which as you read:
+
+- **`[[command]]`** — a command-palette action, and the one extension point wired
+  end to end. Its `mode` decides what running it does: `invoke` calls a runtime
+  method, `panel` opens the plugin's panel, `webview` opens its web surface. It
+  can carry a `keybind`. Only `invoke` has a host behind it today.
 - **`[panel]`** — a side-drawer panel rendered from the runtime's responses.
+  Declared and validated; the app does not render it yet.
 - **`[webview]`** — a native web surface placed as a panel, tab, or window,
-  sourced from a `url`, a bundled `entry`, or a `service`.
-- **`[[trigger]]`** — a hook that fires on an ADE event. Its action is `notify`
+  sourced from a `url`, a bundled `entry`, or a `service`. Declared and
+  validated; the app does not render it yet.
+- **`[[trigger]]`** — a hook meant to fire on an ADE event. Its action is `notify`
   (post a desktop notification) or `invoke` (call a runtime method), and it can
-  be conditioned with `when`.
-- **`[[tool]]`** — a tool exposed to the coding agents, with typed parameters, so
-  the agent itself can call plugin functionality.
+  be conditioned with `when`. Declared and validated; the app does not dispatch
+  triggers yet, so a trigger you write never fires.
+- **`[[tool]]`** — a tool meant to be exposed to the coding agents, with typed
+  parameters. Declared and validated; the app does not offer plugin tools to
+  agents yet.
+
+Treat the four unwired points as available at the manifest level rather than as
+working features: the vocabulary is stable and your manifest will validate, but
+host dispatch is still on the roadmap (`docs/roadmap.md`).
 
 ### Trigger events
 
-A `[[trigger]]` can hook any of these ADE events:
+A `[[trigger]]` may name any of these ADE events, and the parser checks the name:
 
 `task_created`, `run_started`, `run_finished`, `run_failed`, `worktree_created`,
 `worktree_removed`, `diff_ready`, `task_merged`.
+
+The app does not emit these to plugins yet — this is the target vocabulary, not a
+live hook.
 
 ## Capabilities
 
