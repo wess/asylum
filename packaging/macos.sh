@@ -12,6 +12,19 @@ label="${2:?usage: macos.sh <rust-target> <label>}"
 app="target/${target}/release/bundle/osx/Asylum.app"
 [ -d "$app" ] || { echo "missing bundle: $app" >&2; exit 1; }
 
+# cargo-bundle names the executable after the cargo bin target, which is
+# `asylumdev` so a dev build never collides with an installed `asylum`. Ship it
+# under the real name, the way linux.sh and windows.ps1 already do - otherwise a
+# release install reports itself as `asylumdev` in Activity Monitor and in crash
+# reports. The rename has to happen here, before signing: the signature covers
+# both the executable and the Info.plist that names it.
+if [ -x "$app/Contents/MacOS/asylumdev" ]; then
+  mv "$app/Contents/MacOS/asylumdev" "$app/Contents/MacOS/asylum"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable asylum" "$app/Contents/Info.plist"
+  echo "renamed bundle executable to asylum"
+fi
+[ -x "$app/Contents/MacOS/asylum" ] || { echo "no asylum executable in $app" >&2; exit 1; }
+
 mkdir -p dist
 dmg="dist/asylum-${label}.dmg"
 

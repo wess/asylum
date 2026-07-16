@@ -158,7 +158,9 @@ jobs:
         id: verify
         run: |
           app="target/aarch64-apple-darwin/release/bundle/osx/Asylum.app"
-          test -x "$app/Contents/MacOS/asylum" || test -x "$app/Contents/MacOS/asylumdev"
+          # Strictly `asylum`: accepting `asylumdev` too is why v0.1.0 shipped
+          # with the dev binary name inside the bundle.
+          test -x "$app/Contents/MacOS/asylum"
           if [ -z "${MACOS_SIGN_IDENTITY}" ]; then
             echo "::warning::Unsigned build - Gatekeeper will block it on install; the release notes carry the workaround."
             echo "signed=false" >> "$GITHUB_OUTPUT"
