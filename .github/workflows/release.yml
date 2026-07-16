@@ -118,7 +118,10 @@ jobs:
     # runtime and the dmg is notarized. Without the secrets the bundle ships
     # genuinely unsigned - Gatekeeper on macOS 15+ refuses it, and Control-click
     # -> Open no longer bypasses that, so a user has to clear the quarantine
-    # attribute by hand. The release notes say so (see `publish`).
+    # attribute by hand. `signed` reports which of the two actually happened, so
+    # the release notes and the cask describe the artifact rather than guess.
+    outputs:
+      signed: ${{ steps.verify.outputs.signed }}
     env:
       MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
       MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
@@ -152,14 +155,26 @@ jobs:
           mv dist/asylum-macos-arm64.dmg dist/Asylum.dmg
 
       - name: Verify bundle
+        id: verify
         run: |
           app="target/aarch64-apple-darwin/release/bundle/osx/Asylum.app"
           test -x "$app/Contents/MacOS/asylum" || test -x "$app/Contents/MacOS/asylumdev"
-          if [ -n "${MACOS_SIGN_IDENTITY}" ]; then
-            # A signed build that fails verification must not ship, so no `|| true`.
-            codesign --verify --strict --verbose=2 "$app"
-          else
+          if [ -z "${MACOS_SIGN_IDENTITY}" ]; then
             echo "::warning::Unsigned build - Gatekeeper will block it on install; the release notes carry the workaround."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A signed build that fails verification must not ship, so no `|| true`.
+          codesign --verify --strict --verbose=2 "$app"
+          # The dmg is the thing users download, and a stapled ticket is the only
+          # proof notarization actually landed. Claiming it on the strength of the
+          # identity alone is how release notes end up telling people to strip the
+          # quarantine flag from an app that never needed it.
+          if xcrun stapler validate dist/Asylum.dmg; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Signed but not notarized - the release notes carry the Gatekeeper workaround."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload DMG
@@ -232,24 +247,32 @@ jobs:
       # Every line stays indented inside this block scalar on purpose: an
       # unindented `---` would read as a YAML document separator and silently
       # drop every job defined below this one.
-      - name: Note unsigned-build caveats
+      - name: Note install caveats
         run: |
           V="${{ needs.check-version.outputs.version }}"
           BODY=$(gh release view "v${V}" --repo "${{ github.repository }}" --json body -q .body)
+          if [ "${SIGNED}" = "true" ]; then
+            MAC=$(printf '%s\n' \
+              '**macOS** - signed and notarized: download the `.dmg`, drag Asylum to' \
+              'Applications, and open it. No quarantine workaround is needed.')
+          else
+            MAC=$(printf '%s\n' \
+              '**macOS** - this build is not signed or notarized, so Gatekeeper will' \
+              'refuse to open it, and on macOS 15+ the Control-click -> Open trick no' \
+              'longer works. Open **System Settings -> Privacy & Security** and choose' \
+              '**Open Anyway**, or clear the quarantine flag directly:' \
+              '' \
+              '```sh' \
+              'xattr -dr com.apple.quarantine /Applications/Asylum.app' \
+              '```')
+          fi
           NOTE=$(printf '%s\n' \
             '' \
             '---' \
             '' \
             '### Installing' \
             '' \
-            '**macOS** - the app is not signed or notarized, so Gatekeeper will' \
-            'refuse to open it, and on macOS 15+ the Control-click -> Open trick no' \
-            'longer works. Open **System Settings -> Privacy & Security** and choose' \
-            '**Open Anyway**, or clear the quarantine flag directly:' \
-            '' \
-            '```sh' \
-            'xattr -dr com.apple.quarantine /Applications/Asylum.app' \
-            '```' \
+            "${MAC}" \
             '' \
             '**Windows** - builds are beta and unsigned; SmartScreen will warn about' \
             'an unknown publisher. The `.zip` is the guaranteed deliverable.')
@@ -264,6 +287,7 @@ jobs:
           esac
         env:
           GH_TOKEN: ${{ github.token }}
+          SIGNED: ${{ needs.build.outputs.signed }}
 
       - name: Publish the release
         run: |
@@ -274,7 +298,7 @@ jobs:
 
   update-homebrew:
     runs-on: ubuntu-latest
-    needs: [check-version, publish]
+    needs: [check-version, build, publish]
     if: needs.check-version.outputs.changed == 'true'
     # A missing HOMEBREW_TAP_TOKEN (or tap repo) must not fail a release that
     # has already published its artifacts - the cask can be refreshed by hand.
@@ -326,18 +350,32 @@ jobs:
               "~/Library/Preferences/dev.asylum.app.plist",
               "~/.config/asylum",
             ]
-
+          end
+          RUBY
+          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" tap/Casks/asylum.rb
+          sed -i "s/SHA_DARWIN_ARM64_PLACEHOLDER/${{ steps.shas.outputs.sha_darwin_arm64 }}/g" tap/Casks/asylum.rb
+          # Gatekeeper caveats belong only on a build that actually needs them.
+          # Telling someone to strip the quarantine attribute off a notarized app
+          # trains them to defeat the check that was protecting them.
+          if [ "${SIGNED}" != "true" ]; then
+            python3 - << 'PY'
+          path = "tap/Casks/asylum.rb"
+          caveats = '''
             caveats <<~EOS
-              Asylum is not yet signed or notarized, so Gatekeeper will refuse to
+              This build is not signed or notarized, so Gatekeeper will refuse to
               open it. Either open System Settings -> Privacy & Security and
               choose "Open Anyway", or clear the quarantine flag:
 
                 xattr -dr com.apple.quarantine "#{appdir}/Asylum.app"
             EOS
-          end
-          RUBY
-          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" tap/Casks/asylum.rb
-          sed -i "s/SHA_DARWIN_ARM64_PLACEHOLDER/${{ steps.shas.outputs.sha_darwin_arm64 }}/g" tap/Casks/asylum.rb
+          '''
+          body = open(path).read().rstrip()
+          assert body.endswith("end"), "cask does not end with `end`; refusing to patch"
+          open(path, "w").write(body[:-3] + caveats + "end\n")
+          PY
+          fi
+        env:
+          SIGNED: ${{ needs.build.outputs.signed }}
 
       - name: Push updated cask
         run: |
@@ -437,7 +475,19 @@ jobs:
           git add packaging/scoop/asylum.json
           if git diff --cached --quiet; then
             echo "Scoop manifest unchanged."
-          else
-            git commit -m "Update Scoop manifest to v${{ needs.check-version.outputs.version }}"
-            git push
+            exit 0
           fi
+          git commit -m "Update Scoop manifest to v${{ needs.check-version.outputs.version }}"
+          # This job starts at the release commit but lands minutes later, after
+          # the platform builds - main has usually moved on by then, and a plain
+          # push loses the race. Rebase onto whatever arrived and retry; the
+          # manifest is machine-written, so there is nothing to conflict over.
+          for i in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push rejected (attempt ${i}/3) - rebasing onto origin/main."
+            git pull --rebase origin main || exit 1
+          done
+          echo "::warning::Could not push the Scoop manifest after 3 attempts; update it by hand."
+          exit 1
