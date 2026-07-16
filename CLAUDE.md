@@ -201,4 +201,3 @@ links are written back to the note.
 - `docs/architecture.md` — crate-by-crate detail and data flow.
 - `docs/plugins.md` — the plugin manifest, runtime, and capability model.
 - `docs/gpui.md` — the gpui/guise/libsinclair dependency recipe.
-- `docs/homelab.md` — local media and infrastructure API map; canonical specs live in `~/Desktop/Dev/docs`.
