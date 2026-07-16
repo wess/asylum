@@ -770,6 +770,9 @@ impl Root {
                 self.fanout_in_progress,
                 self.setup_checks.clone(),
                 self.setup_open,
+                // Read off `self`, not through the handle: this runs inside
+                // Root's own render, so `handle.read(cx)` double-leases it.
+                self.layout_names(),
                 compose.clone(),
                 self.start_ref_input.clone().unwrap(),
                 handle,

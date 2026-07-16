@@ -22,6 +22,7 @@ pub fn main_content(
     preparing: bool,
     setup_checks: Vec<crate::setup::Check>,
     setup_open: bool,
+    layout_names: Vec<String>,
     compose: Entity<guise::TextInput>,
     start_ref: Entity<guise::TextInput>,
     handle: Entity<Root>,
@@ -57,7 +58,6 @@ pub fn main_content(
         setup_open,
         handle.clone(),
     ));
-    let layout_names = handle.read(cx).layout_names();
     col = col.child(compose_box(
         project_name,
         &fanout,
