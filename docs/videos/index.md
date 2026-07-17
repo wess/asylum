@@ -39,13 +39,13 @@ book chapter under "Go deeper."
 | 08 | [Notes and Knowledge](08-notes-and-knowledge.md) | The Markdown vault: wiki links, backlinks, tags, templates, attaching notes to tasks/runs. | ~6 min | Ep 03 |
 | 09 | [Integrations](09-integrations.md) | GitHub PRs/issues + issue→worktree, Linear. | ~5 min | Ep 06 |
 | 10 | [Terminal, Editor, Preview, Browser](10-terminal-editor-preview-browser.md) | Splittable terminal, editor + file tree, previews, browser design mode. | ~6 min | Ep 02 |
-| 11 | [The CLI Tour](11-the-cli-tour.md) | Every `asylum` subcommand, quickly. | ~6 min | Ep 03 |
+| 11 | [The CLI Tour](11-the-cli-tour.md) | Every `asylum` subcommand, including the aggregated MCP gateway. | ~8 min | Ep 03 |
 | 12 | [The Agent Control Surface](12-agent-control-surface.md) | An agent orchestrating siblings: env vars, `asylum control`, `asylum wait`, a worked demo. | ~9 min | Ep 11 |
 | 13 | [Mobile Companion and Events](13-mobile-companion-and-events.md) | The companion server, the event stream, following the fleet from a phone. | ~5 min | Ep 03 |
 | 14 | [Plugins](14-plugins.md) | plugin.toml, process vs WASM, `asylum plugin`, building a simple one. | ~7 min | Ep 11 |
 | 15 | [Expert Workflows](15-expert-workflows.md) | Tournaments, agent-driven sub-fleets, review-driven iteration, best practices. | ~7 min | All prior |
 
-**Total runtime:** ~89 minutes across 16 episodes.
+**Total runtime:** ~91 minutes across 16 episodes.
 
 ## Suggested learning paths
 

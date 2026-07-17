@@ -20,6 +20,8 @@ const lessons: Record<string, string[]> = {
   episode10: ["settings.png", "diff.png", "integrations.png", "notes.png"],
 };
 
+const requested = new Set((Bun.env.VIDEOS ?? "").split(",").filter(Boolean));
+
 const run = async (args: string[], label: string) => {
   const child = Bun.spawn(args, { stdout: "ignore", stderr: "pipe" });
   const error = await new Response(child.stderr).text();
@@ -58,6 +60,7 @@ const makeposter = async (screen: string, output: string) => run([
 await mkdir(work, { recursive: true });
 
 for (const [id, images] of Object.entries(lessons)) {
+  if (requested.size > 0 && !requested.has(id)) continue;
   const source = join(videos, `${id}.mp4`);
   if (!(await Bun.file(source).exists())) continue;
   const length = await duration(source);

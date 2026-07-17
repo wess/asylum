@@ -19,7 +19,7 @@ const episodes: Episode[] = [
   { id: "06", title: "Diffs, checks, and annotations", level: "Intermediate", sources: ["05-review-diffs-checks-annotations.md"] },
   { id: "07", title: "Select and merge the winner", level: "Intermediate", sources: ["06-merge-the-winner.md"] },
   { id: "08", title: "Notes, context, and reusable workflows", level: "Intermediate", sources: ["08-notes-and-knowledge.md", "07-layouts-and-presets.md"] },
-  { id: "09", title: "CLI, integrations, companion, and plugins", level: "Advanced", sources: ["11-the-cli-tour.md", "09-integrations.md", "13-mobile-companion-and-events.md", "14-plugins.md"] },
+  { id: "09", title: "CLI, MCP gateway, integrations, and plugins", level: "Advanced", sources: ["11-the-cli-tour.md", "09-integrations.md", "13-mobile-companion-and-events.md", "14-plugins.md"] },
   { id: "10", title: "Expert orchestration and security", level: "Expert", sources: ["12-agent-control-surface.md", "15-expert-workflows.md"] },
 ];
 

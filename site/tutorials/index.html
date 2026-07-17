@@ -31,7 +31,7 @@
         </div>
         <dl>
           <div><dt>3</dt><dd>learning levels</dd></div>
-          <div><dt>9</dt><dd>complete tutorials</dd></div>
+          <div><dt>10</dt><dd>complete tutorials</dd></div>
           <div><dt>0</dt><dd>demo-only steps</dd></div>
         </dl>
       </section>
@@ -64,7 +64,7 @@
           <article class="courseepisode"><video controls preload="none" poster="../videos/episode06.png"><source src="../videos/episode06.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode06.vtt" srclang="en" label="English" default /></video><div><span>06 · Intermediate · 2:50</span><h3>Diffs, checks, and annotations</h3><p>Compare the evidence, understand verification results, and send precise line-level feedback to a run.</p><a href="../videos/transcripts/episode06.md">Read transcript</a></div></article>
           <article class="courseepisode"><video controls preload="none" poster="../videos/episode07.png"><source src="../videos/episode07.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode07.vtt" srclang="en" label="English" default /></video><div><span>07 · Intermediate · 1:54</span><h3>Select and merge the winner</h3><p>Use merge preflight, resolve blockers, preserve the base branch, and finish a tournament safely.</p><a href="../videos/transcripts/episode07.md">Read transcript</a></div></article>
           <article class="courseepisode"><video controls preload="none" poster="../videos/episode08.png"><source src="../videos/episode08.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode08.vtt" srclang="en" label="English" default /></video><div><span>08 · Intermediate · 4:52</span><h3>Notes, context, and reusable workflows</h3><p>Turn Markdown into durable project memory, attach context to work, and reuse layouts without losing judgment.</p><a href="../videos/transcripts/episode08.md">Read transcript</a></div></article>
-          <article class="courseepisode"><video controls preload="none" poster="../videos/episode09.png"><source src="../videos/episode09.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode09.vtt" srclang="en" label="English" default /></video><div><span>09 · Advanced · 11:30</span><h3>CLI, integrations, companion, and plugins</h3><p>Operate beyond the main window: automation, GitHub and Linear, remote observation, event streams, and extension points.</p><a href="../videos/transcripts/episode09.md">Read transcript</a></div></article>
+          <article class="courseepisode"><video controls preload="none" poster="../videos/episode09.png"><source src="../videos/episode09.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode09.vtt" srclang="en" label="English" default /></video><div><span>09 · Advanced · 12:53</span><h3>CLI, MCP gateway, integrations, and plugins</h3><p>Operate beyond the main window with automation, scoped MCP tools, GitHub and Linear, event streams, and extension points.</p><a href="../videos/transcripts/episode09.md">Read transcript</a></div></article>
           <article class="courseepisode"><video controls preload="none" poster="../videos/episode10.png"><source src="../videos/episode10.mp4" type="video/mp4" /><track kind="captions" src="../videos/episode10.vtt" srclang="en" label="English" default /></video><div><span>10 · Expert · 8:07</span><h3>Expert orchestration and security</h3><p>Coordinate sub-fleets, control cost and concurrency, secure local services, and make evidence-driven operating decisions.</p><a href="../videos/transcripts/episode10.md">Read transcript</a></div></article>
         </div>
       </section>
@@ -131,6 +131,13 @@
             <strong>Create a safe plugin</strong>
             <p>Build a Bun process plugin with one declared capability.</p>
             <small>TypeScript and JSON</small>
+          </a>
+          <a href="#mcpgateway" class="tutorialcard" data-tutorial="advanced">
+            <span class="level advanced">Advanced</span><span class="duration">30 min</span>
+            <i data-lucide="workflow" aria-hidden="true"></i>
+            <strong>Connect tools through MCP</strong>
+            <p>Give every agent one secured gateway to local and remote MCP servers.</p>
+            <small>Keep unlocked and one MCP server</small>
           </a>
           <a href="#strategy" class="tutorialcard" data-tutorial="advanced">
             <span class="level advanced">Advanced</span><span class="duration">35 min</span>
@@ -280,6 +287,30 @@
               <li><div><span>5</span><h3>Send the batch</h3></div><p>Choose the owning run and send all pins as one structured prompt. Verify the result in the same browser surface.</p></li>
             </ol>
             <div class="checkpoint amber"><i data-lucide="scan-search" aria-hidden="true"></i><div><strong>Useful note</strong><p>“On narrow screens this action row clips the final button. Keep all actions visible without horizontal scrolling.”</p></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article id="mcpgateway" class="lesson" data-lesson="advanced">
+        <div class="shell lessonlayout">
+          <header class="lessonmeta">
+            <span class="level advanced">Advanced</span><span>30 minutes</span>
+            <h2>Connect tools through the MCP gateway</h2>
+            <p>Configure each service once, then expose a scoped and auditable tool catalog to every managed agent.</p>
+            <div><strong>You will learn</strong><span>Namespaces</span><span>Keep secrets</span><span>Tool filtering</span><span>Exposure modes</span></div>
+          </header>
+          <div class="lessonbody">
+            <h3>Before you start</h3>
+            <p>Install one local MCP server or obtain a Streamable HTTP MCP endpoint. Unlock Keep before starting the app when the upstream needs a credential.</p>
+            <ol class="lessonsteps">
+              <li><div><span>1</span><h3>Enable the loopback gateway</h3></div><p>In Settings → MCP gateway, enable the service and keep its bind address on <code>127.0.0.1</code>. The app refuses non-loopback binds.</p></li>
+              <li><div><span>2</span><h3>Configure an upstream</h3></div><p>Edit <code>mcp_servers</code> in <code>settings.json</code>. Use <code>command</code> and <code>args</code> for stdio, or <code>transport: "http"</code> and <code>url</code> for Streamable HTTP. Give it a lowercase namespace such as <code>github</code>.</p></li>
+              <li><div><span>3</span><h3>Resolve credentials through Keep</h3></div><p>Run <code>asylum keep set githubpat</code>. Reference it as <code>{secret:githubpat}</code> in a stdio environment value, or set <code>secret: "githubpat"</code> for HTTP authorization. The agent never receives the secret.</p></li>
+              <li><div><span>4</span><h3>Reduce the exposed surface</h3></div><p>Use <code>allow</code> and <code>deny</code> to publish only required tools. Set <code>project</code> when a server belongs to one repository; a project-scoped server shadows a global server with the same name.</p></li>
+              <li><div><span>5</span><h3>Choose an exposure mode</h3></div><p>Use <code>direct</code> for a small catalog. Use <code>search</code> for a broad fleet: agents receive only <code>asylum_find_tool</code> and <code>asylum_call_tool</code>, then load definitions when needed.</p></li>
+              <li><div><span>6</span><h3>Verify from a managed run</h3></div><p>Launch a run and execute <code>asylum mcp list</code>. Confirm the expected namespaced tools appear, such as <code>github__list_issues</code>. Use <code>asylum mcp stdio</code> when an agent client supports MCP only over stdio.</p></li>
+            </ol>
+            <div class="checkpoint"><i data-lucide="shield-check" aria-hidden="true"></i><div><strong>Checkpoint</strong><p>The run sees only the intended namespaced tools, can call one successfully, and the call is recorded as an <code>mcp_call</code> event for that run.</p></div></div>
           </div>
         </div>
       </article>
