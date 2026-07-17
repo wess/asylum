@@ -154,7 +154,7 @@ dependencies = [
 
 [[package]]
 name = "agent"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "config",
 ]
@@ -222,7 +222,7 @@ checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 
 [[package]]
 name = "app"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "agent",
  "anyhow",
@@ -1084,7 +1084,7 @@ dependencies = [
 
 [[package]]
 name = "checks"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde_json",
 ]
@@ -1127,7 +1127,7 @@ dependencies = [
 
 [[package]]
 name = "cli"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "agent",
  "config",
@@ -1250,7 +1250,7 @@ dependencies = [
 
 [[package]]
 name = "companion"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde_json",
  "store",
@@ -1286,7 +1286,7 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "getrandom 0.3.4",
  "serde",
@@ -1332,7 +1332,7 @@ dependencies = [
 
 [[package]]
 name = "control"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "hmac",
  "serde_json",
@@ -1719,7 +1719,7 @@ dependencies = [
 
 [[package]]
 name = "designmode"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -2410,7 +2410,7 @@ dependencies = [
 
 [[package]]
 name = "fuzzy"
-version = "0.1.2"
+version = "0.1.3"
 
 [[package]]
 name = "gdk"
@@ -2625,14 +2625,14 @@ dependencies = [
 
 [[package]]
 name = "git"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "github"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -3755,7 +3755,7 @@ dependencies = [
 
 [[package]]
 name = "keep"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "aes-gcm",
  "getrandom 0.3.4",
@@ -3914,7 +3914,7 @@ dependencies = [
 
 [[package]]
 name = "linear"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -4327,7 +4327,7 @@ checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
 
 [[package]]
 name = "notes"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde_yaml_ng",
  "tempfile",
@@ -4336,7 +4336,7 @@ dependencies = [
 
 [[package]]
 name = "notify"
-version = "0.1.2"
+version = "0.1.3"
 
 [[package]]
 name = "ntapi"
@@ -5050,7 +5050,7 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "plugin"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde",
  "toml 0.8.23",
@@ -5058,7 +5058,7 @@ dependencies = [
 
 [[package]]
 name = "pluginrt"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "plugin",
  "serde",
@@ -5212,7 +5212,7 @@ dependencies = [
 
 [[package]]
 name = "preview"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "pulldown-cmark",
 ]
@@ -5351,7 +5351,7 @@ dependencies = [
 
 [[package]]
 name = "proxy"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "config",
  "getrandom 0.3.4",
@@ -5779,7 +5779,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "remote"
-version = "0.1.2"
+version = "0.1.3"
 
 [[package]]
 name = "renderdoc-sys"
@@ -5821,7 +5821,7 @@ checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
 
 [[package]]
 name = "runner"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "agent",
  "libsinclair",
@@ -6066,7 +6066,7 @@ checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
 
 [[package]]
 name = "search"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "thiserror 1.0.69",
 ]
@@ -6514,7 +6514,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "store"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "rusqlite",
  "thiserror 1.0.69",
@@ -7328,7 +7328,7 @@ checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
 
 [[package]]
 name = "update"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde",
  "serde_json",
