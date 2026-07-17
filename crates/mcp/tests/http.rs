@@ -31,6 +31,11 @@ fn find_subsequence_locates_the_header_terminator() {
 
 #[test]
 fn response_builders_set_the_content_type() {
-    assert_eq!(Response::json(200, "{}".into()).content_type, "application/json");
-    assert!(Response::text(404, "x").content_type.starts_with("text/plain"));
+    assert_eq!(
+        Response::json(200, "{}".into()).content_type,
+        "application/json"
+    );
+    assert!(Response::text(404, "x")
+        .content_type
+        .starts_with("text/plain"));
 }

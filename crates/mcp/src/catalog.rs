@@ -156,7 +156,10 @@ pub fn find(merged_tools: &[Value], query: &str, limit: usize) -> Vec<Value> {
                 return true;
             }
             let name = tool.get("name").and_then(Value::as_str).unwrap_or("");
-            let desc = tool.get("description").and_then(Value::as_str).unwrap_or("");
+            let desc = tool
+                .get("description")
+                .and_then(Value::as_str)
+                .unwrap_or("");
             name.to_lowercase().contains(&needle) || desc.to_lowercase().contains(&needle)
         })
         .take(limit)

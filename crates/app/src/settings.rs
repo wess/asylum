@@ -691,7 +691,13 @@ pub fn settings_view(
         }
     }
     col = col.child(section(
-        "proxy", "Secrets proxy", &collapsed, body, &handle, dimmed, border,
+        "proxy",
+        "Secrets proxy",
+        &collapsed,
+        body,
+        &handle,
+        dimmed,
+        border,
     ));
 
     // ── MCP gateway ──
@@ -784,7 +790,13 @@ pub fn settings_view(
         }
     }
     col = col.child(section(
-        "mcp", "MCP gateway", &collapsed, body, &handle, dimmed, border,
+        "mcp",
+        "MCP gateway",
+        &collapsed,
+        body,
+        &handle,
+        dimmed,
+        border,
     ));
 
     // ── Keybindings ──
@@ -815,7 +827,13 @@ pub fn settings_view(
     }
     body = body.child(keys);
     col = col.child(section(
-        "keys", "Keybindings", &collapsed, body, &handle, dimmed, border,
+        "keys",
+        "Keybindings",
+        &collapsed,
+        body,
+        &handle,
+        dimmed,
+        border,
     ));
 
     div()

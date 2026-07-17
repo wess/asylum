@@ -177,7 +177,12 @@ fn serve_one(shared: &Shared, req: http::Request) -> http::Response {
     }
     // The gateway lives at /mcp, with an optional /mcp/<service> to scope one
     // service. Anything else is not ours.
-    let Some(rest) = req.path.split('?').next().and_then(|p| p.strip_prefix("/mcp")) else {
+    let Some(rest) = req
+        .path
+        .split('?')
+        .next()
+        .and_then(|p| p.strip_prefix("/mcp"))
+    else {
         return http::Response::text(404, "not found");
     };
     let only = match rest {
@@ -297,7 +302,10 @@ fn tools_call(
     id: Value,
     params: &Value,
 ) -> Response {
-    let name = params.get("name").and_then(Value::as_str).unwrap_or_default();
+    let name = params
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
 
     // `search` mode's discovery tool: search the catalog and return matches as a
@@ -315,7 +323,11 @@ fn tools_call(
     let (target, target_args) = if gateway.expose == Expose::Search && name == catalog::CALL_TOOL {
         let inner = arguments.get("name").and_then(Value::as_str);
         let Some(inner) = inner else {
-            return Response::error(id, jsonrpc::INVALID_PARAMS, "asylum_call_tool requires a name");
+            return Response::error(
+                id,
+                jsonrpc::INVALID_PARAMS,
+                "asylum_call_tool requires a name",
+            );
         };
         let inner_args = arguments.get("arguments").cloned().unwrap_or(json!({}));
         (inner.to_string(), inner_args)

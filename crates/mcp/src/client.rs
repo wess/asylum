@@ -132,10 +132,7 @@ impl StdioUpstream {
             .stderr(Stdio::inherit())
             .spawn()
             .map_err(|e| format!("could not launch `{command}`: {e}"))?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or("child produced no stdout pipe")?;
+        let stdout = child.stdout.take().ok_or("child produced no stdout pipe")?;
         let stdin = child.stdin.take().ok_or("child produced no stdin pipe")?;
         let conn = StdioConn::new(BufReader::new(stdout), stdin);
         Ok(StdioUpstream {
@@ -189,7 +186,11 @@ impl HttpUpstream {
     }
 
     fn post(&self, envelope: &Value, want_reply: bool) -> Result<Option<Response>, String> {
-        let session = self.session.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let session = self
+            .session
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
         let outcome = http_post(&self.url, envelope, self.auth.as_ref(), session.as_deref())?;
         if let Some(id) = outcome.session_id {
             *self.session.lock().unwrap_or_else(|e| e.into_inner()) = Some(id);
@@ -265,7 +266,10 @@ fn http_post(
             curl_escape(value)
         ));
     }
-    config.push_str(&format!("data = \"{}\"\n", curl_escape(&envelope.to_string())));
+    config.push_str(&format!(
+        "data = \"{}\"\n",
+        curl_escape(&envelope.to_string())
+    ));
 
     let mut child = Command::new("curl")
         .args(&args)
@@ -331,7 +335,8 @@ fn parse_http_response(raw: &str) -> HttpOutcome {
 
 /// Split off the first header block (up to the first blank line) from the rest.
 fn split_head(raw: &str) -> Option<(&str, &str)> {
-    raw.split_once("\r\n\r\n").or_else(|| raw.split_once("\n\n"))
+    raw.split_once("\r\n\r\n")
+        .or_else(|| raw.split_once("\n\n"))
 }
 
 /// Whether a header block's status line is an interim `1xx` response.

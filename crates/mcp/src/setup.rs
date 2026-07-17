@@ -65,7 +65,10 @@ fn connect_one(
             match StdioUpstream::spawn(&server.command, &server.args, &env) {
                 Ok(upstream) => Some(Box::new(upstream)),
                 Err(e) => {
-                    warnings.push(format!("mcp server `{}` failed to launch: {e}", server.name));
+                    warnings.push(format!(
+                        "mcp server `{}` failed to launch: {e}",
+                        server.name
+                    ));
                     None
                 }
             }

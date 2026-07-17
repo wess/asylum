@@ -259,8 +259,13 @@ fn main() {
                                     "tool": call.tool, "ok": call.ok, "project": call.project,
                                 })
                                 .to_string();
-                                let _ =
-                                    db.record_event("mcp_call", task, Some(call.run), &data, unix_now());
+                                let _ = db.record_event(
+                                    "mcp_call",
+                                    task,
+                                    Some(call.run),
+                                    &data,
+                                    unix_now(),
+                                );
                             }
                         });
                         let gateway = mcp::Gateway {

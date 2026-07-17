@@ -35,7 +35,13 @@ impl Request {
     pub fn parse(raw: &str) -> Result<Request, Box<Response>> {
         let value: Value = match serde_json::from_str(raw) {
             Ok(v) => v,
-            Err(_) => return Err(Box::new(Response::error(Value::Null, PARSE_ERROR, "parse error"))),
+            Err(_) => {
+                return Err(Box::new(Response::error(
+                    Value::Null,
+                    PARSE_ERROR,
+                    "parse error",
+                )))
+            }
         };
         Request::from_value(value)
     }
@@ -43,7 +49,11 @@ impl Request {
     /// Interpret an already-parsed JSON value as a request.
     pub fn from_value(value: Value) -> Result<Request, Box<Response>> {
         let obj = value.as_object().ok_or_else(|| {
-            Box::new(Response::error(Value::Null, INVALID_REQUEST, "not a JSON object"))
+            Box::new(Response::error(
+                Value::Null,
+                INVALID_REQUEST,
+                "not a JSON object",
+            ))
         })?;
         // `id` may legitimately be null or absent; we treat an absent id as a
         // notification. A present-but-null id is also a notification per
@@ -165,7 +175,10 @@ pub fn parse_reply(value: &Value) -> Option<Response> {
         return Some(Response::result(id, result.clone()));
     }
     if let Some(error) = value.get("error") {
-        let code = error.get("code").and_then(Value::as_i64).unwrap_or(INTERNAL_ERROR);
+        let code = error
+            .get("code")
+            .and_then(Value::as_i64)
+            .unwrap_or(INTERNAL_ERROR);
         let message = error
             .get("message")
             .and_then(Value::as_str)

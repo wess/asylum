@@ -96,7 +96,10 @@ fn call_tool_routes_and_unmangles() {
     assert!(matches!(payload, Payload::Result(_)));
     // The upstream saw the *unmangled* name and the original arguments.
     let recorded = calls.lock().unwrap().clone();
-    assert_eq!(recorded, vec![("create_pr".to_string(), json!({ "title": "hi" }))]);
+    assert_eq!(
+        recorded,
+        vec![("create_pr".to_string(), json!({ "title": "hi" }))]
+    );
 }
 
 #[test]

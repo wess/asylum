@@ -86,7 +86,8 @@ impl Server {
         }
         // Per the lifecycle, the server may not be sent other requests until it
         // has received `notifications/initialized`.
-        self.upstream.notify("notifications/initialized", Value::Null)?;
+        self.upstream
+            .notify("notifications/initialized", Value::Null)?;
         Ok(())
     }
 
@@ -187,11 +188,17 @@ impl Host {
     }
 
     pub fn resources(&self, project: i64, only: Option<&str>) -> Vec<Value> {
-        catalog::merge_field(&self.ready_listings(project, only, |s| s.resources.clone()), "uri")
+        catalog::merge_field(
+            &self.ready_listings(project, only, |s| s.resources.clone()),
+            "uri",
+        )
     }
 
     pub fn prompts(&self, project: i64, only: Option<&str>) -> Vec<Value> {
-        catalog::merge_field(&self.ready_listings(project, only, |s| s.prompts.clone()), "name")
+        catalog::merge_field(
+            &self.ready_listings(project, only, |s| s.prompts.clone()),
+            "name",
+        )
     }
 
     /// Ensure every visible server is ready, then gather each one's listing.
@@ -212,9 +219,15 @@ impl Host {
     pub fn call_tool(&self, project: i64, name: &str, arguments: Value) -> Payload {
         self.dispatch(project, name, "tool", |server, tool| {
             if !catalog::is_allowed(tool, &server.allow, &server.deny) {
-                return Err(err(METHOD_NOT_FOUND, format!("tool `{name}` is not available")));
+                return Err(err(
+                    METHOD_NOT_FOUND,
+                    format!("tool `{name}` is not available"),
+                ));
             }
-            Ok(("tools/call", json!({ "name": tool, "arguments": arguments })))
+            Ok((
+                "tools/call",
+                json!({ "name": tool, "arguments": arguments }),
+            ))
         })
     }
 
@@ -247,10 +260,16 @@ impl Host {
         build: impl FnOnce(&Server, &str) -> Result<(&'static str, Value), Payload>,
     ) -> Payload {
         let Some((service, original)) = catalog::route(mangled) else {
-            return err(INVALID_PARAMS, format!("`{mangled}` is not a namespaced {kind}"));
+            return err(
+                INVALID_PARAMS,
+                format!("`{mangled}` is not a namespaced {kind}"),
+            );
         };
         let Some(server) = self.find(service, project) else {
-            return err(METHOD_NOT_FOUND, format!("no connected service `{service}`"));
+            return err(
+                METHOD_NOT_FOUND,
+                format!("no connected service `{service}`"),
+            );
         };
         let (method, params) = match build(server, original) {
             Ok(built) => built,

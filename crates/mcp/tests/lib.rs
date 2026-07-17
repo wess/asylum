@@ -93,7 +93,10 @@ fn a_notification_owes_no_response() {
 #[test]
 fn an_unknown_method_is_method_not_found() {
     let (gw, _) = gateway(Expose::Direct);
-    match handle(&gw, 0, 0, None, req("does/notexist", json!({}))).unwrap().payload {
+    match handle(&gw, 0, 0, None, req("does/notexist", json!({})))
+        .unwrap()
+        .payload
+    {
         Payload::Error { code, .. } => assert_eq!(code, jsonrpc::METHOD_NOT_FOUND),
         _ => panic!("expected method-not-found"),
     }
@@ -103,7 +106,12 @@ fn an_unknown_method_is_method_not_found() {
 fn direct_mode_lists_namespaced_tools() {
     let (gw, _) = gateway(Expose::Direct);
     let v = result_of(handle(&gw, 0, 0, None, req("tools/list", json!({}))));
-    let names: Vec<&str> = v["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
+    let names: Vec<&str> = v["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap())
+        .collect();
     assert_eq!(names, vec!["github__create_pr"]);
 }
 
@@ -111,7 +119,12 @@ fn direct_mode_lists_namespaced_tools() {
 fn search_mode_lists_only_the_meta_tools() {
     let (gw, _) = gateway(Expose::Search);
     let v = result_of(handle(&gw, 0, 0, None, req("tools/list", json!({}))));
-    let names: Vec<&str> = v["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
+    let names: Vec<&str> = v["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap())
+        .collect();
     assert_eq!(names, vec![catalog::FIND_TOOL, catalog::CALL_TOOL]);
 }
 
@@ -123,9 +136,15 @@ fn direct_mode_routes_a_tool_call() {
         0,
         0,
         None,
-        req("tools/call", json!({ "name": "github__create_pr", "arguments": { "x": 1 } })),
+        req(
+            "tools/call",
+            json!({ "name": "github__create_pr", "arguments": { "x": 1 } }),
+        ),
     ));
-    assert!(v["content"][0]["text"].as_str().unwrap().contains("create_pr"));
+    assert!(v["content"][0]["text"]
+        .as_str()
+        .unwrap()
+        .contains("create_pr"));
     assert_eq!(*calls.lock().unwrap(), vec!["create_pr".to_string()]);
 }
 
@@ -138,7 +157,10 @@ fn search_mode_find_then_call() {
         0,
         0,
         None,
-        req("tools/call", json!({ "name": catalog::FIND_TOOL, "arguments": { "query": "pr" } })),
+        req(
+            "tools/call",
+            json!({ "name": catalog::FIND_TOOL, "arguments": { "query": "pr" } }),
+        ),
     ));
     let text = found["content"][0]["text"].as_str().unwrap();
     assert!(text.contains("github__create_pr"));
@@ -174,7 +196,10 @@ fn a_tool_call_is_audited_with_the_run() {
         3,
         99,
         None,
-        req("tools/call", json!({ "name": "github__create_pr", "arguments": {} })),
+        req(
+            "tools/call",
+            json!({ "name": "github__create_pr", "arguments": {} }),
+        ),
     );
     let recorded = seen.lock().unwrap();
     assert_eq!(recorded.len(), 1);
@@ -187,7 +212,10 @@ fn a_tool_call_is_audited_with_the_run() {
 #[test]
 fn resources_read_requires_a_uri() {
     let (gw, _) = gateway(Expose::Direct);
-    match handle(&gw, 0, 0, None, req("resources/read", json!({}))).unwrap().payload {
+    match handle(&gw, 0, 0, None, req("resources/read", json!({})))
+        .unwrap()
+        .payload
+    {
         Payload::Error { code, .. } => assert_eq!(code, jsonrpc::INVALID_PARAMS),
         _ => panic!("expected invalid-params"),
     }

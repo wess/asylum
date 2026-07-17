@@ -58,7 +58,10 @@ fn list() -> Result<(), String> {
     }
     for tool in &tools {
         let name = tool.get("name").and_then(Value::as_str).unwrap_or("?");
-        let desc = tool.get("description").and_then(Value::as_str).unwrap_or("");
+        let desc = tool
+            .get("description")
+            .and_then(Value::as_str)
+            .unwrap_or("");
         let desc = desc.lines().next().unwrap_or("");
         println!("{name}\t{desc}");
     }
