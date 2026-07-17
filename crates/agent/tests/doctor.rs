@@ -71,8 +71,11 @@ fn a_program_not_on_path_is_missing() {
 #[cfg(unix)]
 #[test]
 fn a_real_executable_is_probed_for_real() {
-    // `true` exits 0 and prints nothing, so it lands on the silent-success path.
-    assert_eq!(probe("/usr/bin/true"), Probe::Ok("ok".to_string()));
+    // Covers the spawn path rather than the reporting rules. What `true`
+    // answers `--version` with is the platform's business: GNU coreutils
+    // prints a version line, macOS prints nothing and lands on the
+    // silent-success path, and both are Ok.
+    assert!(probe("/usr/bin/true").ok());
 }
 
 #[test]
