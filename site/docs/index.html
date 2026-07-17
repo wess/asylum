@@ -37,7 +37,7 @@
         <div class="docsresults" data-docresults hidden></div>
         <nav class="docsnav" data-docnav>
           <p>Start</p>
-          <a href="#overview" data-doclink="overview">Overview</a>
+          <a href="#overview" data-doclink="overview" class="active" aria-current="page">Overview</a>
           <a href="#install" data-doclink="install">Install</a>
           <a href="#firsttask" data-doclink="firsttask">Run your first task</a>
           <p>Operate</p>
@@ -57,7 +57,11 @@
       </aside>
 
       <section id="docscontent" class="docscontent" tabindex="-1">
-        <article id="overview" data-article data-title="Overview" data-keywords="ade agent development environment projects tasks runs worktrees architecture">
+        <!-- Overview ships active so the page still reads if the script never
+             arrives: every article is display:none until JS marks one, and a
+             stale cached page asking for a replaced asset hash would otherwise
+             render an empty column. showarticle() clears this on load. -->
+        <article id="overview" class="active" data-article data-title="Overview" data-keywords="ade agent development environment projects tasks runs worktrees architecture">
           <p class="doccrumb">Start / Overview</p>
           <h1>Asylum documentation</h1>
           <p class="doclead">Asylum is a native Agent Development Environment. It runs coding agents in isolated Git worktrees, records each attempt, and gives you one place to compare, verify, and merge the result.</p>
