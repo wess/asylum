@@ -165,9 +165,19 @@ const initcopy = () => {
   });
 };
 
+const initvideoposters = () => {
+  document.querySelectorAll<HTMLVideoElement>("video").forEach((video) => {
+    const source = video.querySelector<HTMLSourceElement>('source[type="video/mp4"]');
+    if (!source) return;
+    const name = source.src.split("/").pop()?.replace(/\.mp4$/, ".png");
+    if (name) video.poster = new URL(`../videos/${name}`, source.src).href;
+  });
+};
+
 export const initcommon = () => {
   rendericons();
   initnavigation();
   initreveal();
   initcopy();
+  initvideoposters();
 };

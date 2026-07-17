@@ -161,6 +161,9 @@ dist/
 build/
 release/
 *.tar
+# Intermediate clips ffmpeg writes while rebuilding the tutorial videos; the
+# finished mp4s land in site/public/videos and are tracked.
+site/.video/
 
 # ...but the Notes editor bundle is prebuilt and embedded into the `notes`
 # binary at compile time (include_dir!), so it must stay tracked.
