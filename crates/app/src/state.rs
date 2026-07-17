@@ -232,6 +232,9 @@ pub struct Root {
     pub settings_watch: Option<config::WatchHandle>,
     /// The Settings surface's text inputs (built lazily).
     pub settings_inputs: Option<crate::settings::Inputs>,
+    /// Which Settings accordion sections are collapsed (by section key). All but
+    /// the first start collapsed so the page opens compact.
+    pub settings_collapsed: std::collections::HashSet<&'static str>,
     /// Live per-agent CLI probes, keyed by agent id, shown on the agent's row.
     pub agent_tests: std::collections::HashMap<String, crate::settings::Test>,
 }
@@ -409,6 +412,7 @@ impl Root {
             settings_diagnostics: Vec::new(),
             settings_watch: None,
             settings_inputs: None,
+            settings_collapsed: crate::settings::default_collapsed(),
             agent_tests: std::collections::HashMap::new(),
         };
         root.refresh_setup();

@@ -58,6 +58,7 @@ pub struct Inputs {
     pub worktree: Entity<guise::TextInput>,
     pub font: Entity<guise::TextInput>,
     pub proxy_bind: Entity<guise::TextInput>,
+    pub mcp_bind: Entity<guise::TextInput>,
     pub programs: std::collections::BTreeMap<String, Entity<guise::TextInput>>,
 }
 
@@ -111,6 +112,25 @@ pub fn ensure_inputs(root: &mut Root, cx: &mut Context<Root>) {
             );
         },
     );
+    let mcp_bind = text_input(
+        cx,
+        &root.settings.mcp.bind,
+        "127.0.0.1:8790",
+        |root, text, cx| {
+            let bind = if text.trim().is_empty() {
+                config::McpPrefs::default().bind
+            } else {
+                text.trim().to_string()
+            };
+            write_mcp(
+                root,
+                root.settings.mcp.enabled,
+                &bind,
+                &root.settings.mcp.expose.clone(),
+                cx,
+            );
+        },
+    );
     let mut programs = std::collections::BTreeMap::new();
     for agent in agent::registry::catalog(&root.settings.custom_agents) {
         let id = agent.id.clone();
@@ -143,6 +163,7 @@ pub fn ensure_inputs(root: &mut Root, cx: &mut Context<Root>) {
         worktree,
         font,
         proxy_bind,
+        mcp_bind,
         programs,
     });
 }
@@ -177,6 +198,7 @@ pub fn sync_inputs(root: &mut Root, settings: &config::Settings, cx: &mut Contex
         (inputs.worktree.clone(), settings.worktree_dir.clone()),
         (inputs.font.clone(), settings.editor.font_family.clone()),
         (inputs.proxy_bind.clone(), settings.proxy.bind.clone()),
+        (inputs.mcp_bind.clone(), settings.mcp.bind.clone()),
     ] {
         input.update(cx, |i, cx| {
             if i.text() != value {
@@ -244,13 +266,32 @@ fn write_editor(root: &mut Root, editor: config::EditorPrefs, cx: &mut Context<R
     }
 }
 
+/// Persist the `mcp` gateway prefs object, or drop the key when it is all
+/// defaults again (keeps the file minimal). The `mcp_servers` list itself is
+/// edited in settings.json - only the gateway toggles live here.
+fn write_mcp(root: &mut Root, enabled: bool, bind: &str, expose: &str, cx: &mut Context<Root>) {
+    let defaults = config::McpPrefs::default();
+    if !enabled && bind == defaults.bind && expose == defaults.expose {
+        reset(root, "mcp", cx);
+    } else {
+        write(
+            root,
+            "mcp",
+            json!({ "enabled": enabled, "bind": bind, "expose": expose }),
+            cx,
+        );
+    }
+}
+
 // ── The surface ─────────────────────────────────────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 pub fn settings_view(
     settings: config::Settings,
     diagnostics: Vec<config::Diagnostic>,
     agents: Vec<AgentRow>,
     inputs: Inputs,
+    collapsed: std::collections::HashSet<&'static str>,
     handle: Entity<Root>,
     _window: &mut Window,
     cx: &mut App,
@@ -327,9 +368,13 @@ pub fn settings_view(
         );
     }
 
+    // Each group below is a collapsible accordion section: clicking its header
+    // toggles the section's collapsed state (held on Root), so the page opens
+    // compact and you scroll only the groups you expand.
+
     // ── General ──
-    col = col.child(heading("General", dimmed, border));
-    col = col.child(row(
+    let mut body = section_body();
+    body = body.child(row(
         "Theme",
         "Color scheme for the whole app.",
         settings.theme != defaults.theme,
@@ -337,7 +382,7 @@ pub fn settings_view(
         theme_control(&settings.theme, &handle),
         chrome,
     ));
-    col = col.child(row(
+    body = body.child(row(
         "Worktree directory",
         "Where per-task worktrees are created, relative to a project root. Press enter to apply.",
         settings.worktree_dir != defaults.worktree_dir,
@@ -356,7 +401,7 @@ pub fn settings_view(
             settings.max_parallel_runs.to_string()
         };
         let value = settings.max_parallel_runs as i64;
-        col = col.child(row(
+        body = body.child(row(
             "Max parallel runs",
             "Concurrent agent runs across all tasks; 0 means unlimited.",
             settings.max_parallel_runs != defaults.max_parallel_runs,
@@ -382,7 +427,7 @@ pub fn settings_view(
             format!("{} min", settings.run_timeout_minutes)
         };
         let value = settings.run_timeout_minutes as i64;
-        col = col.child(row(
+        body = body.child(row(
             "Run timeout",
             "Stop an agent that exceeds this duration; 0 disables the timeout.",
             settings.run_timeout_minutes != defaults.run_timeout_minutes,
@@ -401,10 +446,13 @@ pub fn settings_view(
             chrome,
         ));
     }
+    col = col.child(section(
+        "general", "General", &collapsed, body, &handle, dimmed, border,
+    ));
 
     // ── Agents ──
-    col = col.child(heading("Agents", dimmed, border));
-    col = col.child(
+    let mut body = section_body();
+    body = body.child(
         Text::new("Agents fanned out by default when a task is dispatched.")
             .size(Size::Xs)
             .dimmed(),
@@ -461,7 +509,7 @@ pub fn settings_view(
                     });
                 }),
         );
-        col = col.child(row(
+        body = body.child(row(
             SharedString::from(agent.name.clone()),
             SharedString::from(format!("id: {} · executable", agent.id)),
             false,
@@ -470,10 +518,13 @@ pub fn settings_view(
             chrome,
         ));
     }
+    col = col.child(section(
+        "agents", "Agents", &collapsed, body, &handle, dimmed, border,
+    ));
 
     // ── Editor ──
-    col = col.child(heading("Editor", dimmed, border));
-    col = col.child(row(
+    let mut body = section_body();
+    body = body.child(row(
         "Font family",
         "Editor font; press enter to apply.",
         ed.font_family != ed_defaults.font_family,
@@ -485,7 +536,7 @@ pub fn settings_view(
             .into_any_element(),
         chrome,
     ));
-    col = col.child(row(
+    body = body.child(row(
         "Font size",
         "Editor font size in points.",
         ed.font_size != ed_defaults.font_size,
@@ -505,7 +556,7 @@ pub fn settings_view(
         ),
         chrome,
     ));
-    col = col.child(row(
+    body = body.child(row(
         "Tab width",
         "Spaces per indentation level.",
         ed.tab_width != ed_defaults.tab_width,
@@ -528,7 +579,7 @@ pub fn settings_view(
     {
         let h = handle.clone();
         let autosave = ed.autosave;
-        col = col.child(row(
+        body = body.child(row(
             "Autosave",
             "Save editor buffers automatically.",
             ed.autosave != ed_defaults.autosave,
@@ -548,10 +599,13 @@ pub fn settings_view(
             chrome,
         ));
     }
+    col = col.child(section(
+        "editor", "Editor", &collapsed, body, &handle, dimmed, border,
+    ));
 
     // ── Secrets proxy ──
-    col = col.child(heading("Secrets proxy", dimmed, border));
-    col = col.child(
+    let mut body = section_body();
+    body = body.child(
         Text::new(
             "Let agents call external APIs without seeing the keys. Define upstreams below \
              and store each key in the encrypted keep with `asylum keep set <name>`. \
@@ -564,7 +618,7 @@ pub fn settings_view(
         let h = handle.clone();
         let enabled = settings.proxy.enabled;
         let bind = settings.proxy.bind.clone();
-        col = col.child(row(
+        body = body.child(row(
             "Enable",
             "Run the loopback secrets proxy; agents reach it via `asylum call`.",
             enabled != defaults.proxy.enabled,
@@ -588,7 +642,7 @@ pub fn settings_view(
             chrome,
         ));
     }
-    col = col.child(row(
+    body = body.child(row(
         "Bind address",
         "Loopback only — a non-loopback bind is refused. Press enter to apply.",
         settings.proxy.bind != defaults.proxy.bind,
@@ -603,7 +657,7 @@ pub fn settings_view(
     // Upstreams (edit the list in settings.json). Each shows whether its secret
     // is currently provided in the environment.
     if settings.upstreams.is_empty() {
-        col = col.child(
+        body = body.child(
             Text::new(
                 "Upstreams let agents call approved external APIs without seeing their secrets. None are configured; add one under \"upstreams\" in settings.json.",
             )
@@ -623,7 +677,7 @@ pub fn settings_view(
             } else {
                 format!("project {} keep", u.project)
             };
-            col = col.child(row(
+            body = body.child(row(
                 SharedString::from(u.name.clone()),
                 SharedString::from(format!("{} · {} · {}", u.base_url, u.secret, scope)),
                 false,
@@ -636,10 +690,106 @@ pub fn settings_view(
             ));
         }
     }
+    col = col.child(section(
+        "proxy", "Secrets proxy", &collapsed, body, &handle, dimmed, border,
+    ));
+
+    // ── MCP gateway ──
+    let mut body = section_body();
+    body = body.child(
+        Text::new(
+            "One MCP server every agent connects to, fronting the servers below under \
+             per-service namespaces (github__create_pr). Loopback-only and scoped per \
+             run. Edit the server list under \"mcp_servers\" in settings.json. \
+             See docs/mcp.md.",
+        )
+        .size(Size::Xs)
+        .dimmed(),
+    );
+    {
+        let h = handle.clone();
+        let enabled = settings.mcp.enabled;
+        let bind = settings.mcp.bind.clone();
+        let expose = settings.mcp.expose.clone();
+        body = body.child(row(
+            "Enable",
+            "Run the loopback MCP gateway; agents connect to one aggregated server.",
+            enabled != defaults.mcp.enabled,
+            None,
+            Switch::new("mcp-enabled")
+                .checked(enabled)
+                .aria_label("Enable the MCP gateway")
+                .size(Size::Sm)
+                .on_change(move |_, _, cx| {
+                    let bind = bind.clone();
+                    let expose = expose.clone();
+                    h.update(cx, |root, cx| {
+                        write_mcp(root, !enabled, &bind, &expose, cx);
+                    });
+                })
+                .into_any_element(),
+            chrome,
+        ));
+    }
+    body = body.child(row(
+        "Bind address",
+        "Loopback only — a non-loopback bind is refused. Agents reach it at /mcp. \
+         Press enter to apply.",
+        settings.mcp.bind != defaults.mcp.bind,
+        None,
+        div()
+            .w(px(280.0))
+            .flex_none()
+            .child(inputs.mcp_bind.clone())
+            .into_any_element(),
+        chrome,
+    ));
+    body = body.child(row(
+        "Tool exposure",
+        "direct lists every tool; search advertises a find/call pair so tool \
+         definitions load on demand (keeps a wide fleet's context small).",
+        settings.mcp.expose != defaults.mcp.expose,
+        None,
+        expose_control(
+            &settings.mcp.expose,
+            settings.mcp.enabled,
+            &settings.mcp.bind,
+            &handle,
+        ),
+        chrome,
+    ));
+    if settings.mcp_servers.is_empty() {
+        body = body.child(
+            Text::new(
+                "No MCP servers configured. Add one under \"mcp_servers\" in settings.json \
+                 — a stdio command or an http url — and it appears here, namespaced.",
+            )
+            .size(Size::Xs)
+            .dimmed(),
+        );
+    } else {
+        for server in &settings.mcp_servers {
+            let (detail, status, color) = mcp_server_status(server);
+            body = body.child(row(
+                SharedString::from(server.name.clone()),
+                SharedString::from(detail),
+                false,
+                None,
+                Badge::new(status)
+                    .color(color)
+                    .variant(Variant::Light)
+                    .into_any_element(),
+                chrome,
+            ));
+        }
+    }
+    col = col.child(section(
+        "mcp", "MCP gateway", &collapsed, body, &handle, dimmed, border,
+    ));
 
     // ── Keybindings ──
-    col = col.child(heading("Keybindings", dimmed, border));
-    col = col.child(
+    let mut body = section_body();
+    body = body.child(
         Text::new(
             "Defaults layered with `keybindings` in settings.json — add \"chord=action\" \
              entries to rebind, or \"chord=\" to unbind.",
@@ -663,7 +813,10 @@ pub fn settings_view(
                 .child(Kbd::new(SharedString::from(chord.to_string()))),
         );
     }
-    col = col.child(keys);
+    body = body.child(keys);
+    col = col.child(section(
+        "keys", "Keybindings", &collapsed, body, &handle, dimmed, border,
+    ));
 
     div()
         .id("settings-scroll")
@@ -681,20 +834,74 @@ struct Chrome {
     desc: gpui::Pixels,
 }
 
-/// A group label with its underline divider.
-fn heading(text: &'static str, dimmed: gpui::Hsla, border: gpui::Hsla) -> impl IntoElement {
-    div()
+/// The Settings accordion section keys, in display order. Stable ids for
+/// collapse state.
+pub const SECTIONS: [&str; 6] = ["general", "agents", "editor", "proxy", "mcp", "keys"];
+
+/// The collapse state a fresh Settings surface opens with: every section except
+/// the first is collapsed, so the page opens compact.
+pub fn default_collapsed() -> std::collections::HashSet<&'static str> {
+    SECTIONS.iter().copied().skip(1).collect()
+}
+
+/// A section body: a column the section's rows are appended to.
+fn section_body() -> gpui::Div {
+    div().flex().flex_col().gap_1()
+}
+
+/// One collapsible accordion group. The header (a disclosure chevron + label
+/// over the underline divider) is clickable and toggles the section's collapsed
+/// state on [`Root`]; the body renders only when the section is expanded.
+#[allow(clippy::too_many_arguments)]
+fn section(
+    key: &'static str,
+    title: &'static str,
+    collapsed: &std::collections::HashSet<&'static str>,
+    body: gpui::Div,
+    handle: &Entity<Root>,
+    dimmed: gpui::Hsla,
+    border: gpui::Hsla,
+) -> impl IntoElement {
+    let is_collapsed = collapsed.contains(key);
+    let toggle = handle.clone();
+    let chevron = if is_collapsed {
+        "chevron-right"
+    } else {
+        "chevron-down"
+    };
+
+    let header = div()
+        .id(SharedString::from(format!("settings-section-{key}")))
         .flex()
-        .flex_col()
+        .flex_row()
+        .items_center()
+        .gap_2()
         .pt(px(22.0))
-        .gap(px(8.0))
+        .pb(px(8.0))
+        .cursor_pointer()
+        .child(crate::icons::icon(chevron, 14.0).text_color(dimmed))
         .child(
             div()
                 .text_size(px(12.5))
                 .text_color(dimmed)
-                .child(SharedString::from(text)),
+                .child(SharedString::from(title)),
         )
+        .on_click(move |_, _, cx| {
+            toggle.update(cx, |root, cx| {
+                // Toggle: remove if present, else insert.
+                if !root.settings_collapsed.remove(key) {
+                    root.settings_collapsed.insert(key);
+                }
+                cx.notify();
+            });
+        });
+
+    div()
+        .flex()
+        .flex_col()
+        .child(header)
         .child(div().w_full().h(px(1.0)).bg(border))
+        .when(!is_collapsed, |d| d.child(div().pt(px(8.0)).child(body)))
 }
 
 /// One settings row: label + description on the left, the control (and a
@@ -841,6 +1048,72 @@ fn theme_control(current: &str, handle: &Entity<Root>) -> gpui::AnyElement {
         );
     }
     group.into_any_element()
+}
+
+/// The MCP tool-exposure picker: `direct` lists every tool, `search` advertises
+/// the lazy find/call pair. Writes the `mcp` object, preserving enabled + bind.
+fn expose_control(
+    current: &str,
+    enabled: bool,
+    bind: &str,
+    handle: &Entity<Root>,
+) -> gpui::AnyElement {
+    let mut group = div().flex().flex_row().gap_1();
+    for mode in ["direct", "search"] {
+        let active = current.eq_ignore_ascii_case(mode);
+        let h = handle.clone();
+        let bind = bind.to_string();
+        group = group.child(
+            Button::new(SharedString::from(format!("mcp-expose-{mode}")), mode)
+                .size(Size::Xs)
+                .variant(if active {
+                    Variant::Filled
+                } else {
+                    Variant::Default
+                })
+                .on_click(move |_, _, cx| {
+                    let bind = bind.clone();
+                    h.update(cx, |root, cx| write_mcp(root, enabled, &bind, mode, cx));
+                }),
+        );
+    }
+    group.into_any_element()
+}
+
+/// One MCP server's row detail, status label, and status color: its transport +
+/// target + scope, and whether it is enabled (and, for an authenticated HTTP
+/// server, whether its secret is present in the keep).
+fn mcp_server_status(server: &config::McpServer) -> (String, &'static str, ColorName) {
+    let scope = if server.project == 0 {
+        "global".to_string()
+    } else {
+        format!("project {}", server.project)
+    };
+    let target = if server.transport == "http" {
+        server.url.clone()
+    } else if server.args.is_empty() {
+        server.command.clone()
+    } else {
+        format!("{} {}", server.command, server.args.join(" "))
+    };
+    let transport = if server.transport.is_empty() {
+        "stdio"
+    } else {
+        server.transport.as_str()
+    };
+    let detail = format!("{transport} · {target} · {scope}");
+    let (status, color) = if !server.enabled {
+        ("disabled", ColorName::Gray)
+    } else if server.transport == "http" && !server.secret.is_empty() {
+        if crate::secrets::has_secret(&server.secret, server.project) {
+            ("secret set", ColorName::Green)
+        } else {
+            ("secret missing", ColorName::Red)
+        }
+    } else {
+        ("enabled", ColorName::Green)
+    };
+    (detail, status, color)
 }
 
 /// A −/value/+ stepper; each press clamps to `range` and runs `on_set`.

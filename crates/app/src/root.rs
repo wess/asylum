@@ -254,11 +254,13 @@ fn onboarding_path() -> impl IntoElement {
     path
 }
 
+#[allow(clippy::too_many_arguments)]
 fn onboarding_settings(
     settings: config::Settings,
     diagnostics: Vec<config::Diagnostic>,
     agents: Vec<crate::settings::AgentRow>,
     inputs: crate::settings::Inputs,
+    collapsed: std::collections::HashSet<&'static str>,
     handle: Entity<Root>,
     window: &mut Window,
     cx: &mut App,
@@ -288,6 +290,7 @@ fn onboarding_settings(
             diagnostics,
             agents,
             inputs,
+            collapsed,
             handle,
             window,
             cx,
@@ -395,6 +398,7 @@ impl Render for Root {
                     self.settings_diagnostics.clone(),
                     self.agent_rows(),
                     self.settings_inputs.clone().expect("settings inputs"),
+                    self.settings_collapsed.clone(),
                     handle,
                     window,
                     cx,
@@ -918,6 +922,7 @@ impl Root {
                     self.settings_diagnostics.clone(),
                     self.agent_rows(),
                     inputs,
+                    self.settings_collapsed.clone(),
                     handle,
                     window,
                     cx,
