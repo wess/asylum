@@ -47,6 +47,7 @@ fn surface() -> Option<TabKind> {
         Ok("tasks") => None,
         Ok("diff") => Some(TabKind::Diff),
         Ok("integrations") => Some(TabKind::Integrations),
+        Ok("accounts") => Some(TabKind::Accounts),
         Ok("settings") => Some(TabKind::Settings),
         _ => Some(TabKind::Notes),
     }

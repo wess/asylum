@@ -2,9 +2,29 @@
 
 use gpui::prelude::*;
 use gpui::{div, px, App, ClickEvent, ElementId, FontWeight, SharedString, Window};
-use guise::{ColorName, ColorValue, Size, Variant};
+use guise::{ColorName, ColorValue, Size, Text, Title, Variant};
 
 type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
+
+/// Consistent, welcoming guidance when a surface has nothing to show yet.
+pub fn empty(title: impl Into<SharedString>, detail: impl Into<SharedString>) -> impl IntoElement {
+    div()
+        .flex()
+        .flex_col()
+        .items_center()
+        .justify_center()
+        .w_full()
+        .min_h(px(180.0))
+        .gap(px(8.0))
+        .px(px(24.0))
+        .child(Title::new(title.into()).order(4))
+        .child(
+            div()
+                .max_w(px(520.0))
+                .text_center()
+                .child(Text::new(detail.into()).size(Size::Sm).dimmed()),
+        )
+}
 
 #[derive(IntoElement)]
 pub struct Button {

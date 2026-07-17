@@ -5,7 +5,7 @@ use gpui::prelude::*;
 use gpui::{div, px, App, Entity, IntoElement, SharedString, Window};
 use guise::prelude::*;
 
-use crate::control::Button;
+use crate::control::{empty, Button};
 use crate::state::Root;
 use store::Notification;
 
@@ -13,7 +13,7 @@ pub fn inbox_view(
     items: Vec<Notification>,
     handle: Entity<Root>,
     _window: &mut Window,
-    _cx: &mut App,
+    cx: &mut App,
 ) -> impl IntoElement {
     let mut col = div().flex().flex_col().w_full().gap_4().p(px(20.0));
 
@@ -26,9 +26,10 @@ pub fn inbox_view(
             .justify_between()
             .child(Title::new("Inbox").order(2))
             .child(
-                Button::new("mark-all", "Mark all read")
+                Button::new("mark-all", "Mark all as read")
                     .size(Size::Xs)
                     .variant(Variant::Subtle)
+                    .disabled(items.iter().all(|item| item.read))
                     .on_click(move |_, _, cx| {
                         clear.update(cx, |root, cx| {
                             if let Err(error) = root.db.mark_all_read() {
@@ -41,16 +42,20 @@ pub fn inbox_view(
     );
 
     if items.is_empty() {
-        return col.child(Text::new("You're all caught up.").size(Size::Sm).dimmed());
+        return col.child(empty(
+            "You’re all caught up",
+            "Run updates, completed checks, and anything that needs your attention will appear here.",
+        ));
     }
 
+    let focus = guise::theme::theme(cx).primary().hsla();
     for n in items {
-        col = col.child(notification_row(n, handle.clone()));
+        col = col.child(notification_row(n, handle.clone(), focus));
     }
     col
 }
 
-fn notification_row(n: Notification, handle: Entity<Root>) -> impl IntoElement {
+fn notification_row(n: Notification, handle: Entity<Root>, focus: gpui::Hsla) -> impl IntoElement {
     let id = n.id;
     let label = format!("Mark {} as read", n.title);
     let color = match n.kind.as_str() {
@@ -66,7 +71,7 @@ fn notification_row(n: Notification, handle: Entity<Root>) -> impl IntoElement {
         .tab_index(0)
         .role(gpui::accesskit::Role::Button)
         .aria_label(SharedString::from(label))
-        .focus_visible(|style| style.border_1().border_color(gpui::rgb(0x3b82f6)))
+        .focus_visible(move |style| style.border_1().border_color(focus))
         .on_click(move |_, _, cx| {
             handle.update(cx, |root, cx| {
                 if let Err(error) = root.db.mark_read(id, true) {

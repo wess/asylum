@@ -232,6 +232,8 @@ pub struct Root {
     pub settings_watch: Option<config::WatchHandle>,
     /// The Settings surface's text inputs (built lazily).
     pub settings_inputs: Option<crate::settings::Inputs>,
+    /// Live per-agent CLI probes, keyed by agent id, shown on the agent's row.
+    pub agent_tests: std::collections::HashMap<String, crate::settings::Test>,
 }
 
 /// A project node in the workspace tree.
@@ -407,6 +409,7 @@ impl Root {
             settings_diagnostics: Vec::new(),
             settings_watch: None,
             settings_inputs: None,
+            agent_tests: std::collections::HashMap::new(),
         };
         root.refresh_setup();
         root

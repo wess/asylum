@@ -79,6 +79,7 @@ pub enum ConfirmAction {
     DeleteProject(i64),
     DeleteTask(i64),
     DeleteNote(String),
+    DeleteAccount(i64),
     ArchiveTask(i64),
     RemoveWorktree { run_id: i64, force: bool },
     CleanupTask(i64),
@@ -91,6 +92,7 @@ impl ConfirmAction {
             Self::DeleteProject(_) => "Remove this project from Asylum?",
             Self::DeleteTask(_) => "Delete this task?",
             Self::DeleteNote(_) => "Delete this note?",
+            Self::DeleteAccount(_) => "Delete this account?",
             Self::ArchiveTask(_) => "Archive this task?",
             Self::RemoveWorktree { force: true, .. } => "Discard this dirty worktree?",
             Self::RemoveWorktree { force: false, .. } => "Remove this worktree?",
@@ -109,6 +111,9 @@ impl ConfirmAction {
             }
             Self::DeleteNote(_) => {
                 "The Markdown file and its task/run attachments will be deleted."
+            }
+            Self::DeleteAccount(_) => {
+                "Saved usage history will also be deleted. Provider credentials are not changed."
             }
             Self::ArchiveTask(_) => "The task will move out of the active workflow.",
             Self::RemoveWorktree { force: true, .. } => {
@@ -326,6 +331,19 @@ impl Root {
                 let mut report = agent::doctor::inspect(&agent);
                 report.verified = verified.contains(&agent.id);
                 (agent, report)
+            })
+            .collect()
+    }
+
+    /// The agent reports paired with their last CLI probe, for the Settings
+    /// surface's Agents section.
+    pub fn agent_rows(&self) -> Vec<crate::settings::AgentRow> {
+        self.agent_reports()
+            .into_iter()
+            .map(|(agent, report)| crate::settings::AgentRow {
+                test: self.agent_tests.get(&agent.id).cloned(),
+                agent,
+                report,
             })
             .collect()
     }
@@ -1610,6 +1628,14 @@ impl Root {
             ConfirmAction::DeleteProject(id) => self.remove_project(id),
             ConfirmAction::DeleteTask(id) => self.delete_task(id),
             ConfirmAction::DeleteNote(path) => self.delete_note(&path, cx),
+            ConfirmAction::DeleteAccount(id) => match self.db.delete_account(id) {
+                Ok(()) => self.push_notice(
+                    NoticeTone::Success,
+                    "Account deleted",
+                    "Another account for this provider is selected automatically when available.",
+                ),
+                Err(error) => self.push_error("Could not delete account", error.to_string()),
+            },
             ConfirmAction::ArchiveTask(id) => self.archive_task(id),
             ConfirmAction::RemoveWorktree { run_id, force } => {
                 self.remove_worktree_now(run_id, force)

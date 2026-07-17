@@ -92,14 +92,20 @@ pub(super) fn pane(
         .p(px(10.0))
         .gap_1();
     let Some(note) = note else {
-        return pane
-            .child(content.child(Text::new("Select a note").dimmed()))
-            .into_any_element();
+        return pane.child(content.child(
+            Text::new("Select a note to see its properties, links, backlinks, tags, and attached task context.")
+                .size(Size::Xs)
+                .dimmed(),
+        )).into_any_element();
     };
 
     let mut properties = detailsection(if compact { "Properties" } else { "Frontmatter" });
     if note.properties.is_empty() {
-        properties = properties.child(Text::new("No properties").size(Size::Xs).dimmed());
+        properties = properties.child(
+            Text::new("Properties add structured details such as status, type, or owner. Use name: value below to add one.")
+                .size(Size::Xs)
+                .dimmed(),
+        );
     }
     for property in note.properties {
         let name = property.name.clone();
@@ -150,6 +156,13 @@ pub(super) fn pane(
     content = content.child(properties);
 
     let mut tags = detailsection("Tags").flex_row().flex_wrap();
+    if note.tags.is_empty() {
+        tags = tags.child(
+            Text::new("Tags group related notes and make them easier to filter.")
+                .size(Size::Xs)
+                .dimmed(),
+        );
+    }
     for tag in note.tags {
         let value = tag.clone();
         let filter = handle.clone();
@@ -173,7 +186,11 @@ pub(super) fn pane(
 
     let mut attached = detailsection("Attached context");
     if attachments.is_empty() {
-        attached = attached.child(Text::new("Not attached").size(Size::Xs).dimmed());
+        attached = attached.child(
+            Text::new("Attach this note to a task or run to include its context in agent prompts.")
+                .size(Size::Xs)
+                .dimmed(),
+        );
     }
     for attachment in attachments {
         let label = match (attachment.task_id, attachment.run_id) {
@@ -200,7 +217,12 @@ fn detailsection(title: &'static str) -> gpui::Div {
 fn linksection(title: &'static str, notes: Vec<notes::Note>, handle: Entity<Root>) -> gpui::Div {
     let mut section = detailsection(title);
     if notes.is_empty() {
-        return section.child(Text::new("None").size(Size::Xs).dimmed());
+        let detail = if title == "Backlinks" {
+            "Notes that link to this note will appear here."
+        } else {
+            "Add a [[wiki link]] in the note to connect related ideas."
+        };
+        return section.child(Text::new(detail).size(Size::Xs).dimmed());
     }
     for note in notes {
         let path = note.path.clone();

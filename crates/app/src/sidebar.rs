@@ -107,7 +107,18 @@ fn nav_menu(
         .gap_1()
         .when(collapsed, |element| element.p(px(6.0)))
         .when(!collapsed, |element| element.p(px(8.0)));
-    for (v, _glyph, _label) in View::BAR {
+    for (index, (v, _glyph, _label)) in View::BAR.iter().enumerate() {
+        if !collapsed && index == 4 {
+            col = col.child(
+                div()
+                    .px(px(10.0))
+                    .pt(px(10.0))
+                    .pb(px(3.0))
+                    .text_color(p.dimmed)
+                    .text_size(px(11.0))
+                    .child("TOOLS"),
+            );
+        }
         let v = *v;
         let active = Some(v) == active_view;
         let h = handle.clone();

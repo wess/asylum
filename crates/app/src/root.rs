@@ -72,7 +72,8 @@ fn onboarding(
         .items_center()
         .justify_center()
         .size_full()
-        .gap_3();
+        .gap_4()
+        .p(px(32.0));
     for notice in notices {
         let color = match notice.tone {
             crate::run::NoticeTone::Error => ColorName::Red,
@@ -132,53 +133,131 @@ fn onboarding(
             );
     }
     let configure = handle.clone();
-    body.child(icon("git-branch", 40.0).text_color(gpui::rgb(0x3b82f6)))
-        .child(Title::new("Welcome to Asylum").order(1))
-        .child(
-            Text::new("Open a repository to create your first isolated agent run.")
-                .size(Size::Sm)
-                .dimmed(),
-        )
-        .child(
-            Badge::new(SharedString::from(format!(
-                "{verified} verified, {installed} installed"
-            )))
-            .color(if verified > 0 {
-                ColorName::Green
-            } else {
-                ColorName::Orange
-            })
-            .variant(Variant::Light),
-        )
-        .child(
+    let readiness = if verified > 0 {
+        format!("Ready to work · {verified} agent(s) verified")
+    } else if installed > 0 {
+        format!("{installed} agent(s) found · verify after opening a project")
+    } else {
+        "No agent CLI found · configure one before your first run".to_string()
+    };
+    body.child(
+        div()
+            .w_full()
+            .max_w(px(860.0))
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .items_center()
+            .gap(px(48.0))
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .flex_1()
+                    .min_w(px(320.0))
+                    .gap_3()
+                    .child(icon("git-branch", 40.0).text_color(gpui::rgb(0x3b82f6)))
+                    .child(Title::new("Run the same task. Compare the evidence.").order(1))
+                    .child(
+                        Text::new("Asylum gives each coding agent an isolated copy of your repository, then brings their changes, checks, and output together for review.")
+                            .size(Size::Sm)
+                            .dimmed(),
+                    )
+                    .child(
+                        Badge::new(SharedString::from(readiness))
+                            .color(if verified > 0 { ColorName::Green } else { ColorName::Orange })
+                            .variant(Variant::Light),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .flex_wrap()
+                            .gap_2()
+                            .child(
+                                Button::new("open-project", "Open a repository…")
+                                    .variant(Variant::Filled)
+                                    .size(Size::Md)
+                                    .on_click(move |_, _, cx| open_project(handle.clone(), cx)),
+                            )
+                            .child(
+                                Button::new("configure-agents", "Configure agents")
+                                    .variant(Variant::Subtle)
+                                    .size(Size::Md)
+                                    .on_click(move |_, _, cx| {
+                                        configure.update(cx, |root, cx| {
+                                            root.onboarding_settings = true;
+                                            cx.notify();
+                                        });
+                                    }),
+                            ),
+                    )
+                    .child(
+                        Text::new("Your repository is not modified when you open it. Changes happen in separate git worktrees until you choose to merge.")
+                            .size(Size::Xs)
+                            .dimmed(),
+                    ),
+            )
+            .child(onboarding_path()),
+    )
+}
+
+fn onboarding_path() -> impl IntoElement {
+    let mut path = div()
+        .flex()
+        .flex_col()
+        .min_w(px(260.0))
+        .gap_3()
+        .p_4()
+        .border_1()
+        .rounded(px(8.0))
+        .child(Text::new("Your first run").bold());
+    for (number, title, detail) in [
+        ("1", "Open a repository", "Choose an existing git project."),
+        (
+            "2",
+            "Describe one outcome",
+            "Use a template or write a focused task.",
+        ),
+        (
+            "3",
+            "Start with one agent",
+            "Add more agents when comparison helps.",
+        ),
+        (
+            "4",
+            "Review before merging",
+            "Run checks and inspect the diff.",
+        ),
+    ] {
+        path = path.child(
             div()
                 .flex()
                 .flex_row()
+                .items_start()
                 .gap_2()
                 .child(
-                    Button::new("open-project", "Open a folder…")
-                        .variant(Variant::Filled)
-                        .size(Size::Md)
-                        .on_click(move |_, _, cx| open_project(handle.clone(), cx)),
+                    Badge::new(number)
+                        .color(ColorName::Blue)
+                        .variant(Variant::Light),
                 )
                 .child(
-                    Button::new("configure-agents", "Configure agents")
-                        .variant(Variant::Subtle)
-                        .size(Size::Md)
-                        .on_click(move |_, _, cx| {
-                            configure.update(cx, |root, cx| {
-                                root.onboarding_settings = true;
-                                cx.notify();
-                            });
-                        }),
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(Text::new(title).size(Size::Sm).bold())
+                        .child(Text::new(detail).size(Size::Xs).dimmed()),
                 ),
-        )
+        );
+    }
+    path
 }
 
 fn onboarding_settings(
     settings: config::Settings,
     diagnostics: Vec<config::Diagnostic>,
-    reports: Vec<(agent::registry::Agent, agent::doctor::Report)>,
+    agents: Vec<crate::settings::AgentRow>,
     inputs: crate::settings::Inputs,
     handle: Entity<Root>,
     window: &mut Window,
@@ -207,7 +286,7 @@ fn onboarding_settings(
         .child(crate::settings::settings_view(
             settings,
             diagnostics,
-            reports,
+            agents,
             inputs,
             handle,
             window,
@@ -314,7 +393,7 @@ impl Render for Root {
                 return onboarding_settings(
                     self.settings.clone(),
                     self.settings_diagnostics.clone(),
-                    self.agent_reports(),
+                    self.agent_rows(),
                     self.settings_inputs.clone().expect("settings inputs"),
                     handle,
                     window,
@@ -371,7 +450,7 @@ impl Render for Root {
         }
         if self.account_input.is_none() {
             let input = cx.new(|cx| {
-                guise::TextInput::new(cx).placeholder("provider: label (e.g. claude: work)")
+                guise::TextInput::new(cx).placeholder("Provider: label, e.g. claude: work")
             });
             cx.subscribe(&input, |root, _input, event: &guise::TextInputEvent, cx| {
                 if matches!(event, guise::TextInputEvent::Submit(_)) {
@@ -837,7 +916,7 @@ impl Root {
                 Some(inputs) => crate::settings::settings_view(
                     self.settings.clone(),
                     self.settings_diagnostics.clone(),
-                    self.agent_reports(),
+                    self.agent_rows(),
                     inputs,
                     handle,
                     window,

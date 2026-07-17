@@ -5,7 +5,7 @@ use gpui::prelude::*;
 use gpui::{div, px, App, Entity, IntoElement, SharedString, Window};
 use guise::prelude::*;
 
-use crate::control::Button;
+use crate::control::{empty, Button};
 use crate::state::Root;
 use plugin::Installed;
 
@@ -36,11 +36,10 @@ pub fn plugins_view(
     }
 
     if installed.plugins.is_empty() {
-        return col.child(
-            Text::new("No plugins installed. Drop a plugin directory (with a plugin.toml) into the plugins folder.")
-                .size(Size::Sm)
-                .dimmed(),
-        );
+        return col.child(empty(
+            "Make Asylum your own",
+            "No plugins are installed yet. Add a plugin folder containing plugin.toml to the directory shown above.",
+        ));
     }
 
     for p in installed.plugins {

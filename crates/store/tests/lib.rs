@@ -148,6 +148,16 @@ fn accounts_hot_swap_active() {
 }
 
 #[test]
+fn deleting_active_account_promotes_the_next_account() {
+    let db = db();
+    let first = db.add_account("claude", "work", 1).unwrap();
+    let second = db.add_account("claude", "personal", 2).unwrap();
+    db.delete_account(first.id).unwrap();
+    assert_eq!(db.active_account("claude").unwrap().unwrap().id, second.id);
+    assert_eq!(db.accounts(Some("claude")).unwrap().len(), 1);
+}
+
+#[test]
 fn usage_snapshot_and_fraction() {
     let db = db();
     let a = db.add_account("claude", "me", 1).unwrap();

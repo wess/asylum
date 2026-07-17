@@ -36,6 +36,74 @@ pub fn inspect(agent: &Agent) -> Report {
     }
 }
 
+/// What an agent's CLI said when asked to identify itself. `inspect` only finds
+/// the file; this is whether it actually runs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Probe {
+    /// It ran and reported this version line.
+    Ok(String),
+    /// It ran but exited non-zero.
+    Failed(String),
+    /// It could not be launched at all.
+    Missing(String),
+}
+
+impl Probe {
+    pub fn ok(&self) -> bool {
+        matches!(self, Probe::Ok(_))
+    }
+
+    /// The line to show beside the agent's row.
+    pub fn message(&self) -> &str {
+        match self {
+            Probe::Ok(m) | Probe::Failed(m) | Probe::Missing(m) => m,
+        }
+    }
+}
+
+/// Run `<program> --version` and classify what came back. Blocking: callers on
+/// the app side hand this to a background thread.
+pub fn probe(program: &str) -> Probe {
+    let program = program.trim();
+    if program.is_empty() {
+        return Probe::Missing("no executable configured".to_string());
+    }
+    if find_program(program).is_none() {
+        return Probe::Missing(format!("`{program}` not found on PATH"));
+    }
+    match std::process::Command::new(program)
+        .arg("--version")
+        .output()
+    {
+        Ok(out) => classify(
+            program,
+            out.status.success(),
+            &String::from_utf8_lossy(&out.stdout),
+            &String::from_utf8_lossy(&out.stderr),
+        ),
+        Err(e) => Probe::Missing(format!("`{program}` could not start: {e}")),
+    }
+}
+
+/// Turn one `--version` invocation into a [`Probe`]. Split out of [`probe`] so
+/// the reporting rules are covered without launching anything.
+pub fn classify(program: &str, success: bool, stdout: &str, stderr: &str) -> Probe {
+    if success {
+        return Probe::Ok(first_line(stdout).unwrap_or_else(|| "ok".to_string()));
+    }
+    // A CLI that rejects `--version` usually explains itself on stderr; fall
+    // back to naming the command when it says nothing useful.
+    Probe::Failed(first_line(stderr).unwrap_or_else(|| format!("`{program} --version` failed")))
+}
+
+/// The first line with something on it.
+fn first_line(text: &str) -> Option<String> {
+    text.lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(str::to_string)
+}
+
 /// A best-effort install command or docs URL for a known agent CLI. Returns
 /// `None` for agents we don't have a canonical install line for.
 pub fn install_hint(id: &str) -> Option<&'static str> {

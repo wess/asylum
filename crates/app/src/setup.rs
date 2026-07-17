@@ -207,19 +207,15 @@ pub fn panel(checks: Vec<Check>, open: bool, handle: Entity<Root>) -> impl IntoE
                 Button::new(
                     "show-setup",
                     SharedString::from(if blocked > 0 {
-                        format!("Setup: {blocked} blocked")
+                        format!("Review {blocked} setup issue(s)")
                     } else if attention > 0 {
-                        format!("Setup: {attention} to verify")
+                        format!("Review {attention} setup item(s)")
                     } else {
-                        "Setup ready".to_string()
+                        "Project setup is ready".to_string()
                     }),
                 )
                 .size(Size::Xs)
-                .variant(if blocked > 0 {
-                    Variant::Filled
-                } else {
-                    Variant::Subtle
-                })
+                .variant(Variant::Subtle)
                 .on_click(move |_, _, cx| {
                     toggle.update(cx, |root, cx| {
                         root.setup_open = true;

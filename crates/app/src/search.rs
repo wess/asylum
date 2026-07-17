@@ -6,7 +6,7 @@ use gpui::{div, px, App, Context, Entity, IntoElement, SharedString, Window};
 use guise::prelude::*;
 use guise::TextInputEvent;
 
-use crate::control::Button;
+use crate::control::{empty, Button};
 use crate::state::{Root, SearchResult};
 use crate::workspace::TabKind;
 
@@ -71,17 +71,18 @@ pub fn search_view(
         );
 
     if results.is_empty() {
-        return col
-            .child(
-                Text::new(if query.trim().is_empty() {
-                    "No notes, tasks, or runs yet."
-                } else {
-                    "No matches in this project."
-                })
-                .size(Size::Sm)
-                .dimmed(),
+        let (title, detail) = if query.trim().is_empty() {
+            (
+                "Search your whole project",
+                "Find source files, notes, tasks, runs, and saved terminal output from one place.",
             )
-            .into_any_element();
+        } else {
+            (
+                "No matches found",
+                "Try fewer words, a file name, or a broader phrase. Search includes code and saved project activity.",
+            )
+        };
+        return col.child(empty(title, detail)).into_any_element();
     }
 
     col = col.child(

@@ -7,7 +7,7 @@ use gpui::prelude::*;
 use gpui::{div, px, rgba, App, Entity, IntoElement, SharedString, Window};
 use guise::prelude::*;
 
-use crate::control::Button;
+use crate::control::{empty, Button};
 use crate::state::Root;
 use crate::state::RunRow;
 use checks::{CheckResult, Status};
@@ -79,6 +79,7 @@ pub fn review(
             ),
     );
 
+    let has_runs = !runs.is_empty();
     if !branches.is_empty() {
         let mut chips = div()
             .flex()
@@ -102,7 +103,7 @@ pub fn review(
         col = col.child(chips);
     }
 
-    if !runs.is_empty() {
+    if has_runs {
         let mut row = div()
             .flex()
             .flex_row()
@@ -138,19 +139,28 @@ pub fn review(
         col = col.child(row);
     }
 
-    col = col.child(comment_panel(
-        &annotations,
-        target.clone(),
-        note,
-        handle.clone(),
-    ));
+    if has_runs {
+        col = col.child(comment_panel(
+            &annotations,
+            target.clone(),
+            note,
+            handle.clone(),
+        ));
+    }
 
     if files.is_empty() {
-        return col.child(
-            Text::new("No changes to review yet.")
-                .size(Size::Sm)
-                .dimmed(),
-        );
+        let (title, detail) = if !has_runs {
+            (
+                "Choose a run to review",
+                "Start or select an agent run, then return here to inspect its changes and leave line comments.",
+            )
+        } else {
+            (
+                "No file changes yet",
+                "This run has not changed tracked files. Check its terminal output for progress or an explanation.",
+            )
+        };
+        return col.child(empty(title, detail));
     }
 
     for file in files {

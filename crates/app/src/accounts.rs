@@ -1,11 +1,11 @@
 //! The Accounts surface: provider accounts with usage bars and the active
-//! account marked. Clicking an inactive account hot-swaps it.
+//! account marked. Explicit actions switch or delete an account.
 
 use gpui::prelude::*;
 use gpui::{div, px, App, Entity, IntoElement, SharedString, Window};
 use guise::prelude::*;
 
-use crate::control::Button;
+use crate::control::{empty, Button};
 use crate::state::{AccountRow, Root};
 
 pub fn accounts_view(
@@ -15,9 +15,14 @@ pub fn accounts_view(
     _window: &mut Window,
     cx: &mut App,
 ) -> impl IntoElement {
-    let focus = guise::theme::theme(cx).primary().hsla();
+    let _ = cx;
     let mut col = div().flex().flex_col().w_full().gap_4().p(px(20.0));
     col = col.child(Title::new("Accounts").order(2));
+    col = col.child(
+        Text::new("Accounts are local labels for provider identities and their usage history. The active account marks your preferred identity in Asylum; it does not sign in or change the provider CLI session. Authentication stays with each provider’s CLI.")
+            .size(Size::Sm)
+            .dimmed(),
+    );
 
     // Add-account form: provider and optional label, Enter or the button adds.
     let add = handle.clone();
@@ -39,24 +44,22 @@ pub fn accounts_view(
     );
 
     if rows.is_empty() {
-        return col.child(
-            Text::new("No accounts yet. Add one above, then run an agent to verify it.")
-                .size(Size::Sm)
-                .dimmed(),
-        );
+        return col.child(empty(
+            "Connect your first account",
+            "Enter a provider and optional label above to organize work and personal identities and keep their usage records separate.",
+        ));
     }
 
     for row in rows {
-        col = col.child(account_card(row, handle.clone(), focus));
+        col = col.child(account_card(row, handle.clone()));
     }
     col
 }
 
-fn account_card(row: AccountRow, handle: Entity<Root>, focus: gpui::Hsla) -> impl IntoElement {
+fn account_card(row: AccountRow, handle: Entity<Root>) -> impl IntoElement {
     let id = row.account.id;
     let active = row.account.active;
     let provider = row.account.provider.clone();
-    let account_label = row.account.label.clone();
 
     let mut card = div().flex().flex_col().gap_2().child(
         div()
@@ -82,7 +85,7 @@ fn account_card(row: AccountRow, handle: Entity<Root>, focus: gpui::Hsla) -> imp
                     .color(ColorName::Green)
                     .variant(Variant::Light)
             } else {
-                Badge::new("switch")
+                Badge::new("available")
                     .color(ColorName::Gray)
                     .variant(Variant::Light)
             }),
@@ -105,25 +108,43 @@ fn account_card(row: AccountRow, handle: Entity<Root>, focus: gpui::Hsla) -> imp
         card = card.child(usage_bar(pct));
     }
 
-    let clickable = div()
-        .id(SharedString::from(format!("account-{id}")))
-        .cursor_pointer()
-        .tab_index(0)
-        .role(gpui::accesskit::Role::Button)
-        .aria_label(SharedString::from(format!(
-            "Use {provider} account {account_label}"
-        )))
-        .focus_visible(move |style| style.border_1().border_color(focus))
-        .on_click(move |_, _, cx| {
-            handle.update(cx, |root, cx| {
-                if let Err(error) = root.db.activate_account(id) {
-                    root.push_error("Could not switch account", error.to_string());
-                }
-                cx.notify();
-            });
-        })
-        .child(Card::new().padding(Size::Md).child(card));
-    clickable
+    let activate = handle.clone();
+    let remove = handle;
+    card = card.child(
+        div()
+            .flex()
+            .flex_row()
+            .items_center()
+            .gap_2()
+            .children((!active).then(|| {
+                Button::new(
+                    SharedString::from(format!("activate-account-{id}")),
+                    "Use account",
+                )
+                .size(Size::Xs)
+                .variant(Variant::Filled)
+                .on_click(move |_, _, cx| {
+                    activate.update(cx, |root, cx| {
+                        if let Err(error) = root.db.activate_account(id) {
+                            root.push_error("Could not switch account", error.to_string());
+                        }
+                        cx.notify();
+                    });
+                })
+            }))
+            .child(
+                Button::new(SharedString::from(format!("delete-account-{id}")), "Delete")
+                    .size(Size::Xs)
+                    .variant(Variant::Subtle)
+                    .on_click(move |_, _, cx| {
+                        remove.update(cx, |root, cx| {
+                            root.confirm = Some(crate::run::ConfirmAction::DeleteAccount(id));
+                            cx.notify();
+                        });
+                    }),
+            ),
+    );
+    Card::new().padding(Size::Md).child(card)
 }
 
 /// A slim usage meter, 0..100.

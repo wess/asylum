@@ -46,7 +46,11 @@ pub fn integrations_view(
 
     if let Some(err) = error {
         col = col.child(
-            Alert::new(SharedString::from(format!("GitHub: {err}"))).color(ColorName::Yellow),
+            Alert::new(SharedString::from(format!(
+                "Check that the GitHub CLI is installed and signed in, then refresh. {err}"
+            )))
+            .title("Could not load GitHub")
+            .color(ColorName::Yellow),
         );
     }
 
@@ -54,7 +58,7 @@ pub fn integrations_view(
     col = col.child(Title::new("Pull requests").order(4));
     if prs.is_empty() {
         col = col.child(
-            Text::new("No open pull requests loaded.")
+            Text::new("Pull requests created for this repository appear here so you can follow work through review. None are open right now.")
                 .size(Size::Sm)
                 .dimmed(),
         );
@@ -69,7 +73,11 @@ pub fn integrations_view(
     // Issues.
     col = col.child(Title::new("Issues").order(4));
     if issues.is_empty() {
-        col = col.child(Text::new("No open issues loaded.").size(Size::Sm).dimmed());
+        col = col.child(
+            Text::new("GitHub issues appear here so you can turn reported work into an isolated worktree. None are open right now.")
+                .size(Size::Sm)
+                .dimmed(),
+        );
     } else {
         let mut list = div().flex().flex_col().gap_2();
         for issue in issues {
@@ -81,16 +89,34 @@ pub fn integrations_view(
     // Linear.
     col = col.child(Title::new("Linear").order(4));
     if !linear_configured {
+        let settings = handle.clone();
         col = col.child(
-            Text::new(
-                "Set \"linear_token\" in settings to browse Linear issues and open a worktree from one.",
-            )
-            .size(Size::Sm)
-            .dimmed(),
+            div()
+                .flex()
+                .flex_row()
+                .flex_wrap()
+                .items_center()
+                .gap_2()
+                .child(
+                    Text::new("Connect Linear to browse issues and start work from them.")
+                        .size(Size::Sm)
+                        .dimmed(),
+                )
+                .child(
+                    Button::new("linear-settings", "Open settings")
+                        .size(Size::Xs)
+                        .variant(Variant::Subtle)
+                        .on_click(move |_, window, cx| {
+                            settings.update(cx, |root, cx| {
+                                root.open_view(crate::state::View::Settings, window, cx);
+                                cx.notify();
+                            });
+                        }),
+                ),
         );
     } else if linear_issues.is_empty() {
         col = col.child(
-            Text::new("No Linear issues loaded. Refresh to fetch them.")
+            Text::new("Linear issues appear here so you can start a task directly from planned work. Refresh to load them.")
                 .size(Size::Sm)
                 .dimmed(),
         );

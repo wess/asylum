@@ -107,10 +107,22 @@ impl Db {
         Ok(())
     }
 
-    /// Delete an account (and its usage rows via cascade).
+    /// Delete an account (and its usage rows via cascade). If it was active,
+    /// promote the oldest remaining account for the same provider.
     pub fn delete_account(&self, id: i64) -> Result<()> {
-        self.conn()
-            .execute("DELETE FROM accounts WHERE id = ?1", params![id])?;
+        let account = self.account(id)?;
+        let tx = self.conn().unchecked_transaction()?;
+        tx.execute("DELETE FROM accounts WHERE id = ?1", params![id])?;
+        if account.active {
+            tx.execute(
+                "UPDATE accounts SET active = 1 WHERE id = (
+                    SELECT id FROM accounts WHERE provider = ?1
+                    ORDER BY created_at, id LIMIT 1
+                )",
+                params![account.provider],
+            )?;
+        }
+        tx.commit()?;
         Ok(())
     }
 

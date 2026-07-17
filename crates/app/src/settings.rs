@@ -15,6 +15,43 @@ use serde_json::json;
 use crate::control::{Button, Switch};
 use crate::state::Root;
 
+/// A running or finished CLI probe for one agent.
+#[derive(Clone)]
+pub enum Test {
+    Running,
+    Done(agent::doctor::Probe),
+}
+
+/// One row of the Agents section: the agent (with the user's executable
+/// override resolved), whether it is installed, and its last CLI probe.
+#[derive(Clone)]
+pub struct AgentRow {
+    pub agent: agent::registry::Agent,
+    pub report: agent::doctor::Report,
+    pub test: Option<Test>,
+}
+
+/// Run one agent's CLI off-thread and record what it said for the row to show.
+/// The probe uses the configured executable, so a corrected path is tested as
+/// typed rather than whatever is on PATH.
+pub fn test_agent(root: &mut Root, id: String, program: String, cx: &mut Context<Root>) {
+    root.agent_tests.insert(id.clone(), Test::Running);
+    cx.notify();
+    let executor = cx.background_executor().clone();
+    cx.spawn(async move |handle, cx| {
+        let probe = executor
+            .spawn(async move { agent::doctor::probe(&program) })
+            .await;
+        handle
+            .update(cx, |root, cx| {
+                root.agent_tests.insert(id, Test::Done(probe));
+                cx.notify();
+            })
+            .ok();
+    })
+    .detach();
+}
+
 /// The surface's text inputs, built lazily and kept in sync with the file.
 #[derive(Clone)]
 pub struct Inputs {
@@ -212,7 +249,7 @@ fn write_editor(root: &mut Root, editor: config::EditorPrefs, cx: &mut Context<R
 pub fn settings_view(
     settings: config::Settings,
     diagnostics: Vec<config::Diagnostic>,
-    reports: Vec<(agent::registry::Agent, agent::doctor::Report)>,
+    agents: Vec<AgentRow>,
     inputs: Inputs,
     handle: Entity<Root>,
     _window: &mut Window,
@@ -221,6 +258,11 @@ pub fn settings_view(
     let t = guise::theme::theme(cx);
     let dimmed = t.dimmed().hsla();
     let border = t.border().hsla();
+    let chrome = Chrome {
+        border,
+        dimmed,
+        desc: px(t.font_size(Size::Xs)),
+    };
     let defaults = config::Settings::default();
     let ed_defaults = config::EditorPrefs::default();
     let ed = settings.editor.clone();
@@ -293,7 +335,7 @@ pub fn settings_view(
         settings.theme != defaults.theme,
         Some(reset_btn("reset-theme", "theme", &handle)),
         theme_control(&settings.theme, &handle),
-        border,
+        chrome,
     ));
     col = col.child(row(
         "Worktree directory",
@@ -305,7 +347,7 @@ pub fn settings_view(
             .flex_none()
             .child(inputs.worktree.clone())
             .into_any_element(),
-        border,
+        chrome,
     ));
     {
         let display = if settings.max_parallel_runs == 0 {
@@ -330,7 +372,7 @@ pub fn settings_view(
                     write(root, "max_parallel_runs", json!(v), cx);
                 },
             ),
-            border,
+            chrome,
         ));
     }
     {
@@ -356,7 +398,7 @@ pub fn settings_view(
                     write(root, "run_timeout_minutes", json!(v), cx);
                 },
             ),
-            border,
+            chrome,
         ));
     }
 
@@ -368,21 +410,22 @@ pub fn settings_view(
             .dimmed(),
     );
     let selected = settings.default_agents.clone();
-    for agent in agent::registry::catalog(&settings.custom_agents) {
+    for entry in &agents {
+        let agent = entry.agent.clone();
         let on = selected.contains(&agent.id);
         let id = agent.id.clone();
         let h = handle.clone();
         let current = selected.clone();
-        let report = reports
-            .iter()
-            .find(|(candidate, _)| candidate.id == agent.id);
-        let (status, color) = match report {
-            Some((_, report)) if report.verified() => ("verified", ColorName::Green),
-            Some((_, report)) if report.ready() => ("installed", ColorName::Orange),
-            _ => ("not found", ColorName::Red),
+        let (status, color) = if entry.report.verified() {
+            ("verified", ColorName::Green)
+        } else if entry.report.ready() {
+            ("installed", ColorName::Orange)
+        } else {
+            ("not found", ColorName::Red)
         };
         let program = inputs.programs.get(&agent.id).cloned();
         let mut controls = div().flex().flex_row().items_center().gap_2();
+        controls = controls.child(test_result(entry.test.as_ref()));
         controls = controls.child(Badge::new(status).color(color).variant(Variant::Light));
         if let Some(program) = program {
             controls = controls.child(
@@ -395,6 +438,7 @@ pub fn settings_view(
                     .child(program),
             );
         }
+        controls = controls.child(test_btn(&agent, &handle));
         controls = controls.child(
             Switch::new(SharedString::from(format!("agent-{}", agent.id)))
                 .checked(on)
@@ -423,7 +467,7 @@ pub fn settings_view(
             false,
             None,
             controls.into_any_element(),
-            border,
+            chrome,
         ));
     }
 
@@ -439,7 +483,7 @@ pub fn settings_view(
             .flex_none()
             .child(inputs.font.clone())
             .into_any_element(),
-        border,
+        chrome,
     ));
     col = col.child(row(
         "Font size",
@@ -459,7 +503,7 @@ pub fn settings_view(
                 write_editor(root, editor, cx);
             },
         ),
-        border,
+        chrome,
     ));
     col = col.child(row(
         "Tab width",
@@ -479,7 +523,7 @@ pub fn settings_view(
                 write_editor(root, editor, cx);
             },
         ),
-        border,
+        chrome,
     ));
     {
         let h = handle.clone();
@@ -501,7 +545,7 @@ pub fn settings_view(
                     });
                 })
                 .into_any_element(),
-            border,
+            chrome,
         ));
     }
 
@@ -541,7 +585,7 @@ pub fn settings_view(
                     });
                 })
                 .into_any_element(),
-            border,
+            chrome,
         ));
     }
     col = col.child(row(
@@ -554,15 +598,14 @@ pub fn settings_view(
             .flex_none()
             .child(inputs.proxy_bind.clone())
             .into_any_element(),
-        border,
+        chrome,
     ));
     // Upstreams (edit the list in settings.json). Each shows whether its secret
     // is currently provided in the environment.
     if settings.upstreams.is_empty() {
         col = col.child(
             Text::new(
-                "No upstreams yet. Add them under \"upstreams\" in settings.json \
-                 (Edit in settings.json, above).",
+                "Upstreams let agents call approved external APIs without seeing their secrets. None are configured; add one under \"upstreams\" in settings.json.",
             )
             .size(Size::Xs)
             .dimmed(),
@@ -589,7 +632,7 @@ pub fn settings_view(
                     .color(color)
                     .variant(Variant::Light)
                     .into_any_element(),
-                border,
+                chrome,
             ));
         }
     }
@@ -629,6 +672,15 @@ pub fn settings_view(
         .child(col)
 }
 
+/// The theme values a row draws itself with, read once rather than per row.
+#[derive(Clone, Copy)]
+struct Chrome {
+    border: gpui::Hsla,
+    dimmed: gpui::Hsla,
+    /// Font size for a row's description line.
+    desc: gpui::Pixels,
+}
+
 /// A group label with its underline divider.
 fn heading(text: &'static str, dimmed: gpui::Hsla, border: gpui::Hsla) -> impl IntoElement {
     div()
@@ -653,12 +705,27 @@ fn row(
     modified: bool,
     reset: Option<gpui::AnyElement>,
     control: gpui::AnyElement,
-    border: gpui::Hsla,
+    chrome: Chrome,
 ) -> impl IntoElement {
+    // The description is a child of a *column* on purpose. gpui reports a text
+    // element's min-content width as its whole single line, so as a row's flex
+    // item it could never shrink and would slide under the control; as a
+    // column's item it takes the column's width and wraps.
+    let description = div()
+        .flex()
+        .flex_col()
+        .min_w(px(0.0))
+        .text_size(chrome.desc)
+        .text_color(chrome.dimmed)
+        .child(desc.into());
+
     let left = div()
         .flex()
         .flex_col()
         .gap(px(2.0))
+        // Take the space the control leaves and wrap the description inside it,
+        // so every row's control lands on the same right edge.
+        .flex_1()
         .min_w(px(0.0))
         .child(
             div()
@@ -675,7 +742,7 @@ fn row(
                     )
                 }),
         )
-        .child(Text::new(desc.into()).size(Size::Xs).dimmed());
+        .child(description);
 
     let mut right = div().flex().flex_row().items_center().gap_2().flex_none();
     if let Some(reset) = reset.filter(|_| modified) {
@@ -686,15 +753,60 @@ fn row(
     div()
         .flex()
         .flex_row()
-        .flex_wrap()
         .items_center()
         .justify_between()
         .gap_3()
         .py(px(10.0))
         .border_b_1()
-        .border_color(border)
+        .border_color(chrome.border)
         .child(left)
         .child(right)
+}
+
+/// A "Test" button that runs the agent's configured executable. It reports the
+/// saved program, so press enter in the path field before testing an edit.
+fn test_btn(agent: &agent::registry::Agent, handle: &Entity<Root>) -> gpui::AnyElement {
+    let h = handle.clone();
+    let id = agent.id.clone();
+    let program = agent.program.clone();
+    Button::new(SharedString::from(format!("test-{}", agent.id)), "Test")
+        .variant(Variant::Default)
+        .size(Size::Xs)
+        .on_click(move |_, _, cx| {
+            let (id, program) = (id.clone(), program.clone());
+            h.update(cx, |root, cx| test_agent(root, id, program, cx));
+        })
+        .into_any_element()
+}
+
+/// What the last probe said, beside the agent's row.
+fn test_result(test: Option<&Test>) -> gpui::AnyElement {
+    let (label, color) = match test {
+        None => return div().into_any_element(),
+        Some(Test::Running) => ("testing…".to_string(), ColorName::Gray),
+        Some(Test::Done(probe)) => {
+            let color = if probe.ok() {
+                ColorName::Green
+            } else {
+                ColorName::Red
+            };
+            let mark = if probe.ok() { '\u{2713}' } else { '\u{2717}' };
+            (format!("{mark} {}", trunc(probe.message(), 28)), color)
+        }
+    };
+    Badge::new(SharedString::from(label))
+        .color(color)
+        .variant(Variant::Light)
+        .into_any_element()
+}
+
+/// Clip `text` to `max` characters so a long version banner or error can't
+/// crowd the row's other controls.
+fn trunc(text: &str, max: usize) -> String {
+    if text.chars().count() <= max {
+        return text.to_string();
+    }
+    text.chars().take(max.saturating_sub(1)).collect::<String>() + "…"
 }
 
 /// A "Reset" button that removes `key` from settings.json.
