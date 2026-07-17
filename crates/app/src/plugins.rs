@@ -16,7 +16,14 @@ pub fn plugins_view(
     _window: &mut Window,
     _cx: &mut App,
 ) -> impl IntoElement {
-    let mut col = div().flex().flex_col().w_full().gap_4().p(px(20.0));
+    let mut col = div()
+        .id("plugins-scroll")
+        .flex()
+        .flex_col()
+        .size_full()
+        .gap_4()
+        .p(px(20.0))
+        .overflow_y_scroll();
     col = col.child(Title::new("Plugins").order(2));
     col = col.child(
         Text::new(SharedString::from(format!("Directory: {dir}")))

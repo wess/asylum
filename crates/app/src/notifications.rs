@@ -15,7 +15,14 @@ pub fn inbox_view(
     _window: &mut Window,
     cx: &mut App,
 ) -> impl IntoElement {
-    let mut col = div().flex().flex_col().w_full().gap_4().p(px(20.0));
+    let mut col = div()
+        .id("inbox-scroll")
+        .flex()
+        .flex_col()
+        .size_full()
+        .gap_4()
+        .p(px(20.0))
+        .overflow_y_scroll();
 
     let clear = handle.clone();
     col = col.child(

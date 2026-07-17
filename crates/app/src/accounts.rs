@@ -16,7 +16,14 @@ pub fn accounts_view(
     cx: &mut App,
 ) -> impl IntoElement {
     let _ = cx;
-    let mut col = div().flex().flex_col().w_full().gap_4().p(px(20.0));
+    let mut col = div()
+        .id("accounts-scroll")
+        .flex()
+        .flex_col()
+        .size_full()
+        .gap_4()
+        .p(px(20.0))
+        .overflow_y_scroll();
     col = col.child(Title::new("Accounts").order(2));
     col = col.child(
         Text::new("Accounts are local labels for provider identities and their usage history. The active account marks your preferred identity in Asylum; it does not sign in or change the provider CLI session. Authentication stays with each provider’s CLI.")
