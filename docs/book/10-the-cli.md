@@ -22,6 +22,9 @@ asylum worktree <create|list|remove>
 asylum run <agent> <prompt...> [--cwd <dir>]
 asylum search <pattern> [--dir <dir>]
 asylum control <status|read <id>|spawn <agent> <prompt>|activity <state>|check|skill>
+asylum call [<upstream> <METHOD> <path> [--data <body>]] [--skill]
+asylum mcp <list | serve [--bind addr] | stdio | skill>
+asylum keep <set <name> [--project <id>] [--value <v>] | rm <name> | list>
 asylum wait run <id> [--status <s>] [--activity <a>] [--timeout <secs>]
 asylum plugin <install <owner/repo> | search | list>
 asylum layout <list | show <name>>
@@ -205,6 +208,34 @@ asylum call --skill
 
 The method defaults to `GET` and the path to `/`. A `--data` body is sent as
 `application/json`. Requests go out over `curl`.
+
+## `mcp` — the aggregated MCP gateway
+
+Work with the MCP gateway: one MCP server that fronts every configured upstream
+server under per-service namespaces (`github__create_pr`). See
+[Chapter 14](14-configuration-reference.md) for `mcp` / `mcp_servers`, and
+`docs/mcp.md`.
+
+```sh
+# Inside a run: list the services + tools currently exposed to you.
+asylum mcp list
+
+# Stand up a gateway from settings.json (for an agent launched outside the app).
+asylum mcp serve
+asylum mcp serve --bind 127.0.0.1:8790
+
+# Bridge a stdio-only MCP client to the gateway over HTTP.
+asylum mcp stdio
+
+# Print the skill doc that teaches an agent this gateway.
+asylum mcp skill
+```
+
+`list` and `stdio` read `ASYLUM_MCP_URL` / `ASYLUM_MCP_TOKEN` from the run's
+environment; `serve` reads `mcp` / `mcp_servers` from `settings.json` (resolving
+any `{secret:NAME}` from the keep when `ASYLUM_KEEP_PASSPHRASE` is set). Use
+`stdio` when an agent CLI speaks MCP only over stdio — it proxies stdin/stdout
+JSON-RPC to the gateway's HTTP endpoint.
 
 ## Computer use: `snapshot`, `click`, `fill`
 

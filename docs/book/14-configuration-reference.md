@@ -82,7 +82,18 @@ if malformed, is reported as a diagnostic rather than aborting the load.
 
   // Named upstreams the proxy forwards to. Secret VALUES live in the encrypted
   // keep, never here; `secret` names the keep entry.
-  "upstreams": []
+  "upstreams": [],
+
+  // MCP gateway: one aggregating MCP server every agent connects to.
+  "mcp": {
+    "enabled": false,
+    "bind": "127.0.0.1:8790",
+    "expose": "direct"
+  },
+
+  // The upstream MCP servers the gateway aggregates, each under its own
+  // namespace (`<name>__<tool>`).
+  "mcp_servers": []
 }
 ```
 
@@ -286,6 +297,70 @@ with `ASYLUM_KEEP_PASSPHRASE`); `secret` only names the keep entry.
 ]
 ```
 
+## `mcp` — MCP gateway
+
+One aggregating [Model Context Protocol](https://modelcontextprotocol.io) server
+that every agent connects to, fronting the servers in `mcp_servers` under
+per-service namespaces (a `create_pr` tool on the `github` server is exposed as
+`github__create_pr`, and a call to it is routed back). See `docs/mcp.md`. The
+gateway toggles here are also editable in **Settings → MCP gateway**; the server
+list is edited in this file.
+
+- **`enabled`** (bool, default `false`) — whether the gateway runs. Off by
+  default; it only does something once you define `mcp_servers`.
+- **`bind`** (string, default `"127.0.0.1:8790"`) — the bind address.
+  **Loopback-only, enforced**. Like the proxy, the gateway is always
+  authenticated — each run gets a signed token naming its project and run,
+  injected as `ASYLUM_MCP_TOKEN` alongside `ASYLUM_MCP_URL` (the MCP endpoint is
+  that URL plus `/mcp`).
+- **`expose`** (string, default `"direct"`) — how tools are surfaced.
+  `"direct"` lists every upstream tool, namespaced. `"search"` advertises only
+  `asylum_find_tool` / `asylum_call_tool`, so tool definitions load on demand —
+  which keeps a wide fleet's context small.
+
+## `mcp_servers` — the servers the gateway aggregates
+
+An array of upstream MCP servers. Each is either a local process
+(`transport: "stdio"`) or a remote endpoint (`transport: "http"`), exposed under
+its `name` as a namespace.
+
+- **`name`** (string) — the namespace agents see (`<name>__<tool>`). Lowercase
+  slug (`[a-z0-9-]`, no `__`).
+- **`transport`** (string, default `"stdio"`) — `"stdio"` or `"http"`.
+- **`command`** / **`args`** (stdio) — the program to launch and its arguments.
+- **`url`** (http) — the MCP endpoint URL.
+- **`env`** (stdio, object) — extra environment for the child. A value of the
+  form `"{secret:NAME}"` is resolved from the keep at spawn (scoped to the
+  server's project); any other value is literal.
+- **`secret`** (http) — a keep entry injected as the auth header (never stored
+  here). Empty means no auth.
+- **`header`** (http, default `"Authorization"`) / **`format`** (http, default
+  `"Bearer {secret}"`) — how the secret is injected.
+- **`allow`** / **`deny`** (arrays) — expose only these tool names, or hide
+  these (by their *upstream* name, before namespacing).
+- **`project`** (integer, default `0`) — the project this server belongs to, or
+  `0` for a global server. A project-scoped server shadows a global one of the
+  same name.
+- **`enabled`** (bool, default `true`) — set `false` to keep a server's config
+  without aggregating it.
+
+```jsonc
+"mcp_servers": [
+  {
+    "name": "github",
+    "command": "gh-mcp",
+    "args": ["--stdio"],
+    "env": { "GITHUB_TOKEN": "{secret:github_pat}" }
+  },
+  {
+    "name": "docs",
+    "transport": "http",
+    "url": "https://mcp.example.com/mcp",
+    "secret": "docs_token"
+  }
+]
+```
+
 ## Environment overrides
 
 Two secret keys can be filled from the environment instead of the file, so the
@@ -336,11 +411,11 @@ defaults. Add keys as you hit a reason to.
 - `agents` overrides per agent (`program`, `extra_args`, `enabled`);
   `custom_agents` adds your own (`id`/`program`/`args`/`delivery`).
 - `editor`, `keybindings` (chord=action, empty unbinds), `companion`, `control`,
-  `proxy`, and `upstreams` round out the file.
-- The control surface and the proxy are loopback-only (enforced) and *always*
-  authenticated — an empty `control.token` provisions a per-session token, it
-  does not disable auth. The companion refuses a non-loopback bind without a
-  token.
+  `proxy`, `upstreams`, `mcp`, and `mcp_servers` round out the file.
+- The control surface, the proxy, and the MCP gateway are loopback-only
+  (enforced) and *always* authenticated — an empty `control.token` provisions a
+  per-session token, it does not disable auth. The companion refuses a
+  non-loopback bind without a token.
 - `linear_token` and `companion.token` fall back to `ASYLUM_LINEAR_TOKEN` and
   `ASYLUM_COMPANION_TOKEN` when left empty.
 
