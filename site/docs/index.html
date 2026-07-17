@@ -44,6 +44,7 @@
           <a href="#agents" data-doclink="agents">Agents and fan-out</a>
           <a href="#runs" data-doclink="runs">Runs and terminals</a>
           <a href="#control" data-doclink="control">Fleet control</a>
+          <a href="#mcp" data-doclink="mcp">MCP gateway</a>
           <a href="#review" data-doclink="review">Review and merge</a>
           <a href="#memory" data-doclink="memory">Project memory</a>
           <a href="#search" data-doclink="search">Unified search</a>
@@ -186,6 +187,23 @@ asylum control spawn codex "write the tests"
 asylum control activity blocked       # report yourself before you ask a question
 asylum wait run 42 --status succeeded # block until a sibling finishes</code></pre>
           <p>Write-effects (spawning a helper run, running checks) are queued and drained by the desktop app, so the API stays safe and pure. An append-only event log streams over both the control and companion servers, so a phone or an agent can follow the fleet without polling.</p>
+        </article>
+
+        <article id="mcp" data-article data-title="MCP gateway" data-keywords="mcp model context protocol tools servers github linear aggregate namespace gateway stdio http claude codex context">
+          <p class="doccrumb">Operate / MCP gateway</p>
+          <h1>MCP gateway</h1>
+          <p class="doclead">Asylum runs one Model Context Protocol server that every agent connects to, fronting all your configured MCP servers behind a single connection — instead of teaching each agent about each service.</p>
+          <h2>Namespaced tools</h2>
+          <p>Each upstream server is exposed under its own namespace. A <code>create_pr</code> tool on the <code>github</code> server is presented to the agent as <code>github__create_pr</code>, and a call to it is routed back to that server. The gateway is loopback-only and token-authenticated; each run's token names its project (which servers it may see) and its run (so every tool call is attributable).</p>
+          <h2>Configure once</h2>
+          <p>Enable the gateway and list your servers — a local <code>stdio</code> command or a remote <code>http</code> endpoint — in <code>settings.json</code>, or from <strong>Settings → MCP gateway</strong>. Secrets come from the encrypted keep, never the file.</p>
+          <pre class="codeblock"><code>"mcp": { "enabled": true, "bind": "127.0.0.1:8790", "expose": "direct" },
+"mcp_servers": [
+  { "name": "github", "command": "gh-mcp", "args": ["--stdio"],
+    "env": { "GITHUB_TOKEN": "{secret:github_pat}" } }
+]</code></pre>
+          <h2>Keep context small</h2>
+          <p>Per-server <code>allow</code> / <code>deny</code> filters expose only the tools you want. Set <code>"expose": "search"</code> and the gateway advertises just a find/call pair, so tool definitions load on demand — which matters when you fan one task across a whole fleet. From a run, <code>asylum mcp list</code> shows what you can reach.</p>
         </article>
 
         <article id="review" data-article data-title="Review and merge" data-keywords="diff comments annotation checks pass fail merge pull request github conflicts cleanup">
