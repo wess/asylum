@@ -1,0 +1,15 @@
+[package]
+autotests = false
+name = "mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The MCP gateway: one aggregating Model Context Protocol server every agent connects to, fronting the configured upstream MCP servers under per-service namespaces."
+
+[dependencies]
+config = { path = "../config" }
+keep = { path = "../keep" }
+serde_json = { workspace = true }
+hmac = "0.12"
+sha2 = "0.10"
+subtle = "2"

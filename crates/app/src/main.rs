@@ -213,6 +213,78 @@ fn main() {
         }
     }
 
+    // Launch the MCP gateway on its own thread: one aggregating MCP server every
+    // agent connects to, fronting the configured upstream servers under
+    // per-service namespaces (`<service>__<tool>`). Loopback-only and always
+    // token-authenticated, like the proxy; each run gets a token naming its
+    // project (which servers it may see) and its run (so a tool call is
+    // attributable). Server secrets are resolved from the keep, scoped to the
+    // server's project.
+    let mcp_prefs = loaded.settings.mcp.clone();
+    if mcp_prefs.enabled {
+        let key = config::token::generate().unwrap_or_default();
+        if !key.is_empty() {
+            secrets::set_mcp_key(key.clone());
+            match config::bind::guard(&mcp_prefs.bind, &key, config::bind::Policy::LoopbackOnly) {
+                Ok(()) => {
+                    let bind = mcp_prefs.bind.clone();
+                    let servers = loaded.settings.mcp_servers.clone();
+                    let expose = mcp::Expose::parse(&mcp_prefs.expose);
+                    let keep = keep_handle.clone();
+                    let report_path = db_path.clone();
+                    let audit_path = db_path.clone();
+                    std::thread::spawn(move || {
+                        // Spawn/connect each server, resolving its secrets from
+                        // the keep scoped to its project (0 = global).
+                        let (host, warnings) = mcp::connect(&servers, |project, name| {
+                            let guard = keep.lock().unwrap_or_else(|e| e.into_inner());
+                            guard.as_ref().and_then(|k| {
+                                let scope = (project != 0).then_some(project);
+                                k.resolve(scope, name).map(str::to_string)
+                            })
+                        });
+                        for warning in &warnings {
+                            report_server_problem(&report_path, "MCP server skipped", warning);
+                        }
+                        // Attribute every tool call to its run in the event log,
+                        // so the Diff surface (and siblings) can see what an agent
+                        // reached for.
+                        let audit: mcp::AuditHook = Box::new(move |call: mcp::Audit| {
+                            if call.run == 0 {
+                                return;
+                            }
+                            if let Ok(db) = store::Db::open(&audit_path) {
+                                let task = db.run(call.run).ok().map(|r| r.task_id);
+                                let data = serde_json::json!({
+                                    "tool": call.tool, "ok": call.ok, "project": call.project,
+                                })
+                                .to_string();
+                                let _ =
+                                    db.record_event("mcp_call", task, Some(call.run), &data, unix_now());
+                            }
+                        });
+                        let gateway = mcp::Gateway {
+                            key,
+                            host,
+                            expose,
+                            audit: Some(audit),
+                        };
+                        if let Err(error) = mcp::serve(bind.as_str(), gateway) {
+                            report_server_problem(
+                                &report_path,
+                                "MCP gateway stopped",
+                                &format!("The MCP gateway failed: {error}"),
+                            );
+                        }
+                    });
+                }
+                Err(refusal) => {
+                    report_server_problem(&db_path, "MCP gateway disabled", &format!("{refusal}"))
+                }
+            }
+        }
+    }
+
     // Check GitHub Releases for a newer version and, once, drop an Inbox
     // notification pointing at the download. Non-blocking and opt-out.
     if std::env::var_os("ASYLUM_NO_UPDATE_CHECK").is_none() {
@@ -256,6 +328,14 @@ fn main() {
 
             cx.activate(true);
         });
+}
+
+/// Unix seconds, for stamping audit events.
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 /// Path to the encrypted secrets keep, alongside `settings.json`.

@@ -18,6 +18,7 @@ pub type SharedKeep = Arc<Mutex<Option<Keep>>>;
 
 static CONTROL_TOKEN: OnceLock<String> = OnceLock::new();
 static PROXY_KEY: OnceLock<String> = OnceLock::new();
+static MCP_KEY: OnceLock<String> = OnceLock::new();
 /// Rewritable, unlike the keys above: the keep can be unlocked or edited after
 /// startup, and a redaction list that could only ever be set once would silently
 /// stop covering every secret added afterwards.
@@ -42,6 +43,16 @@ pub fn set_proxy_key(key: String) {
 /// The secrets-proxy signing key, or empty if the proxy is disabled.
 pub fn proxy_key() -> String {
     PROXY_KEY.get().cloned().unwrap_or_default()
+}
+
+/// Record the MCP gateway signing key (used to mint per-run project+run tokens).
+pub fn set_mcp_key(key: String) {
+    let _ = MCP_KEY.set(key);
+}
+
+/// The MCP gateway signing key, or empty if the gateway is disabled.
+pub fn mcp_key() -> String {
+    MCP_KEY.get().cloned().unwrap_or_default()
 }
 
 /// Record the shared keep handle (set once, at startup).

@@ -117,6 +117,23 @@ helper run or a checks pass, and follows `/control/events`. A running agent
 learns the API from the `SKILL` document (`asylum control skill`) and reaches it
 through the injected env vars; writes are queued for the app to drain.
 
+### `mcp`
+The MCP gateway: one aggregating Model Context Protocol server every agent
+connects to, fronting the configured upstream MCP servers under per-service
+namespaces. Shaped like the secrets `proxy` — the correctness-critical logic is
+pure and unit-tested, the I/O is thin. `namespace.rs` mangles/splits
+`<service>__<tool>`; `catalog.rs` merges N upstream listings into one namespaced
+catalog, routes a namespaced call back to its server, applies `allow`/`deny`, and
+implements the lazy `search` exposure meta-tools; `jsonrpc.rs` is JSON-RPC 2.0;
+`token.rs` mints/verifies the per-run project+run token; `handle` (in `lib.rs`)
+dispatches the MCP method surface. The edges: `http.rs` is the loopback server
+agents POST to; `client.rs` is the per-upstream client (a `StdioUpstream` speaking
+newline-JSON to a child, an `HttpUpstream` over `curl`), behind an `Upstream`
+trait so `host.rs` (handshake, cached listings, project-scoped dispatch) is tested
+against a fake. `setup.rs` builds the live `Host` from `config::McpServer`s,
+resolving secrets from the keep. The app runs it on a background thread and injects
+`ASYLUM_MCP_URL` / `ASYLUM_MCP_TOKEN` per run; see `docs/mcp.md`.
+
 ### `plugin`
 `model.rs` is the parsed manifest and the fixed vocabularies (`CAPABILITIES`,
 `TRIGGER_EVENTS`). `parse.rs` deserializes `plugin.toml` into private `Raw*`

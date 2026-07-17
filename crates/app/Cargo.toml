@@ -36,6 +36,7 @@ git = { path = "../git" }
 github = { path = "../github" }
 keep = { path = "../keep" }
 linear = { path = "../linear" }
+mcp = { path = "../mcp" }
 notify = { path = "../notify" }
 notes = { path = "../notes" }
 plugin = { path = "../plugin" }

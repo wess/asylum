@@ -19,6 +19,7 @@ members = [
     "crates/companion",
     "crates/control",
     "crates/proxy",
+    "crates/mcp",
     "crates/keep",
     "crates/fuzzy",
     "crates/plugin",

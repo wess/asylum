@@ -8,6 +8,7 @@
 //! asylum search <pattern> [--dir <dir>]
 //! asylum control <status|read|spawn|activity|check|skill>   # orchestrate the fleet
 //! asylum call [<upstream> <METHOD> <path> [--data <body>]] [--skill]  # masked API calls
+//! asylum mcp <list|serve|stdio|skill>          # the aggregated MCP gateway
 //! asylum keep <set <name> [--project <id>] [--value <v>] | rm <name> | list>
 //! asylum wait run <id> [--status <s>] [--activity <a>] [--timeout <secs>]
 //! asylum plugin <install <owner/repo> | search | list>
@@ -22,6 +23,7 @@ mod computer;
 mod ctl;
 mod keepcmd;
 mod layouts;
+mod mcpcmd;
 mod plugins;
 
 use std::path::{Path, PathBuf};
@@ -39,6 +41,7 @@ fn main() {
         "search" => do_search(rest),
         "control" => ctl::control(rest),
         "call" => call::call(rest),
+        "mcp" => mcpcmd::mcp(rest),
         "keep" => keepcmd::keep(rest),
         "wait" => ctl::wait(rest),
         "plugin" => plugins::plugin(rest),
@@ -221,6 +224,7 @@ fn print_help() {
          \x20 asylum search <pattern> [--dir <dir>]\n\
          \x20 asylum control <status|read <id>|spawn <agent> <prompt>|activity <state>|check|skill>\n\
          \x20 asylum call [<upstream> <METHOD> <path> [--data <body>]] [--skill]\n\
+         \x20 asylum mcp <list | serve [--bind addr] | stdio | skill>\n\
          \x20 asylum keep <set <name> [--project <id>] [--value <v>] | rm <name> | list>\n\
          \x20 asylum wait run <id> [--status <s>] [--activity <a>] [--timeout <secs>]\n\
          \x20 asylum plugin <install <owner/repo> | search [--limit n] | list>\n\

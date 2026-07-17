@@ -241,6 +241,7 @@ dependencies = [
  "keep",
  "libsinclair",
  "linear",
+ "mcp",
  "notes",
  "notify",
  "plugin",
@@ -1134,6 +1135,7 @@ dependencies = [
  "control",
  "git",
  "keep",
+ "mcp",
  "plugin",
  "proxy",
  "runner",
@@ -4095,6 +4097,18 @@ checksum = "8ea1f30cedd69f0a2954655f7188c6a834246d2bcf1e315e2ac40c4b24dc9519"
 dependencies = [
  "cfg-if",
  "rayon",
+]
+
+[[package]]
+name = "mcp"
+version = "0.1.3"
+dependencies = [
+ "config",
+ "hmac",
+ "keep",
+ "serde_json",
+ "sha2 0.10.9",
+ "subtle",
 ]
 
 [[package]]

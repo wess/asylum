@@ -28,8 +28,8 @@ pub mod watch;
 pub use keys::{Keymap, DEFAULTS as KEY_DEFAULTS};
 pub use load::{default_path, load, load_str, Loaded};
 pub use model::{
-    AgentPrefs, CompanionPrefs, ControlPrefs, CustomAgent, EditorPrefs, Layout, ProxyPrefs,
-    Settings, Upstream,
+    AgentPrefs, CompanionPrefs, ControlPrefs, CustomAgent, EditorPrefs, Layout, McpPrefs,
+    McpServer, ProxyPrefs, Settings, Upstream,
 };
 pub use project::{load_project, parse_project, ProjectConfig, PROJECT_FILE};
 pub use watch::{watch, WatchHandle};

@@ -794,6 +794,26 @@ impl Root {
             env.push((proxy::ENV_TOKEN.to_string(), token));
         }
 
+        // The MCP gateway: the agent connects to one aggregated MCP server at
+        // 127.0.0.1:<port>/mcp and sees every configured service's tools,
+        // namespaced `<service>__<tool>`. The token names this run's project
+        // (which servers it may see) and its run id (for attribution), signed
+        // with the session key. As with the proxy, a run whose task will not
+        // resolve gets no token rather than a project-0 one.
+        if self.settings.mcp.enabled {
+            let port = self.settings.mcp.bind.rsplit(':').next().unwrap_or("8790");
+            let key = crate::secrets::mcp_key();
+            let token = match self.db.task(task_id) {
+                Ok(t) if !key.is_empty() => {
+                    let expires_at = now() + 7 * 24 * 60 * 60;
+                    mcp::token::mint(&key, t.project_id, run_id, expires_at)
+                }
+                _ => String::new(),
+            };
+            env.push((mcp::ENV_URL.to_string(), format!("http://127.0.0.1:{port}")));
+            env.push((mcp::ENV_TOKEN.to_string(), token));
+        }
+
         env
     }
 

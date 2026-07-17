@@ -21,6 +21,10 @@
 - Append-only event log streamed over both the companion (`/api/events`) and
   control (`/control/events`) servers so a phone or an agent follows the fleet
   without polling.
+- MCP gateway: one aggregating MCP server every agent connects to, fronting the
+  configured upstream servers (stdio or HTTP) under per-service namespaces
+  (`github__create_pr`), with per-server tool `allow`/`deny`, project scoping, a
+  lazy `search` exposure mode, and per-run auditing of tool calls.
 - Plugin install from GitHub (`asylum plugin install <owner/repo>`) and topic
   discovery (`asylum plugin search`).
 - Selected-run diff review, inline comments, same-worktree continuation, and

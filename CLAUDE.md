@@ -146,10 +146,21 @@ and the gpui-free core crates never import gpui.
   agent uses a key it never sees and can't redirect or escalate scope. Bind is
   loopback-only; each run gets a signed token naming its project
   (`ASYLUM_PROXY_URL` / `ASYLUM_PROXY_TOKEN`). See `docs/secrets.md`.
+- **`mcp`** — the MCP gateway: one aggregating Model Context Protocol server every
+  agent connects to instead of configuring N servers apiece. It fronts the
+  configured upstream MCP servers (`config::McpServer`, stdio or HTTP) under
+  per-service namespaces — a `create_pr` tool on `github` is exposed as
+  `github__create_pr`, and a call to it is routed back to that server. Pure,
+  tested routing/merging/filtering/scoping (`catalog`, `namespace`, `token`,
+  `handle`) over thin transports (the loopback HTTP server agents POST to, and a
+  stdio/HTTP client per upstream); loopback-only and token-authenticated, each run
+  scoped to its project (which servers it sees) and run (tool calls are audited).
+  An optional lazy `search` exposure keeps a wide fleet's context small
+  (`ASYLUM_MCP_URL` / `ASYLUM_MCP_TOKEN`). See `docs/mcp.md`.
 - **`cli`** — the `asylum` binary: `worktree` ops, `run <agent> <prompt>`,
   `search`, `control` / `wait` (fleet orchestration), `call` (masked API calls),
-  `plugin install` / `search`, `layout`, and computer-use `snapshot` / `click`
-  / `fill`.
+  `mcp` (the aggregated MCP gateway), `plugin install` / `search`, `layout`, and
+  computer-use `snapshot` / `click` / `fill`.
 - **`app`** — the gpui application. Owns the window, the guise theme bridge, and
   the ADE shell composed with guise's `AppShell`: a header (with the command
   palette + quick-open overlays), a collapsible activity switcher + project/task navbar

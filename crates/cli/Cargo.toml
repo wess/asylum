@@ -16,6 +16,7 @@ config = { path = "../config" }
 control = { path = "../control" }
 git = { path = "../git" }
 keep = { path = "../keep" }
+mcp = { path = "../mcp" }
 plugin = { path = "../plugin" }
 proxy = { path = "../proxy" }
 runner = { path = "../runner" }
