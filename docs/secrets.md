@@ -88,9 +88,11 @@ defeated — only configure upstreams you trust.
 ]
 ```
 
-Start Asylum with `ASYLUM_KEEP_PASSPHRASE` set to unlock the keep. (An in-app
-unlock prompt and a Global/Project scope editor are planned in the Settings
-surface.)
+Start Asylum with `ASYLUM_KEEP_PASSPHRASE` set to unlock the keep, or unlock it
+from **Settings → Secrets keep**, which lists secrets by scope and lets you add
+or remove one (no edit-in-place — remove and re-add to change a value).
+Upstreams are full CRUD the same way, in **Settings → Secrets proxy** (add,
+edit, remove) — not just by hand in `settings.json`.
 
 ## For agents
 

@@ -22,21 +22,25 @@ Configure it under `companion` in `settings.json`:
   "companion": {
     "enabled": true,
     "bind": "127.0.0.1:8787",
-    "token": ""
+    "token": "a-strong-token"
   }
 }
 ```
 
-- **enabled** — whether the server runs at all.
-- **bind** — the address. The default binds localhost-only. To reach it from a
-  phone on your LAN, bind `0.0.0.0:8787` — but only do that *with a token set*.
-- **token** — a bearer token. Empty means localhost-only with no auth; a
-  non-empty token is required as `Authorization: Bearer <token>` and is what
-  makes a non-localhost bind safe.
+- **enabled** — whether the server runs at all. Off by default: it exposes
+  projects, tasks, runs, and notifications, and accepts follow-ups into a live
+  agent, so it only starts once you opt in.
+- **bind** — the address. The default binds localhost-only. To also reach it
+  from a phone on your LAN, bind `0.0.0.0:8787`.
+- **token** — a bearer token, required as soon as `enabled` is `true` —
+  loopback or not. An empty token is refused at startup (the app reports the
+  refusal in the Inbox rather than starting unauthenticated); a non-empty
+  token is required as `Authorization: Bearer <token>` on every `/api/*`
+  request. It may also come from `ASYLUM_COMPANION_TOKEN`.
 
-The rule of thumb: **localhost + no token** for solo desktop use, or
-**`0.0.0.0` + a token** to reach it from your phone. Never expose it to the LAN
-without a token — the token is the gate.
+The rule of thumb: opt in and set a token, always — then choose **localhost**
+for solo desktop use from this machine, or **`0.0.0.0`** to also reach it from
+your phone on the LAN.
 
 Open the bound address in a browser and you get a self-contained mobile status
 page that polls the API and shows your inbox and projects at a glance.
@@ -131,8 +135,9 @@ bounded, so treat old cursors as best-effort and keep your cursor current.
 
 ## Try it
 
-1. Set a `companion.token` and bind `0.0.0.0:8787`, then open the address from
-   your phone on the same network and watch your projects and inbox load.
+1. Set `companion.enabled` to `true`, set a `companion.token`, and bind
+   `0.0.0.0:8787`, then open the address from your phone on the same network
+   and watch your projects and inbox load.
 2. From a shell, `GET /api/events?since=0`, note the `cursor`, fan a task out,
    then `GET /api/events?since=<cursor>` and see the `run_started` and
    `run_activity` events for the new runs.
@@ -140,8 +145,9 @@ bounded, so treat old cursors as best-effort and keep your cursor current.
 
 ## Recap
 
-- The companion is a localhost/LAN HTTP server over the store; secure a
-  non-localhost bind with a token.
+- The companion is off by default. Enabling it always requires a token —
+  loopback or not — so an empty token refuses to start rather than opening the
+  store to every local process.
 - Its API exposes projects, tasks, runs (with live activity), notifications, and
   follow-ups.
 - The append-only event log (`run_started`, `run_activity`, `run_finished`,

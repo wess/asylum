@@ -80,9 +80,10 @@ explanation.
 
 ## From your phone
 
-Turn on the mobile companion in Settings (set a token to reach it from your
-phone). You can watch runs, read what agents are doing, and send a follow-up
-message that is delivered straight to the running agent.
+Turn on the mobile companion in Settings and set a token — it's required
+either way, whether you're reaching it from this machine or from your phone.
+You can watch runs, read what agents are doing, and send a follow-up message
+that is delivered straight to the running agent.
 
 ## When something looks wrong
 

@@ -91,6 +91,39 @@ fn history_persists_across_a_simulated_restart() {
     let _ = std::fs::remove_file(&path);
 }
 
+/// Whether a process whose command line contains `marker` is alive.
+#[cfg(unix)]
+fn process_visible(marker: &str) -> bool {
+    std::process::Command::new("pgrep")
+        .args(["-f", marker])
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false)
+}
+
+/// The guarantee cancel/close rest on: shutdown ends the real child process,
+/// not just the pty plumbing.
+#[cfg(unix)]
+#[test]
+fn shutdown_kills_the_child_process() {
+    // A unique sleep duration makes the child findable by command line.
+    let marker = format!("sleep 3141.5{}", std::process::id());
+    let run = Runner::start(&spec("sh", &["-c", &format!("exec {marker}")])).expect("spawn sh");
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while !process_visible(&marker) {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the sleeper never appeared"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(run.is_running());
+    // shutdown joins the reader, which reaps the child, so by the time it
+    // returns the process must be gone — not merely signalled.
+    run.shutdown();
+    assert!(!process_visible(&marker), "the child survived shutdown");
+}
+
 #[cfg(unix)]
 #[test]
 fn still_running_reports_running() {

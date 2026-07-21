@@ -73,6 +73,127 @@ pub fn has_secret(name: &str, project: i64) -> bool {
     keep.has(&Scope::Global, name) || (project != 0 && keep.has(&Scope::Project(project), name))
 }
 
+// ── In-app keep unlock + secret management ──────────────────────────────────
+//
+// The keep is opened at startup only when the proxy is on (see `main`); this
+// lets the Settings surface unlock it on demand and manage secrets the same
+// way the `asylum keep` CLI does. The passphrase is only ever borrowed to
+// derive the key and is never held here; secret values go into the encrypted
+// keep and never into settings.json. Every read/write goes through the shared
+// keep handle - never the Root entity - so it is safe to call during a render.
+
+/// Whether the keep exists and whether it is currently unlocked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeepStatus {
+    /// No keep file on disk yet; a passphrase would create one.
+    Missing,
+    /// A keep file exists but is not unlocked this session.
+    Locked,
+    /// Unlocked and held in memory.
+    Unlocked,
+}
+
+/// The keep file, alongside `settings.json` (matches the CLI and `main`).
+fn keep_file_path() -> std::path::PathBuf {
+    config::default_path()
+        .parent()
+        .map(|dir| dir.join("keep.enc"))
+        .unwrap_or_else(|| std::path::PathBuf::from("keep.enc"))
+}
+
+fn scope_of(project: i64) -> Scope {
+    if project == 0 {
+        Scope::Global
+    } else {
+        Scope::Project(project)
+    }
+}
+
+/// The current keep status for the Settings surface.
+pub fn keep_status() -> KeepStatus {
+    let unlocked = KEEP
+        .get()
+        .map(|h| h.lock().unwrap_or_else(|e| e.into_inner()).is_some())
+        .unwrap_or(false);
+    if unlocked {
+        KeepStatus::Unlocked
+    } else if keep_file_path().exists() {
+        KeepStatus::Locked
+    } else {
+        KeepStatus::Missing
+    }
+}
+
+/// Unlock (or, when no file exists yet, create and persist) the keep with
+/// `passphrase`, holding it in the shared handle. The passphrase is not
+/// retained. A freshly created keep is saved empty so its passphrase is
+/// established on disk before any secret is added.
+pub fn unlock_keep(passphrase: &str) -> Result<(), String> {
+    if passphrase.is_empty() {
+        return Err("Enter a passphrase.".into());
+    }
+    let Some(handle) = KEEP.get() else {
+        return Err("The keep is not initialized.".into());
+    };
+    let path = keep_file_path();
+    let opened = if path.exists() {
+        Keep::open(&path, passphrase).map_err(|e| e.to_string())?
+    } else {
+        let keep = Keep::create(passphrase).map_err(|e| e.to_string())?;
+        keep.save(&path).map_err(|e| e.to_string())?;
+        keep
+    };
+    *handle.lock().unwrap_or_else(|e| e.into_inner()) = Some(opened);
+    refresh_redaction_values();
+    Ok(())
+}
+
+/// Every scope that holds a secret, each with its sorted secret names (values
+/// are never returned). Empty when the keep is locked or absent.
+pub fn keep_scopes() -> Vec<(String, Vec<String>)> {
+    let Some(handle) = KEEP.get() else {
+        return Vec::new();
+    };
+    let guard = handle.lock().unwrap_or_else(|e| e.into_inner());
+    guard.as_ref().map(|k| k.scopes()).unwrap_or_default()
+}
+
+/// Set `name` to `value` in the keep, scoped Global (`project == 0`) or to a
+/// project, and persist atomically. Requires an unlocked keep.
+pub fn keep_set(project: i64, name: &str, value: &str) -> Result<(), String> {
+    let Some(handle) = KEEP.get() else {
+        return Err("The keep is not initialized.".into());
+    };
+    let mut guard = handle.lock().unwrap_or_else(|e| e.into_inner());
+    let Some(keep) = guard.as_mut() else {
+        return Err("Unlock the keep first.".into());
+    };
+    keep.set(&scope_of(project), name, value);
+    keep.save(&keep_file_path()).map_err(|e| e.to_string())?;
+    drop(guard);
+    refresh_redaction_values();
+    Ok(())
+}
+
+/// Remove `name` from the keep in the given scope and persist. Requires an
+/// unlocked keep.
+pub fn keep_remove(project: i64, name: &str) -> Result<(), String> {
+    let Some(handle) = KEEP.get() else {
+        return Err("The keep is not initialized.".into());
+    };
+    let mut guard = handle.lock().unwrap_or_else(|e| e.into_inner());
+    let Some(keep) = guard.as_mut() else {
+        return Err("Unlock the keep first.".into());
+    };
+    if !keep.remove(&scope_of(project), name) {
+        return Err(format!("No such secret: {name}"));
+    }
+    keep.save(&keep_file_path()).map_err(|e| e.to_string())?;
+    drop(guard);
+    refresh_redaction_values();
+    Ok(())
+}
+
 /// Snapshot the keep's secret values for transcript redaction. Call after
 /// unlocking and after edits.
 ///

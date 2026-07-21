@@ -183,6 +183,53 @@ fn runtime_error_is_surfaced() {
 
 #[cfg(unix)]
 #[test]
+fn invoke_once_timeout_returns_a_prompt_reply() {
+    let script = std::env::temp_dir().join(format!("asylum-rttok-{}.sh", std::process::id()));
+    std::fs::write(
+        &script,
+        "read line\necho '{\"id\":1,\"result\":{\"ok\":1}}'\n",
+    )
+    .unwrap();
+    let rt = process_runtime(&format!("sh {}", script.display()));
+    let out = invoke_once_timeout(
+        &rt,
+        std::path::Path::new("."),
+        "ping",
+        json!({}),
+        std::time::Duration::from_secs(5),
+    )
+    .unwrap();
+    assert_eq!(out["ok"], 1);
+    let _ = std::fs::remove_file(&script);
+}
+
+#[cfg(unix)]
+#[test]
+fn invoke_once_timeout_kills_a_hung_runtime() {
+    // Reads the request but never replies; the timeout must fire promptly and
+    // not block for the full sleep.
+    let script = std::env::temp_dir().join(format!("asylum-rthang-{}.sh", std::process::id()));
+    std::fs::write(&script, "read line\nsleep 30\n").unwrap();
+    let rt = process_runtime(&format!("sh {}", script.display()));
+    let start = std::time::Instant::now();
+    let err = invoke_once_timeout(
+        &rt,
+        std::path::Path::new("."),
+        "ping",
+        json!({}),
+        std::time::Duration::from_millis(300),
+    )
+    .unwrap_err();
+    assert!(matches!(err, Error::Timeout(_)), "got {err:?}");
+    assert!(
+        start.elapsed() < std::time::Duration::from_secs(10),
+        "timeout should not wait for the child to exit"
+    );
+    let _ = std::fs::remove_file(&script);
+}
+
+#[cfg(unix)]
+#[test]
 fn persistent_session_handles_multiple_calls() {
     // Echo each request's id back inside a result, forever.
     let script = std::env::temp_dir().join(format!("asylum-rtsess-{}.sh", std::process::id()));

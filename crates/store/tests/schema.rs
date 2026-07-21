@@ -64,6 +64,43 @@ fn every_historical_version_upgrades_to_latest() {
 }
 
 #[test]
+fn fts_migration_backfills_preexisting_rows() {
+    // Rows written before the FTS migration must become searchable after it: the
+    // migration backfills the index from the base tables, not only via triggers
+    // on future writes. Build a database at the version just before FTS (9),
+    // insert a task and a run, then upgrade.
+    let fts_version = 10;
+    let conn = db_at_version(fts_version - 1);
+    conn.execute_batch(
+        "INSERT INTO projects (name, path, created_at) VALUES ('p', '/p', 1);
+         INSERT INTO tasks (project_id, title, prompt, created_at, updated_at)
+             VALUES (1, 'Legacy', 'preexisting sphinx quartz', 1, 1);
+         INSERT INTO runs (task_id, agent, worktree, branch, output)
+             VALUES (1, 'codex', '/w', 'b', 'preexisting basilisk transcript');",
+    )
+    .unwrap();
+    migrate(&conn).unwrap();
+    assert_eq!(user_version(&conn), latest());
+
+    let task_hit: i64 = conn
+        .query_row(
+            "SELECT rowid FROM tasks_fts WHERE tasks_fts MATCH 'sphinx'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(task_hit, 1, "pre-existing task prompt must be indexed");
+    let run_hit: i64 = conn
+        .query_row(
+            "SELECT rowid FROM runs_fts WHERE runs_fts MATCH 'basilisk'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(run_hit, 1, "pre-existing run transcript must be indexed");
+}
+
+#[test]
 fn migrate_is_idempotent_when_already_current() {
     let conn = Connection::open_in_memory().unwrap();
     migrate(&conn).unwrap();

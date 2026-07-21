@@ -3,7 +3,7 @@
 //! numbered pins, and ship the batch to an agent - the signature design flow.
 
 use gpui::prelude::*;
-use gpui::{div, px, Entity, IntoElement, SharedString};
+use gpui::{div, px, Entity, Hsla, IntoElement, SharedString};
 use guise::prelude::*;
 
 use crate::control::{Button, Switch};
@@ -11,16 +11,18 @@ use crate::state::Root;
 
 /// The whole surface: a design toolbar, the collected annotations, and the
 /// web view. Used by both the Browser and Preview tabs.
+#[allow(clippy::too_many_arguments)]
 pub fn design_surface(
     webview: Entity<guise::WebView>,
     enabled: bool,
     pending: Option<designmode::Capture>,
     annotations: Vec<designmode::Annotation>,
     note: Entity<guise::TextInput>,
+    primary: Hsla,
     handle: Entity<Root>,
 ) -> impl IntoElement {
     let strip = (!annotations.is_empty())
-        .then(|| annotation_strip(webview.clone(), annotations, handle.clone()));
+        .then(|| annotation_strip(webview.clone(), annotations, primary, handle.clone()));
     div()
         .flex()
         .flex_col()
@@ -141,6 +143,7 @@ fn toolbar(
 fn annotation_strip(
     webview: Entity<guise::WebView>,
     annotations: Vec<designmode::Annotation>,
+    primary: Hsla,
     handle: Entity<Root>,
 ) -> impl IntoElement {
     let wid = webview.entity_id().as_u64();
@@ -181,7 +184,7 @@ fn annotation_strip(
                             "Remove design annotation {}",
                             i + 1
                         )))
-                        .focus_visible(|style| style.border_1().border_color(gpui::rgb(0x3b82f6)))
+                        .focus_visible(move |style| style.border_1().border_color(primary))
                         .child(Text::new("×").size(Size::Xs).dimmed())
                         .on_click(move |_, _, cx| {
                             let mut js = String::new();

@@ -1,0 +1,48 @@
+name: Feature request
+description: Propose a new feature or enhancement
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Please describe the feature and why it matters.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What problem does this solve? Why do you need this feature?
+      placeholder: |
+        Right now, when I have 5 agents running in parallel, I can't easily...
+        This would help because...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should this feature work? Be concrete.
+      placeholder: |
+        Add a "Metrics" surface that shows a timeline of each run's:
+        - Time to first token
+        - Tokens per second
+        - Total tokens used
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches or workarounds you've tried or thought about.
+      placeholder: |
+        - Could parse the logs manually, but that's tedious
+        - Could add it as a plugin, but it needs tight integration with the run lifecycle
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links, screenshots, or related issues.

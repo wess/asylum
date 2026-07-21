@@ -33,7 +33,8 @@ onto the crates like this:
    also classified into a **semantic activity** (`agent::activity`:
    working / blocked / done / idle) so the board shows which agent is *blocked
    waiting on you*, and every transition appends to the `store` event log. Exit
-   updates the durable status, commits a successful run's worktree changes, and
+   updates the durable status, leaves a successful run's changes uncommitted in
+   its worktree (so the Review surface's per-hunk staging stays live), and
    starts that worktree's detected checks. The queue launches another run when
    capacity opens.
    - **Agents can steer.** The app injects control-surface env vars into each
@@ -43,11 +44,17 @@ onto the crates like this:
      queued as `store::ControlRequest`s and drained by the app on a timer,
      exactly like mobile follow-ups.
 6. **Review.** `git::diff::since_fork(worktree, base_branch)` yields the selected
-   run's diff. Review comments queue another attempt in the same worktree and
-   survive app restarts.
+   run's diff, falling back to the worktree's diff against `HEAD`
+   (`git::diff::against`) when nothing is committed yet — the normal case for a
+   successful run before merge. Per-hunk staging tracks what you have accepted.
+   Review comments queue another attempt in the same worktree and survive app
+   restarts.
 7. **Merge or open a PR.** The app blocks failed checks, checks the base
    worktree, runs a non-destructive conflict preflight, then asks for explicit
-   confirmation. Cleanup removes clean finished worktrees and keeps branches.
+   confirmation to merge or squash-merge — which is also where a successful
+   run's accepted changes are finally committed onto its branch. A separate
+   cleanup action then removes clean finished worktrees and deletes any branch
+   that is now safely merged, leaving unmerged branches alone.
 
 Project memory crosses this loop without replacing it. `notes` indexes plain
 Markdown and wiki-style metadata; `store` remembers the selected vault and

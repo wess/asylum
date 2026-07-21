@@ -21,6 +21,8 @@ pub mod wasm;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::mpsc;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -44,6 +46,8 @@ pub enum Error {
     Runtime(String),
     #[error("this runtime kind has no process to spawn (use invoke_wasm)")]
     Unsupported,
+    #[error("runtime did not reply within {0:?}")]
+    Timeout(Duration),
 }
 
 /// A request sent to a plugin runtime.
@@ -201,6 +205,54 @@ pub fn invoke_once(
     let response = read_response(&mut reader)?;
     let _ = child.wait();
     unwrap_response(response)
+}
+
+/// Like [`invoke_once`], but abandons and kills the child if it does not reply
+/// within `timeout`. The host's trigger dispatch uses this so a hung plugin can
+/// never wedge the caller: the response is read on a helper thread, and on
+/// timeout the child is killed — which closes its pipes, unblocking that thread.
+pub fn invoke_once_timeout(
+    runtime: &Runtime,
+    cwd: &std::path::Path,
+    method: &str,
+    params: Value,
+    timeout: Duration,
+) -> Result<Value, Error> {
+    let mut child = spawn(runtime, cwd)?;
+    let req = Request {
+        id: 1,
+        method: method.to_string(),
+        params,
+    };
+    {
+        let stdin = child.stdin.as_mut().ok_or(Error::Closed)?;
+        write_request(stdin, &req)?;
+    }
+    // Dropping stdin signals EOF to one-shot runtimes.
+    drop(child.stdin.take());
+
+    let stdout = child.stdout.take().ok_or(Error::Closed)?;
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        let _ = tx.send(read_response(&mut reader));
+    });
+    match rx.recv_timeout(timeout) {
+        Ok(response) => {
+            let _ = child.wait();
+            unwrap_response(response?)
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            Err(Error::Timeout(timeout))
+        }
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            Err(Error::Closed)
+        }
+    }
 }
 
 /// A warm, persistent runtime: one long-lived process answering many calls.

@@ -27,13 +27,23 @@
   lazy `search` exposure mode, and per-run auditing of tool calls.
 - Plugin install from GitHub (`asylum plugin install <owner/repo>`) and topic
   discovery (`asylum plugin search`).
+- Plugin `[[trigger]]` dispatch on 8 ADE events, off the UI thread with a
+  per-invocation timeout, for a plugin the user has explicitly enabled — a
+  trust confirmation gates enabling a process runtime; WASM enables directly.
 - Selected-run diff review, inline comments, same-worktree continuation, and
   automatic type-check/lint/test execution.
+- Per-hunk and per-file staging on the Review surface: a successful run's
+  commit is deferred to merge time (regular or squash) so the diff shown stays
+  the live worktree, and staging state always reads from Git.
 - Merge preflight, failed-check blocking, dirty-base protection, conflict
   detection, PR creation, and clean-worktree cleanup.
 - First-run repository flow with explicit git initialization consent, agent
   executable configuration, installed-versus-verified state, and a setup
   doctor for Git, branches, worktrees, agents, Bun, and Cargo.
+- Background, cancellable project setup commands (`asylum.toml` `setup`): each
+  command runs separately with its own output in a cancellable "Preparing"
+  banner, under a 10-minute per-command timeout, and a failure names the exact
+  command and exit code.
 - Task templates, per-task agent selection, workflow stages, actionable empty
   states, command palette actions, and keyboard shortcuts.
 - Editor, terminal, preview, browser/design mode, search, integrations,
@@ -69,16 +79,19 @@
   provisioned, so today's builds are unsigned and Gatekeeper blocks them on
   install (see the README for the workaround).
 - Provider account add + hot-swap and an install-guidance setup doctor.
+- Provider sign-in probes for the account meter (Claude, GitHub, and Codex have
+  a safe non-interactive status check; Gemini does not, and is reported
+  unsupported rather than guessed), run on demand under a timeout so a hung CLI
+  never blocks the app.
 
 ## Next
 
-- Per-hunk staging in the side-by-side diff.
-- Background/cancellable project setup commands with per-command output.
-- Provider-specific sign-in probes and live usage feeds for the account meter.
-- Host dispatch for the four unwired plugin contribution types: trigger
-  auto-dispatch on ADE events, plugin-contributed panels and webviews, and
-  plugin tools offered to the agents. All four parse and validate today;
-  `[[command]]` is the only one the app acts on.
+- Live usage feeds for the account meter — it tracks used/limit/reset from
+  local schema today, without a per-provider network fetch.
+- Host dispatch for the three still-unwired plugin contribution types:
+  plugin-contributed panels and webviews, and plugin tools offered to the
+  agents. All three parse and validate today; `[[command]]` and `[[trigger]]`
+  are the two the app acts on.
 - Provisioning real signing certificates: a Developer ID for macOS (the pipeline
   is already wired for it) and an Authenticode certificate for the Windows
   installers, which an EV certificate would clear SmartScreen for.

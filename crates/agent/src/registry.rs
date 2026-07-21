@@ -158,13 +158,13 @@ pub const BUILTINS: &[AgentDef] = &[
     def(
         "goose",
         "Goose",
-        "🪿",
+        "◎",
         "goose",
         &["run", "-t", "{prompt}"],
         Delivery::Arg,
     ),
     def("amp", "Amp", "⚡", "amp", ARG_PROMPT, Delivery::Stdin),
-    def("droid", "Droid", "🤖", "droid", ARG_PROMPT, Delivery::Arg),
+    def("droid", "Droid", "▣", "droid", ARG_PROMPT, Delivery::Arg),
     def(
         "qwen-code",
         "Qwen Code",

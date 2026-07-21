@@ -40,6 +40,6 @@ pub fn toggle(cx: &mut App) {
     cx.refresh_windows();
     let name = if next.is_dark() { "dark" } else { "light" };
     if let Err(e) = config::edit::set_key(&config::default_path(), "theme", &format!("{name:?}")) {
-        eprintln!("settings: {e}");
+        tracing::warn!(error = %e, "could not persist theme setting");
     }
 }

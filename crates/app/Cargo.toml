@@ -43,7 +43,6 @@ plugin = { path = "../plugin" }
 pluginrt = { path = "../pluginrt" }
 preview = { path = "../preview" }
 proxy = { path = "../proxy" }
-remote = { path = "../remote" }
 runner = { path = "../runner" }
 search = { path = "../search" }
 store = { path = "../store" }
@@ -53,6 +52,13 @@ zeroize = "1"
 anyhow = { workspace = true }
 futures = { workspace = true }
 serde_json = { workspace = true }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
+
+# Group signals for deterministic agent teardown (see src/reap.rs).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 # macOS packaging. `cargo bundle --release --format osx` produces Asylum.app; the
 # release workflow wraps it into a signed/notarized .dmg (packaging/macos.sh).

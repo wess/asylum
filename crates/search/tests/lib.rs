@@ -69,3 +69,45 @@ fn live_search_finds_seeded_content() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn malformed_regex_returns_invalid_pattern() {
+    // Use git grep against a throwaway repo so the test is backend-independent.
+    if std::process::Command::new("git")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        return;
+    }
+    let n = SEQ.fetch_add(1, Ordering::Relaxed);
+    let dir =
+        std::env::temp_dir().join(format!("asylum-search-invalid-{}-{n}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let run = |args: &[&str]| {
+        std::process::Command::new("git")
+            .current_dir(&dir)
+            .args(args)
+            .output()
+            .unwrap();
+    };
+    run(&["init", "-q"]);
+    run(&["config", "user.email", "t@t.t"]);
+    run(&["config", "user.name", "t"]);
+    std::fs::write(dir.join("code.rs"), "fn test() {}\n").unwrap();
+    run(&["add", "."]);
+    run(&["commit", "-qm", "x"]);
+
+    // Unclosed bracket should trigger InvalidPattern error.
+    let result = search(&dir, "[", &Options::default());
+    match result {
+        Err(Error::InvalidPattern(msg)) => {
+            // Error message should mention brackets or pattern.
+            assert!(!msg.is_empty());
+        }
+        other => panic!("expected InvalidPattern, got: {other:?}"),
+    }
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -71,8 +71,9 @@ A big tournament can outlast your attention span at the desk. Use the event
 stream to stay in the loop from anywhere
 ([Chapter 12](12-the-mobile-companion-and-events.md)):
 
-- Bind the companion to `0.0.0.0:8787` **with a token** and watch runs — including
-  their live `blocked` activity — from your phone.
+- Turn on the companion, bind it to `0.0.0.0:8787`, and set **a token** — it is
+  off by default and refuses to start without one — then watch runs, including
+  their live `blocked` activity, from your phone.
 - Send a **follow-up** from your phone to nudge a live run without returning to
   the machine.
 - For scripting, tail `GET /api/events?since=<cursor>` (or `/control/events` from
@@ -95,28 +96,30 @@ worktree per run, isolation preserved across the network.
 ## Plugin-extended pipelines
 
 Plugins ([Chapter 13](13-plugins.md)) are how the ADE is meant to wire into the
-rest of your world. Today one extension point is wired end to end — a
-**`[[command]]`** in the palette, invoked through the plugin's runtime — and
-that is what you can build a workflow on right now. Install a plugin, give it a
-command, and drive it from the palette.
+rest of your world. Two extension points are wired end to end today — a
+**`[[command]]`** in the palette, invoked through the plugin's runtime, and a
+**`[[trigger]]`** that fires on an ADE event — and only for a plugin you have
+explicitly **enabled** in the Plugins surface (a process runtime asks you to
+confirm a trust disclosure first; WASM enables directly). That is what you can
+build a workflow on right now.
 
-The rest of the manifest is declared but not yet dispatched by the app, so treat
-it the way you treat remote worktrees above: real at the manifest level, not a
-working button.
+The rest of the manifest — `[panel]`, `[webview]`, `[[tool]]` — is declared but
+not yet dispatched by the app, so treat those the way you treat remote
+worktrees above: real at the manifest level, not a working button.
 
-- A **`[[trigger]]` on `run_finished` or `task_merged`** is designed to notify a
-  channel, kick a deploy, or file a follow-up — turning a merge into the first
-  step of a pipeline rather than the last. The app does not fire triggers yet; a
-  trigger you write parses and validates but never runs. Until host dispatch
-  lands, get the same effect by invoking the plugin command yourself, or by
-  driving your pipeline from CI on the merged branch.
+- A **`[[trigger]]` on `run_finished` or `task_merged`** notifies a channel,
+  kicks a deploy, or files a follow-up — turning a merge into the first step of
+  a pipeline rather than the last. It runs off the UI thread under a
+  per-invocation timeout, so a slow or hung plugin never wedges the fleet, and a
+  failure lands in the Inbox naming the plugin. Condition it with `when` to fire
+  only on `success` (`zero`) or `failure` (`nonzero`).
 - A **`[[tool]]`** is designed to expose an internal capability (ticketing, a
   knowledge base, a deploy hook) to the agents themselves. The app does not offer
   plugin tools to agents yet. An agent that needs to reach your systems today
   goes through the control surface ([Chapter 11](11-agent-orchestration-and-the-control-surface.md))
   or a masked upstream via `asylum call`.
 - Prefer the **WASM runtime** for anything shared or untrusted — capabilities are
-  enforced there, not merely advisory.
+  enforced there, not merely advisory, and it enables without a trust prompt.
 
 ## Best practices, condensed
 
@@ -128,8 +131,9 @@ working button.
   worktrees are durable, use them.
 - **Right-size concurrency** to your machine and quota; breadth with a concurrency
   cap beats a stampede.
-- **Keep control and companion secured** — localhost by default, a token before
-  the LAN.
+- **Keep control and companion secured** — both loopback by default; control
+  auto-provisions a token, and the companion (off by default) always needs one
+  you set yourself, on the LAN or off it.
 - **Let agents self-report state**; the classifier is a fallback, not the truth.
 - **Reserve sub-fleets** for work that genuinely parallelizes; each helper costs a
   worktree and quota.
@@ -155,8 +159,9 @@ Design and run one end-to-end expert workflow:
 - Agent-driven sub-fleets multiply output and cost — power tool, used sparingly.
 - Events and the companion keep you in the loop remotely; remote worktrees push
   execution over SSH.
-- Plugins turn merges into pipelines and expose your systems to agents under
-  enforced capabilities.
+- Enabled plugins turn merges into pipelines today via triggers; exposing your
+  systems to agents as plugin tools, under enforced capabilities, is still on
+  the roadmap.
 
 ## The end, and the beginning
 

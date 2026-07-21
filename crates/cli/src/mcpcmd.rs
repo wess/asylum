@@ -16,6 +16,8 @@ use std::net::TcpStream;
 
 use serde_json::{json, Value};
 
+use crate::help;
+
 pub fn mcp(args: &[String]) -> Result<(), String> {
     let sub = args.first().map(String::as_str).unwrap_or("");
     let rest = &args[1.min(args.len())..];
@@ -27,7 +29,10 @@ pub fn mcp(args: &[String]) -> Result<(), String> {
         "list" => list(),
         "serve" => serve(rest),
         "stdio" => stdio(),
-        _ => Err("usage: asylum mcp <list|serve|stdio|skill>".into()),
+        _ => Err(format!(
+            "usage: asylum mcp <list|serve|stdio|skill> {}",
+            help::hint(&["mcp"])
+        )),
     }
 }
 

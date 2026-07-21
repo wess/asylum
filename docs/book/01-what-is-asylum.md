@@ -68,7 +68,8 @@ Asylum's window routes between thirteen surfaces. You will meet each in depth
 later; here is the map:
 
 - **Tasks** — the fan-out board where you compose tasks and watch runs race.
-- **Diff** — annotatable diff review with PASS/FAIL checks and inline comments.
+- **Review** — annotatable diff review with PASS/FAIL checks, per-hunk staging,
+  and inline comments.
 - **Search** — cross-worktree content search.
 - **Notes** — a Markdown knowledge vault with wiki links, tags, and templates.
 - **Integrations** — GitHub pull requests and issues, plus Linear.

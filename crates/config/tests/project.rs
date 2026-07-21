@@ -52,6 +52,19 @@ fn repo_config_cannot_set_credentials_or_binds() {
     }
 }
 
+/// `validate_project` (see `validate.rs`) runs right after a clean TOML
+/// parse, so a type-valid but nonsensical `base_branch` - unlike a bad key -
+/// still keeps the rest of the document and is cleared with a diagnostic
+/// naming the key, rather than rejecting the whole file.
+#[test]
+fn semantically_bad_base_branch_is_cleared_not_rejected() {
+    let (cfg, diags) = parse_project("base_branch = \"bad..branch\"\nsetup = [\"bun install\"]\n");
+    assert_eq!(cfg.base_branch, None);
+    assert_eq!(cfg.setup, vec!["bun install"]);
+    assert_eq!(diags.len(), 1);
+    assert_eq!(diags[0].key, "base_branch");
+}
+
 #[test]
 fn missing_file_is_clean_default() {
     let (cfg, diags) = load_project(std::path::Path::new("/no/such/dir"));

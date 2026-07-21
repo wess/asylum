@@ -39,6 +39,8 @@ pub fn navbar(
     project_id: Option<i64>,
     task_id: Option<i64>,
     collapsed: bool,
+    more_shown: bool,
+    keymap: &config::Keymap,
     handle: Entity<Root>,
     _window: &mut Window,
     cx: &mut App,
@@ -50,7 +52,15 @@ pub fn navbar(
         .w_full()
         .h_full()
         .child(collapse_control(collapsed, handle.clone(), &p))
-        .child(nav_menu(active_view, unread, collapsed, handle.clone(), &p));
+        .child(nav_menu(
+            active_view,
+            unread,
+            collapsed,
+            more_shown,
+            keymap,
+            handle.clone(),
+            &p,
+        ));
     if !collapsed {
         nav = nav
             .child(div().w_full().h(px(1.0)).bg(p.border))
@@ -93,11 +103,15 @@ fn collapse_control(collapsed: bool, handle: Entity<Root>, p: &Palette) -> impl 
         ))
 }
 
-/// The vertical view switcher. Clicking an item opens (or focuses) its tab.
+/// The vertical view switcher: the core surfaces, then a "More" reveal for the
+/// rest. Clicking an item opens (or focuses) its tab.
+#[allow(clippy::too_many_arguments)]
 fn nav_menu(
     active_view: Option<View>,
     unread: usize,
     collapsed: bool,
+    more_shown: bool,
+    keymap: &config::Keymap,
     handle: Entity<Root>,
     p: &Palette,
 ) -> impl IntoElement {
@@ -107,71 +121,183 @@ fn nav_menu(
         .gap_1()
         .when(collapsed, |element| element.p(px(6.0)))
         .when(!collapsed, |element| element.p(px(8.0)));
-    for (index, (v, _glyph, _label)) in View::BAR.iter().enumerate() {
-        if !collapsed && index == 4 {
-            col = col.child(
-                div()
-                    .px(px(10.0))
-                    .pt(px(10.0))
-                    .pb(px(3.0))
-                    .text_color(p.dimmed)
-                    .text_size(px(11.0))
-                    .child("TOOLS"),
-            );
-        }
-        let v = *v;
-        let active = Some(v) == active_view;
-        let h = handle.clone();
-        let icon_color = if active { p.primary } else { p.dimmed };
-        let text_color = if active { p.text } else { p.dimmed };
-
-        let mut row = div()
-            .id(SharedString::from(format!("nav-{}", v.label())))
-            .flex()
-            .flex_row()
-            .items_center()
-            .gap(px(10.0))
-            .px(px(10.0))
-            .py(px(7.0))
-            .rounded(px(7.0))
-            .cursor_pointer()
-            .tab_index(0)
-            .role(gpui::accesskit::Role::Button)
-            .aria_label(v.label())
-            .aria_selected(active)
-            .tooltip(guise::tooltip(v.label()))
-            .focus_visible(move |style| style.border_1().border_color(p.primary))
-            .when(collapsed, |element| {
-                element.justify_center().gap(px(4.0)).px(px(4.0))
-            })
-            .child(icon(v.icon(), 16.0).text_color(icon_color));
-        if !collapsed {
-            row = row.child(
-                div()
-                    .flex_1()
-                    .text_color(text_color)
-                    .text_size(px(13.0))
-                    .child(SharedString::from(v.label())),
-            );
-        }
-        if active {
-            row = row.bg(p.hover);
-        }
-        if v == View::Notifications && unread > 0 {
-            row = row.child(
-                Badge::new(SharedString::from(unread.to_string()))
-                    .color(ColorName::Red)
-                    .variant(Variant::Filled),
-            );
-        }
-        col = col.child(row.on_click(move |_, window, cx| {
-            h.update(cx, |root, cx| {
-                root.open_view(v, window, cx);
-                cx.notify();
-            });
-        }));
+    for v in View::PRIMARY {
+        col = col.child(nav_row(
+            *v,
+            active_view,
+            unread,
+            collapsed,
+            keymap,
+            handle.clone(),
+            p,
+        ));
+    }
+    col = col.child(more_toggle(
+        more_shown,
+        collapsed,
+        unread,
+        handle.clone(),
+        p,
+    ));
+    for v in crate::state::more_rail(active_view, more_shown) {
+        col = col.child(nav_row(
+            v,
+            active_view,
+            unread,
+            collapsed,
+            keymap,
+            handle.clone(),
+            p,
+        ));
     }
     col
+}
+
+/// The chord bound to `view`'s action, if the resolved keymap binds one. Rail
+/// tooltips show this alongside the label so the shortcut is discoverable
+/// without opening Settings.
+fn shortcut(view: View, keymap: &config::Keymap) -> Option<&str> {
+    let action = view.keymap_action()?;
+    keymap
+        .bindings()
+        .find(|(_, bound)| *bound == action)
+        .map(|(chord, _)| chord)
+}
+
+/// One rail entry: icon + label (icon only when collapsed), with the unread
+/// badge on the inbox.
+fn nav_row(
+    v: View,
+    active_view: Option<View>,
+    unread: usize,
+    collapsed: bool,
+    keymap: &config::Keymap,
+    handle: Entity<Root>,
+    p: &Palette,
+) -> impl IntoElement {
+    let active = Some(v) == active_view;
+    let icon_color = if active { p.primary } else { p.dimmed };
+    let text_color = if active { p.text } else { p.dimmed };
+    let tip = match shortcut(v, keymap) {
+        Some(chord) => format!("{} ({chord})", v.label()),
+        None => v.label().to_string(),
+    };
+
+    let mut row = div()
+        .id(SharedString::from(format!("nav-{}", v.label())))
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap(px(10.0))
+        .px(px(10.0))
+        .py(px(7.0))
+        .rounded(px(7.0))
+        .cursor_pointer()
+        .tab_index(0)
+        .role(gpui::accesskit::Role::Button)
+        .aria_label(v.label())
+        .aria_selected(active)
+        .tooltip(guise::tooltip(tip))
+        .focus_visible(move |style| style.border_1().border_color(p.primary))
+        .when(collapsed, |element| {
+            element.justify_center().gap(px(4.0)).px(px(4.0))
+        })
+        .child(icon(v.icon(), 16.0).text_color(icon_color));
+    if !collapsed {
+        row = row.child(
+            div()
+                .flex_1()
+                .text_color(text_color)
+                .text_size(px(13.0))
+                .child(SharedString::from(v.label())),
+        );
+    }
+    if active {
+        row = row.bg(p.hover);
+    }
+    if v == View::Notifications && unread > 0 {
+        row = row.child(
+            Badge::new(SharedString::from(unread.to_string()))
+                .color(ColorName::Red)
+                .variant(Variant::Filled),
+        );
+    }
+    row.on_click(move |_, window, cx| {
+        handle.update(cx, |root, cx| {
+            root.open_view(v, window, cx);
+            cx.notify();
+        });
+    })
+}
+
+/// The reveal control between the core surfaces and the rest: a labeled
+/// section toggle when expanded, an ellipsis button on the icon rail. While
+/// the section is hidden it carries the inbox's unread badge so that signal
+/// is never lost.
+fn more_toggle(
+    shown: bool,
+    collapsed: bool,
+    unread: usize,
+    handle: Entity<Root>,
+    p: &Palette,
+) -> impl IntoElement {
+    let label = if shown {
+        "Fewer surfaces"
+    } else {
+        "More surfaces"
+    };
+    let chevron = if shown {
+        "chevron-down"
+    } else {
+        "chevron-right"
+    };
+    let mut row = div()
+        .id("nav-more")
+        .flex()
+        .flex_row()
+        .items_center()
+        .rounded(px(7.0))
+        .cursor_pointer()
+        .tab_index(0)
+        .role(gpui::accesskit::Role::Button)
+        .aria_label(label)
+        .aria_expanded(shown)
+        .tooltip(guise::tooltip(label))
+        .focus_visible(move |style| style.border_1().border_color(p.primary));
+    if collapsed {
+        row = row
+            .justify_center()
+            .px(px(4.0))
+            .py(px(7.0))
+            .child(icon("ellipsis", 16.0).text_color(p.dimmed));
+    } else {
+        row = row
+            .gap(px(6.0))
+            .px(px(10.0))
+            .pt(px(10.0))
+            .pb(px(3.0))
+            .child(icon(chevron, 13.0).text_color(p.dimmed))
+            .child(
+                div()
+                    .flex_1()
+                    .text_color(p.dimmed)
+                    .text_size(px(11.0))
+                    .child("MORE"),
+            );
+    }
+    if !shown && unread > 0 {
+        row = row.child(
+            Badge::new(SharedString::from(unread.to_string()))
+                .color(ColorName::Red)
+                .variant(Variant::Filled),
+        );
+    }
+    row.on_click(move |_, _, cx| {
+        handle.update(cx, |root, cx| {
+            let revealed = !root.settings.sidebar_more;
+            root.set_sidebar_more(revealed, cx);
+        });
+    })
 }
 
 /// The expandable project → task → run tree.

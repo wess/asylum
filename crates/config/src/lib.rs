@@ -14,6 +14,8 @@
 //! - [`watch`] - live reload: poll the file's mtime, fire on change.
 //! - [`bind`] - refuse unsafe (unauthenticated non-loopback) server binds.
 //! - [`token`] - generate the control surface's per-session credential.
+//! - [`validate`] - flag type-valid but semantically bad values (bad ports,
+//!   paths, branch names, ...) as diagnostics alongside `salvage`'s.
 
 pub mod bind;
 pub mod edit;
@@ -23,6 +25,7 @@ pub mod load;
 pub mod model;
 pub mod project;
 pub mod token;
+mod validate;
 pub mod watch;
 
 pub use keys::{Keymap, DEFAULTS as KEY_DEFAULTS};

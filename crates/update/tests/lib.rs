@@ -97,3 +97,56 @@ fn evaluate_unknown_on_garbage() {
     assert_eq!(evaluate("bad", r#"{"tag_name":"1.0.0"}"#), Status::Unknown);
     assert_eq!(evaluate("0.1.0", r#"{"tag_name":"nope"}"#), Status::Unknown);
 }
+
+#[test]
+fn release_captures_name_published_at_and_url() {
+    let json = r#"{"tag_name":"v1.4.0","name":"Widgets galore","html_url":"https://example.com/r/1.4.0","published_at":"2026-01-02T03:04:05Z","body":"Added widgets.","draft":false,"prerelease":false}"#;
+    match evaluate("1.0.0", json) {
+        Status::Available(release) => {
+            assert_eq!(release.name, "Widgets galore");
+            assert_eq!(release.published_at, "2026-01-02T03:04:05Z");
+            assert_eq!(release.url, "https://example.com/r/1.4.0");
+            assert_eq!(release.notes, "Added widgets.");
+        }
+        other => panic!("expected Available, got {other:?}"),
+    }
+}
+
+#[test]
+fn release_defaults_missing_optional_fields() {
+    // Only tag_name present: name/html_url/published_at/body all default to
+    // empty rather than failing to parse.
+    let json = r#"{"tag_name":"v2.0.0"}"#;
+    match evaluate("1.0.0", json) {
+        Status::Available(release) => {
+            assert_eq!(release.name, "");
+            assert_eq!(release.published_at, "");
+            assert_eq!(release.url, "");
+            assert_eq!(release.notes, "");
+        }
+        other => panic!("expected Available, got {other:?}"),
+    }
+}
+
+#[test]
+fn notes_within_cap_are_untouched() {
+    let short = "Fixed a bug.";
+    assert_eq!(truncate_notes(short), short);
+}
+
+#[test]
+fn notes_over_cap_are_truncated_with_a_note() {
+    let long = "a".repeat(NOTES_CAP + 500);
+    let truncated = truncate_notes(&long);
+    assert!(truncated.len() < long.len());
+    assert!(truncated.ends_with("…\n\n(truncated)"));
+    assert!(truncated.starts_with(&"a".repeat(NOTES_CAP)));
+}
+
+#[test]
+fn notes_truncation_is_char_boundary_safe() {
+    // Multi-byte characters straddling the cap must not panic.
+    let long = "€".repeat(NOTES_CAP);
+    let truncated = truncate_notes(&long);
+    assert!(truncated.ends_with("…\n\n(truncated)"));
+}

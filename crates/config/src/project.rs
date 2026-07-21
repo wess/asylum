@@ -56,7 +56,10 @@ pub fn parse_project(text: &str) -> (ProjectConfig, Vec<Diagnostic>) {
         return (ProjectConfig::default(), Vec::new());
     }
     match toml::from_str::<ProjectConfig>(text) {
-        Ok(cfg) => (cfg, Vec::new()),
+        Ok(mut cfg) => {
+            let diagnostics = crate::validate::validate_project(&mut cfg);
+            (cfg, diagnostics)
+        }
         Err(e) => (
             ProjectConfig::default(),
             vec![Diagnostic::new("", e.message().to_string())],

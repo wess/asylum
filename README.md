@@ -53,9 +53,9 @@ Each feature is backed by tested logic and a working UI or CLI surface. See
 - **CLI** (`asylum`) with computer-use automation, fleet control
   (`control`, `wait`, `plugin`, `layout`), and masked secrets (`keep` stores a
   credential encrypted; `call` spends it through the proxy so an agent uses a key
-  it never sees), a **mobile companion** server (live on `:8787`), and an
-  **event stream** both expose so a phone or an agent can follow the fleet
-  without polling.
+  it never sees), an opt-in **mobile companion** server (`:8787`, token
+  required once enabled), and an **event stream** both expose so a phone or an
+  agent can follow the fleet without polling.
 
 ## Install
 
@@ -78,8 +78,7 @@ scoop install https://raw.githubusercontent.com/wess/asylum/main/packaging/scoop
 
 A Chocolatey `.nupkg` is built and attached to each release; it is not pushed to
 the community feed (that needs moderation), so install it from the downloaded
-package. 0.1.0 is the first release — until it is published, build from source
-as below.
+package. Until the first release is published, build from source as below.
 
 The installed binary is `asylum`; a local `cargo run -p app` stays `asylumdev`,
 so a dev build never collides with an installed release.
@@ -105,7 +104,8 @@ Once real signing certificates are wired in, this step goes away.
 ### Windows: beta
 
 The Windows binaries compile and link in CI but have **not been runtime-tested on
-a real machine** — treat them as beta. The installers are also unsigned, so
+a real machine** — treat them as beta. 1.0 targets macOS and Linux; Windows
+leaves beta once it has been runtime-tested on real hardware. The installers are also unsigned, so
 SmartScreen shows an "unknown publisher" prompt until an Authenticode
 certificate is added. The `.zip` is the guaranteed deliverable; the `.msi` is
 best-effort.

@@ -83,19 +83,28 @@ pub(crate) fn resolve_secrets(
 pub fn load_str(src: &str) -> Loaded {
     let cleaned = jsonc::strip(src);
     let trimmed = cleaned.trim();
-    if trimmed.is_empty() {
-        return Loaded {
+    let mut loaded = if trimmed.is_empty() {
+        Loaded {
             settings: Settings::default(),
             diagnostics: Vec::new(),
-        };
-    }
-    match serde_json::from_str::<Settings>(&cleaned) {
-        Ok(settings) => Loaded {
-            settings,
-            diagnostics: Vec::new(),
-        },
-        Err(e) => salvage(&cleaned, e),
-    }
+        }
+    } else {
+        match serde_json::from_str::<Settings>(&cleaned) {
+            Ok(settings) => Loaded {
+                settings,
+                diagnostics: Vec::new(),
+            },
+            Err(e) => salvage(&cleaned, e),
+        }
+    };
+    // Second pass: every key that survived salvage has the right *type*, but
+    // may still be nonsensical (a bad port, an empty worktree_dir, ...). Runs
+    // unconditionally, including on plain defaults, so drift in either the
+    // rules or the compiled defaults surfaces immediately in tests.
+    loaded
+        .diagnostics
+        .extend(crate::validate::validate(&mut loaded.settings));
+    loaded
 }
 
 /// Keep every top-level key that stands on its own, and turn the rest into

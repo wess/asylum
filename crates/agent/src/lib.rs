@@ -20,6 +20,7 @@ pub mod activity;
 pub mod command;
 pub mod doctor;
 pub mod plan;
+pub mod probe;
 pub mod registry;
 
 pub use activity::{classify, default_rules, rules_for, Activity, ActivityRules};

@@ -1,5 +1,5 @@
-//! Branch operations: list, create, delete, checkout, and merge - plus a
-//! non-destructive conflict check.
+//! Branch operations: list, create, delete, checkout, and merge (regular or
+//! squash) - plus a non-destructive conflict check.
 //!
 //! The ADE's merge flow ("merge the winner") lives here: after comparing runs,
 //! the chosen run's branch merges back into the project's base. Before offering
@@ -117,22 +117,80 @@ pub fn merge(repo: &Path, branch: &str) -> Result<MergeOutcome, Error> {
             Ok(MergeOutcome::Merged)
         }
     } else {
-        // Collect conflicted paths from the index.
-        let status = git_capture(repo, &["diff", "--name-only", "--diff-filter=U"])?;
-        let paths = status
-            .stdout
-            .lines()
-            .map(|l| l.trim().to_string())
-            .filter(|l| !l.is_empty())
-            .collect();
-        Ok(MergeOutcome::Conflicts(paths))
+        Ok(MergeOutcome::Conflicts(conflicted_paths(repo)?))
     }
+}
+
+/// Squash-merge `branch` into the current branch of `repo`: `git merge
+/// --squash` stages `branch`'s combined diff into the index without creating
+/// a commit or moving `HEAD`, then - on a clean stage - this makes one commit
+/// of it (`message`, defaulting to `"Squash <branch>"`). Note that unlike
+/// [`merge`], the presence of "Fast-forward" in git's output is *not* a
+/// terminal outcome here: `--squash` prints it whenever the underlying
+/// computation was trivial, but still leaves the result uncommitted, so this
+/// function only ever treats "Already up to date" as needing no commit.
+///
+/// Reports conflicts the same way [`merge`] does (a [`MergeOutcome::Conflicts`]
+/// rather than an `Err`), but recovery differs: a squash merge never records
+/// `MERGE_HEAD`, so [`abort_merge`] cannot undo it - use
+/// [`abort_squash_merge`] instead.
+pub fn merge_squash(
+    repo: &Path,
+    branch: &str,
+    message: Option<&str>,
+) -> Result<MergeOutcome, Error> {
+    let out = git_capture(repo, &["merge", "--squash", branch])?;
+    if !out.success {
+        return Ok(MergeOutcome::Conflicts(conflicted_paths(repo)?));
+    }
+    let text = format!("{}\n{}", out.stdout, out.stderr);
+    if text.contains("Already up to date") {
+        return Ok(MergeOutcome::UpToDate);
+    }
+    let default_message = format!("Squash {branch}");
+    let message = message.unwrap_or(&default_message);
+    git(
+        repo,
+        &[
+            "-c",
+            "user.name=Asylum",
+            "-c",
+            "user.email=asylum@localhost",
+            "commit",
+            "-m",
+            message,
+        ],
+    )?;
+    Ok(MergeOutcome::Merged)
 }
 
 /// Abort an in-progress conflicted merge, restoring the pre-merge state.
 pub fn abort_merge(repo: &Path) -> Result<(), Error> {
     git(repo, &["merge", "--abort"])?;
     Ok(())
+}
+
+/// Recover from a conflicted (or otherwise uncommitted) [`merge_squash`]. A
+/// squash merge never records `MERGE_HEAD`, so `git merge --abort` refuses it
+/// ("There is no merge to abort") - reset the index and working tree back to
+/// `HEAD` instead, the same restoration `git merge --abort` performs once its
+/// `MERGE_HEAD` check passes. Since a squash merge never moves `HEAD`,
+/// resetting to it is always the correct, fully-clean recovery.
+pub fn abort_squash_merge(repo: &Path) -> Result<(), Error> {
+    git(repo, &["reset", "--merge", "HEAD"])?;
+    Ok(())
+}
+
+/// The conflicted (unmerged) paths left in the index by a [`merge`] or
+/// [`merge_squash`] that stopped with conflicts.
+fn conflicted_paths(repo: &Path) -> Result<Vec<String>, Error> {
+    let status = git_capture(repo, &["diff", "--name-only", "--diff-filter=U"])?;
+    Ok(status
+        .stdout
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect())
 }
 
 /// Commit every tracked and untracked change in a completed run worktree.

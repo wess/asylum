@@ -11,6 +11,7 @@
 
 use gpui::{actions, App, Entity, KeyBinding, Keystroke, Menu, MenuItem, OsAction, WindowHandle};
 
+use crate::logs;
 use crate::root::open_project;
 use crate::state::{Root, View};
 use crate::theme;
@@ -56,6 +57,7 @@ actions!(
         RunFanout,
         // Help
         Documentation,
+        OpenLogFolder,
     ]
 );
 
@@ -128,7 +130,7 @@ fn menus() -> Vec<Menu> {
                 MenuItem::action("Quick Open", QuickOpen),
                 MenuItem::separator(),
                 MenuItem::action("Tasks", GoTasks),
-                MenuItem::action("Diff Review", GoDiff),
+                MenuItem::action("Review", GoDiff),
                 MenuItem::action("Search", GoSearch),
                 MenuItem::action("Integrations", GoIntegrations),
                 MenuItem::action("Terminal", GoTerminal),
@@ -145,7 +147,10 @@ fn menus() -> Vec<Menu> {
         Menu {
             name: "Help".into(),
             disabled: false,
-            items: vec![MenuItem::action("Asylum Documentation", Documentation)],
+            items: vec![
+                MenuItem::action("Asylum Documentation", Documentation),
+                MenuItem::action("Open Log Folder", OpenLogFolder),
+            ],
         },
     ]
 }
@@ -161,12 +166,12 @@ fn bindings(settings: &config::Settings) -> Vec<KeyBinding> {
             .split_whitespace()
             .any(|part| Keystroke::parse(part).is_err())
         {
-            eprintln!("settings: keybindings: cannot parse chord `{chord}`");
+            tracing::warn!(chord, "settings: keybindings: cannot parse chord");
             continue;
         }
         match binding(chord, action) {
             Some(b) => out.push(b),
-            None => eprintln!("settings: keybindings: unknown action `{action}`"),
+            None => tracing::warn!(action, "settings: keybindings: unknown action"),
         }
     }
     out
@@ -224,6 +229,7 @@ fn register(root: Entity<Root>, window: WindowHandle<Root>, cx: &mut App) {
     });
 
     cx.on_action::<Documentation>(|_, _| open_url("https://github.com/wess/asylum"));
+    cx.on_action::<OpenLogFolder>(|_, cx| cx.reveal_path(&logs::default_dir()));
 
     // Settings remains available during onboarding so executable paths can be
     // corrected before the first repository is opened.
@@ -275,7 +281,20 @@ fn register(root: Entity<Root>, window: WindowHandle<Root>, cx: &mut App) {
     on_view::<GoPlugins>(window, View::Plugins, cx);
     on_view::<GoAccounts>(window, View::Accounts, cx);
     on_view::<GoInbox>(window, View::Notifications, cx);
-    on_view::<NewTask>(window, View::Tasks, cx);
+
+    // New Task opens the Tasks tab and focuses its compose input directly,
+    // rather than leaving the user to find and click into it.
+    cx.on_action::<NewTask>(move |_, cx| {
+        window
+            .update(cx, |root, w, cx| {
+                root.open_view(View::Tasks, w, cx);
+                if let Some(compose) = root.compose.clone() {
+                    w.focus(&compose.read(cx).focus_handle(), cx);
+                }
+                cx.notify();
+            })
+            .ok();
+    });
 
     cx.on_action::<SplitRight>(move |_, cx| {
         window

@@ -12,6 +12,11 @@ use serde::{Deserialize, Serialize};
 pub struct Settings {
     /// Named color theme for the chrome (guise theme selection).
     pub theme: String,
+    /// Whether the navigation rail reveals the full surface list. Off by
+    /// default: a fresh install shows just the core loop (Tasks, Diff, Search)
+    /// plus a "More" toggle, and every surface stays reachable from the command
+    /// palette and menus. The rail's toggle writes this key back.
+    pub sidebar_more: bool,
     /// Where per-task worktrees are created, relative to a project root.
     pub worktree_dir: String,
     /// Ids of the agents (from the `agent` registry) enabled by default when a
@@ -33,6 +38,11 @@ pub struct Settings {
     pub editor: EditorPrefs,
     /// Keybindings as `chord=action` strings, layered over the defaults.
     pub keybindings: Vec<String>,
+    /// Ids of the plugins the user has explicitly enabled. A plugin is inert
+    /// until it appears here — its triggers never fire and its commands never
+    /// run — so a process plugin (which runs with full user privileges) cannot
+    /// act without a deliberate opt-in. Empty by default: everything disabled.
+    pub enabled_plugins: Vec<String>,
     /// Linear API token. When set, the Integrations surface browses Linear
     /// teams and issues; empty leaves Linear disabled.
     pub linear_token: String,
@@ -60,6 +70,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: "dark".to_string(),
+            sidebar_more: false,
             worktree_dir: ".asylum/worktrees".to_string(),
             default_agents: Vec::new(),
             max_parallel_runs: 4,
@@ -69,6 +80,7 @@ impl Default for Settings {
             layouts: Layout::builtins(),
             editor: EditorPrefs::default(),
             keybindings: Vec::new(),
+            enabled_plugins: Vec::new(),
             linear_token: String::new(),
             companion: CompanionPrefs::default(),
             control: ControlPrefs::default(),
@@ -148,23 +160,26 @@ impl Layout {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct CompanionPrefs {
-    /// Whether the companion server runs at all.
+    /// Whether the companion server runs at all. Off by default: it exposes
+    /// projects, tasks, runs, and notifications, and accepts follow-ups into a
+    /// live agent, so it only starts once you opt in.
     pub enabled: bool,
     /// Address to bind. Localhost by default; set to `0.0.0.0:8787` to reach it
-    /// from a phone on the LAN. A non-loopback bind requires a token - the app
-    /// refuses to start the server on a LAN/wildcard address without one.
+    /// from a phone on the LAN.
     pub bind: String,
-    /// Bearer token required on API requests. Empty is allowed only for a
-    /// loopback bind (localhost-only, no auth); a non-loopback bind without a
-    /// token is refused at startup. When set, it is required as
-    /// `Authorization: Bearer <token>` on every `/api/*` request.
+    /// Bearer token required on every `/api/*` request as
+    /// `Authorization: Bearer <token>`. Required whenever the server is
+    /// enabled, loopback or not - an empty token refuses to start
+    /// (`bind::guard`), and the router denies every request as defense in
+    /// depth even if that guard is bypassed. May also come from
+    /// `ASYLUM_COMPANION_TOKEN`.
     pub token: String,
 }
 
 impl Default for CompanionPrefs {
     fn default() -> Self {
         Self {
-            enabled: true,
+            enabled: false,
             bind: "127.0.0.1:8787".to_string(),
             token: String::new(),
         }

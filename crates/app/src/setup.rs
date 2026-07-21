@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use gpui::prelude::*;
-use gpui::{div, px, Entity, IntoElement, SharedString};
+use gpui::{div, px, ClipboardItem, Entity, IntoElement, SharedString};
 use guise::prelude::*;
 
 use crate::control::Button;
@@ -21,6 +21,10 @@ pub struct Check {
     pub label: String,
     pub detail: String,
     pub status: Status,
+    /// Copy-pasteable install commands surfaced alongside this check
+    /// (agent name, install command), each rendered with a one-click copy
+    /// button rather than left for the user to select and copy by hand.
+    pub hints: Vec<(String, String)>,
 }
 
 impl Check {
@@ -29,7 +33,13 @@ impl Check {
             label: label.into(),
             detail: detail.into(),
             status,
+            hints: Vec::new(),
         }
+    }
+
+    fn with_hints(mut self, hints: Vec<(String, String)>) -> Self {
+        self.hints = hints;
+        self
     }
 }
 
@@ -115,26 +125,24 @@ pub fn inspect(root: &Root) -> Vec<Check> {
             Status::Attention,
         )
     } else {
-        // Nothing installed: show copy-pasteable install lines. Prefer the
-        // agents the user chose as defaults, else a few well-known ones.
+        // Nothing installed: show copy-pasteable install lines, each with a
+        // one-click copy button. Prefer the agents the user chose as
+        // defaults, else a few well-known ones.
         let preferred = &root.settings.default_agents;
-        let hints: Vec<String> = reports
+        let hints: Vec<(String, String)> = reports
             .iter()
             .filter(|(agent, _)| preferred.is_empty() || preferred.contains(&agent.id))
             .filter_map(|(agent, report)| {
-                report.install.map(|hint| format!("• {}: {hint}", agent.name))
+                report.install.map(|hint| (agent.name.clone(), hint.to_string()))
             })
             .take(3)
             .collect();
         let detail = if hints.is_empty() {
             "No agent CLI was found on PATH. Install one (e.g. Claude Code) and enable it in Settings.".to_string()
         } else {
-            format!(
-                "No agent CLI was found on PATH. Install one, then reopen the project:\n{}",
-                hints.join("\n")
-            )
+            "No agent CLI was found on PATH. Install one, then reopen the project:".to_string()
         };
-        Check::new("Agents", detail, Status::Blocked)
+        Check::new("Agents", detail, Status::Blocked).with_hints(hints)
     });
 
     let detected_checks = checks::detect(path);
@@ -230,11 +238,35 @@ pub fn panel(checks: Vec<Check>, open: bool, handle: Entity<Root>) -> impl IntoE
     let hide = handle;
     let mut rows = div().flex().flex_col().gap_1();
     for check in checks {
-        let (label, color) = match check.status {
+        let Check {
+            label,
+            detail,
+            status,
+            hints,
+        } = check;
+        let (status_label, color) = match status {
             Status::Pass => ("ready", ColorName::Green),
             Status::Attention => ("verify", ColorName::Orange),
             Status::Blocked => ("blocked", ColorName::Red),
         };
+        let mut left = div()
+            .flex()
+            .flex_col()
+            .min_w(px(0.0))
+            .flex_1()
+            .child(Text::new(SharedString::from(label)).size(Size::Sm))
+            .child(
+                Text::new(SharedString::from(detail))
+                    .size(Size::Xs)
+                    .dimmed(),
+            );
+        if !hints.is_empty() {
+            let mut hint_list = div().flex().flex_col().gap_1().pt(px(4.0));
+            for (index, (agent, command)) in hints.into_iter().enumerate() {
+                hint_list = hint_list.child(hint_row(index, agent, command));
+            }
+            left = left.child(hint_list);
+        }
         rows = rows.child(
             div()
                 .flex()
@@ -243,23 +275,13 @@ pub fn panel(checks: Vec<Check>, open: bool, handle: Entity<Root>) -> impl IntoE
                 .justify_between()
                 .gap_3()
                 .py(px(3.0))
+                .child(left)
                 .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .min_w(px(0.0))
-                        .flex_1()
-                        .child(Text::new(SharedString::from(check.label)).size(Size::Sm))
-                        .child(
-                            Text::new(SharedString::from(check.detail))
-                                .size(Size::Xs)
-                                .dimmed(),
-                        ),
-                )
-                .child(
-                    div()
-                        .flex_none()
-                        .child(Badge::new(label).color(color).variant(Variant::Light)),
+                    div().flex_none().child(
+                        Badge::new(status_label)
+                            .color(color)
+                            .variant(Variant::Light),
+                    ),
                 ),
         );
     }
@@ -308,4 +330,32 @@ pub fn panel(checks: Vec<Check>, open: bool, handle: Entity<Root>) -> impl IntoE
         )
         .child(rows)
         .into_any_element()
+}
+
+/// One copy-pasteable install hint: the agent name and its install command,
+/// with a one-click button that copies just the command to the clipboard.
+fn hint_row(index: usize, agent: String, command: String) -> impl IntoElement {
+    let clip = command.clone();
+    div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .justify_between()
+        .gap_2()
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .min_w(px(0.0))
+                .child(Text::new(SharedString::from(agent)).size(Size::Xs).dimmed())
+                .child(Text::new(SharedString::from(command)).size(Size::Xs)),
+        )
+        .child(
+            Button::new(SharedString::from(format!("copy-hint-{index}")), "Copy")
+                .size(Size::Xs)
+                .variant(Variant::Subtle)
+                .on_click(move |_, _, cx| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(clip.clone()));
+                }),
+        )
 }

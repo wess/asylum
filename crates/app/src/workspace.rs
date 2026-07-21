@@ -94,7 +94,7 @@ impl TabKind {
     pub fn title(&self) -> String {
         match self {
             TabKind::Tasks => "Tasks".into(),
-            TabKind::Diff => "Diff".into(),
+            TabKind::Diff => "Review".into(),
             TabKind::Search => "Search".into(),
             TabKind::Notes => "Notes".into(),
             TabKind::Integrations => "Integrations".into(),

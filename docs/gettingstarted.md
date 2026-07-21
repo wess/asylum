@@ -41,16 +41,21 @@ also use that worktree and persist while queued.
 
 ## Review and Finish
 
-Select a run, open Review, and compare its diff, terminal output, and checks.
-Click a diff line to add a comment. `Send review to agent` queues another attempt
-for the selected run and resolves the sent comments after the queue operation
-succeeds.
+Select a run, open Review, and compare its diff, terminal output, and checks. A
+successful run's changes stay uncommitted in its worktree until merge, so you
+can stage or unstage individual hunks (or a whole file) before deciding what
+lands; a counter tracks how many hunks are staged. Click a diff line to add a
+comment. `Send review to agent` queues another attempt for the selected run and
+resolves the sent comments after the queue operation succeeds.
 
 Asylum runs detected checks in each successful run's worktree. Failed or active
 checks block merge and PR actions. Before merge, Asylum also checks for user
 changes in the base worktree and computes conflicts without changing the index.
-The final confirmation performs the merge. Cleanup removes clean finished
-worktrees and preserves dirty worktrees and branches.
+The final confirmation performs the merge — as a regular merge or a squash
+merge — which is also when the accepted changes are committed onto the run's
+branch. A separate `Clean up finished worktrees` action removes clean finished
+worktrees and deletes any branch that is now safely merged, leaving dirty
+worktrees and any unmerged branch alone.
 
 ## Project Configuration
 
@@ -66,9 +71,12 @@ setup = ["bun install"]
 RUST_BACKTRACE = "1"
 ```
 
-Asylum runs each `setup` command once in a new worktree before the agent starts.
-A failed command creates a durable failed run with the worktree path and error,
-so you can inspect or remove it from the app.
+Asylum runs each `setup` command once in a new worktree before the agent starts,
+one command at a time with its own captured output, shown in a cancellable
+"Preparing" banner while it runs. Each command gets a 10-minute timeout; a
+failure names the exact command and its exit code, and creates a durable failed
+run with the worktree path and error so you can inspect or remove it from the
+app.
 
 ## Keyboard
 

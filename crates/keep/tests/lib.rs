@@ -237,6 +237,35 @@ fn all_values_spans_every_scope() {
     );
 }
 
+#[test]
+fn scopes_lists_names_by_scope_without_values() {
+    let mut keep = Keep::create("pw").unwrap();
+    keep.set(&Scope::Global, "openai", "sk-global");
+    keep.set(&Scope::Global, "anthropic", "sk-ant");
+    keep.set(&Scope::Project(7), "stripe", "sk_live_7");
+    // An emptied scope is not reported.
+    keep.set(&Scope::Project(9), "gone", "x");
+    keep.remove(&Scope::Project(9), "gone");
+
+    let scopes = keep.scopes();
+    let global = scopes
+        .iter()
+        .find(|(k, _)| k == "global")
+        .map(|(_, n)| n.clone())
+        .unwrap();
+    assert_eq!(global, vec!["anthropic", "openai"]);
+    let project = scopes
+        .iter()
+        .find(|(k, _)| k == "project:7")
+        .map(|(_, n)| n.clone())
+        .unwrap();
+    assert_eq!(project, vec!["stripe"]);
+    assert!(scopes.iter().all(|(k, _)| k != "project:9"));
+    // Values never appear in the listing.
+    let flat = format!("{scopes:?}");
+    assert!(!flat.contains("sk-global") && !flat.contains("sk_live_7"));
+}
+
 fn contains(haystack: &[u8], needle: &[u8]) -> bool {
     haystack.windows(needle.len()).any(|w| w == needle)
 }

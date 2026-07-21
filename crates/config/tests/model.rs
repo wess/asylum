@@ -36,6 +36,36 @@ fn a_default_settings_has_no_layout_named_garbage() {
 }
 
 #[test]
+fn enabled_plugins_default_empty_and_deserialize() {
+    // Everything is disabled out of the box: a plugin is inert until opted in.
+    assert!(Settings::default().enabled_plugins.is_empty());
+
+    let s: Settings =
+        serde_json::from_str(r#"{ "enabled_plugins": ["acme.hello", "beta"] }"#).unwrap();
+    assert_eq!(s.enabled_plugins, vec!["acme.hello", "beta"]);
+
+    // Re-serialize and read back — the list round-trips unchanged.
+    let back: Settings = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+    assert_eq!(back.enabled_plugins, s.enabled_plugins);
+}
+
+#[test]
+fn sidebar_more_is_hidden_by_default() {
+    assert!(!Settings::default().sidebar_more);
+    // The rail's toggle persists the reveal as a plain top-level key.
+    let s: Settings = serde_json::from_str(r#"{ "sidebar_more": true }"#).unwrap();
+    assert!(s.sidebar_more);
+}
+
+#[test]
+fn companion_is_off_by_default() {
+    let s = Settings::default();
+    assert!(!s.companion.enabled);
+    assert!(s.companion.token.is_empty());
+    assert_eq!(s.companion.bind, "127.0.0.1:8787");
+}
+
+#[test]
 fn mcp_is_off_with_no_servers_by_default() {
     let s = Settings::default();
     assert!(!s.mcp.enabled);

@@ -1,5 +1,6 @@
 //! `asylum layout` - inspect the fan-out presets defined in settings.json.
 
+use crate::help;
 use crate::positionals;
 
 pub fn layout(args: &[String]) -> Result<(), String> {
@@ -20,10 +21,12 @@ pub fn layout(args: &[String]) -> Result<(), String> {
             Ok(())
         }
         "show" => {
-            let name = positionals(&args[1..])
-                .first()
-                .cloned()
-                .ok_or("usage: asylum layout show <name>")?;
+            let name = positionals(&args[1..]).first().cloned().ok_or_else(|| {
+                format!(
+                    "usage: asylum layout show <name> {}",
+                    help::hint(&["layout", "show"])
+                )
+            })?;
             let l = settings
                 .layout(&name)
                 .ok_or_else(|| format!("no layout `{name}`"))?;
@@ -40,6 +43,9 @@ pub fn layout(args: &[String]) -> Result<(), String> {
             );
             Ok(())
         }
-        _ => Err("usage: asylum layout <list | show <name>>".into()),
+        _ => Err(format!(
+            "usage: asylum layout <list | show <name>> {}",
+            help::hint(&["layout"])
+        )),
     }
 }

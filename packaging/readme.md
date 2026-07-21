@@ -74,7 +74,8 @@ The app icon lives in `assets/icon.svg`; regenerate the raster/`.icns` with
 
 `packaging/macos.sh` signs and notarizes only when the relevant secrets are set,
 so unsigned local and fork builds still succeed. Configure these repository
-secrets to produce distributable macOS builds:
+secrets to produce distributable macOS builds (provisioning steps:
+[`packaging/signing.md`](signing.md)):
 
 - `MACOS_CERT_P12` — base64 of the Developer ID Application `.p12`
 - `MACOS_CERT_PASSWORD` — its password

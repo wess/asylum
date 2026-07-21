@@ -84,7 +84,7 @@ None of these surfaces replace the fan-out board — they support it. You fan a
 task out, then use the terminal to poke at a worktree, the editor to make a quick
 manual tweak, preview to read what an agent generated, and the browser's design
 mode to hand an agent a precise visual bug. Then you go back to
-[Diff review](06-diffs-checks-and-review.md) and choose a winner.
+[Review](06-diffs-checks-and-review.md) and choose a winner.
 
 ## Try it
 

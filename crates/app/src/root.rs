@@ -2,15 +2,39 @@
 //! an activity switcher + project/task navbar, the active surface in the main
 //! area, and a status footer.
 
+mod chrome;
+mod palette;
+mod panes;
+
+pub use chrome::open_project;
+
 use gpui::prelude::*;
-use gpui::{
-    div, px, App, DragMoveEvent, Empty, Entity, IntoElement, MouseButton, PathPromptOptions,
-    SharedString, Window, WindowControlArea,
+use gpui::{div, px, App, DragMoveEvent, Entity, IntoElement, Window};
+use guise::prelude::*;
+use libsinclair::terminal::SessionOptions;
+use libsinclair::termview::{TermOptions, TermView};
+
+use chrome::{
+    confirm_bar, footer, header, notice_stack, onboarding, onboarding_settings, sidebar_resizer,
 };
+use panes::{pane_view, PaneSnap, TabSnap};
+
+use crate::state::{Root, View};
+use crate::workspace::TabKind;
+use crate::{accounts, diff, fleet, integrations, note, notifications, search, sidebar};
 
 /// Min/max width (px) the left navigation can be dragged to.
 const SIDEBAR_MIN: f32 = 180.0;
 const SIDEBAR_MAX: f32 = 560.0;
+/// Width (px) of the left navigation while collapsed to its icon rail.
+const SIDEBAR_COLLAPSED: f32 = 52.0;
+
+/// Header/footer chrome heights (px). The overlay layers below (the notice
+/// stack, the confirm bar, the sidebar resize divider) anchor to these
+/// instead of duplicating the numbers, so a chrome resize can't silently
+/// reopen an overlap.
+const HEADER_HEIGHT: f32 = 40.0;
+const FOOTER_HEIGHT: f32 = 28.0;
 
 /// Drag payload for the sidebar resize divider. A distinct type so `on_drag_move`
 /// only reacts to this drag.
@@ -21,364 +45,6 @@ struct SidebarDrag;
 const TRAFFIC_LIGHT_INSET: f32 = 76.0;
 #[cfg(not(target_os = "macos"))]
 const TRAFFIC_LIGHT_INSET: f32 = 8.0;
-use guise::prelude::*;
-use libsinclair::terminal::SessionOptions;
-use libsinclair::termview::{TermOptions, TermView};
-
-use crate::control::Button;
-use crate::icons::{icon, icon_button};
-use crate::state::{Root, View};
-use crate::workspace::TabKind;
-use crate::{accounts, diff, fleet, integrations, note, notifications, search, sidebar, theme};
-
-/// Open the native folder picker and add the chosen git repo as a project.
-pub fn open_project(handle: Entity<Root>, cx: &mut App) {
-    let rx = cx.prompt_for_paths(PathPromptOptions {
-        files: false,
-        directories: true,
-        multiple: false,
-        prompt: Some("Open".into()),
-    });
-    cx.spawn(async move |cx| {
-        if let Ok(Ok(Some(paths))) = rx.await {
-            if let Some(path) = paths.into_iter().next() {
-                handle.update(cx, |root, cx| {
-                    if let Err(error) = root.consider_project_path(path) {
-                        root.push_error("Could not open folder", error);
-                    }
-                    cx.notify();
-                });
-            }
-        }
-    })
-    .detach();
-}
-
-/// The first-run / no-projects onboarding screen.
-fn onboarding(
-    handle: Entity<Root>,
-    pending: Option<std::path::PathBuf>,
-    reports: Vec<(agent::registry::Agent, agent::doctor::Report)>,
-    notices: Vec<crate::run::Notice>,
-) -> impl IntoElement {
-    let installed = reports.iter().filter(|(_, report)| report.ready()).count();
-    let verified = reports
-        .iter()
-        .filter(|(_, report)| report.verified())
-        .count();
-    let mut body = div()
-        .flex()
-        .flex_col()
-        .items_center()
-        .justify_center()
-        .size_full()
-        .gap_4()
-        .p(px(32.0));
-    for notice in notices {
-        let color = match notice.tone {
-            crate::run::NoticeTone::Error => ColorName::Red,
-            crate::run::NoticeTone::Warning => ColorName::Orange,
-            crate::run::NoticeTone::Success => ColorName::Green,
-            crate::run::NoticeTone::Info => ColorName::Blue,
-        };
-        body = body.child(
-            div().w(px(560.0)).child(
-                Alert::new(SharedString::from(notice.message))
-                    .title(SharedString::from(notice.title))
-                    .color(color),
-            ),
-        );
-    }
-    if let Some(path) = pending {
-        let initialize = handle.clone();
-        let cancel = handle;
-        return body
-            .child(icon("git-branch", 40.0).text_color(gpui::rgb(0x3b82f6)))
-            .child(Title::new("Initialize git?").order(1))
-            .child(Text::new(SharedString::from(path.display().to_string())).size(Size::Sm))
-            .child(
-                Text::new("Asylum needs git worktrees. It will create a repository and an empty initial commit; existing files are not committed.")
-                    .size(Size::Xs)
-                    .dimmed(),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .gap_2()
-                    .child(
-                        Button::new("cancel-project", "Choose another folder")
-                            .variant(Variant::Subtle)
-                            .size(Size::Sm)
-                            .on_click(move |_, _, cx| {
-                                cancel.update(cx, |root, cx| {
-                                    root.pending_project = None;
-                                    cx.notify();
-                                });
-                            }),
-                    )
-                    .child(
-                        Button::new("initialize-project", "Initialize and open")
-                            .variant(Variant::Filled)
-                            .size(Size::Sm)
-                            .on_click(move |_, _, cx| {
-                                initialize.update(cx, |root, cx| {
-                                    if let Err(error) = root.initialize_pending_project() {
-                                        root.push_error("Could not initialize folder", error);
-                                    }
-                                    cx.notify();
-                                });
-                            }),
-                    ),
-            );
-    }
-    let configure = handle.clone();
-    let readiness = if verified > 0 {
-        format!("Ready to work · {verified} agent(s) verified")
-    } else if installed > 0 {
-        format!("{installed} agent(s) found · verify after opening a project")
-    } else {
-        "No agent CLI found · configure one before your first run".to_string()
-    };
-    body.child(
-        div()
-            .w_full()
-            .max_w(px(860.0))
-            .flex()
-            .flex_row()
-            .flex_wrap()
-            .items_center()
-            .gap(px(48.0))
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .flex_1()
-                    .min_w(px(320.0))
-                    .gap_3()
-                    .child(icon("git-branch", 40.0).text_color(gpui::rgb(0x3b82f6)))
-                    .child(Title::new("Run the same task. Compare the evidence.").order(1))
-                    .child(
-                        Text::new("Asylum gives each coding agent an isolated copy of your repository, then brings their changes, checks, and output together for review.")
-                            .size(Size::Sm)
-                            .dimmed(),
-                    )
-                    .child(
-                        Badge::new(SharedString::from(readiness))
-                            .color(if verified > 0 { ColorName::Green } else { ColorName::Orange })
-                            .variant(Variant::Light),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_row()
-                            .flex_wrap()
-                            .gap_2()
-                            .child(
-                                Button::new("open-project", "Open a repository…")
-                                    .variant(Variant::Filled)
-                                    .size(Size::Md)
-                                    .on_click(move |_, _, cx| open_project(handle.clone(), cx)),
-                            )
-                            .child(
-                                Button::new("configure-agents", "Configure agents")
-                                    .variant(Variant::Subtle)
-                                    .size(Size::Md)
-                                    .on_click(move |_, _, cx| {
-                                        configure.update(cx, |root, cx| {
-                                            root.onboarding_settings = true;
-                                            cx.notify();
-                                        });
-                                    }),
-                            ),
-                    )
-                    .child(
-                        Text::new("Your repository is not modified when you open it. Changes happen in separate git worktrees until you choose to merge.")
-                            .size(Size::Xs)
-                            .dimmed(),
-                    ),
-            )
-            .child(onboarding_path()),
-    )
-}
-
-fn onboarding_path() -> impl IntoElement {
-    let mut path = div()
-        .flex()
-        .flex_col()
-        .min_w(px(260.0))
-        .gap_3()
-        .p_4()
-        .border_1()
-        .rounded(px(8.0))
-        .child(Text::new("Your first run").bold());
-    for (number, title, detail) in [
-        ("1", "Open a repository", "Choose an existing git project."),
-        (
-            "2",
-            "Describe one outcome",
-            "Use a template or write a focused task.",
-        ),
-        (
-            "3",
-            "Start with one agent",
-            "Add more agents when comparison helps.",
-        ),
-        (
-            "4",
-            "Review before merging",
-            "Run checks and inspect the diff.",
-        ),
-    ] {
-        path = path.child(
-            div()
-                .flex()
-                .flex_row()
-                .items_start()
-                .gap_2()
-                .child(
-                    Badge::new(number)
-                        .color(ColorName::Blue)
-                        .variant(Variant::Light),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .child(Text::new(title).size(Size::Sm).bold())
-                        .child(Text::new(detail).size(Size::Xs).dimmed()),
-                ),
-        );
-    }
-    path
-}
-
-#[allow(clippy::too_many_arguments)]
-fn onboarding_settings(
-    settings: config::Settings,
-    diagnostics: Vec<config::Diagnostic>,
-    agents: Vec<crate::settings::AgentRow>,
-    inputs: crate::settings::Inputs,
-    collapsed: std::collections::HashSet<&'static str>,
-    handle: Entity<Root>,
-    window: &mut Window,
-    cx: &mut App,
-) -> gpui::AnyElement {
-    let back = handle.clone();
-    div()
-        .id("onboarding-settings")
-        .flex()
-        .flex_col()
-        .size_full()
-        .overflow_y_scroll()
-        .child(
-            div().p_3().child(
-                Button::new("settings-back", "Back to setup")
-                    .size(Size::Sm)
-                    .variant(Variant::Subtle)
-                    .on_click(move |_, _, cx| {
-                        back.update(cx, |root, cx| {
-                            root.onboarding_settings = false;
-                            cx.notify();
-                        });
-                    }),
-            ),
-        )
-        .child(crate::settings::settings_view(
-            settings,
-            diagnostics,
-            agents,
-            inputs,
-            collapsed,
-            handle,
-            window,
-            cx,
-        ))
-        .into_any_element()
-}
-
-fn notice_stack(notices: Vec<crate::run::Notice>, handle: Entity<Root>) -> impl IntoElement {
-    let mut stack = div()
-        .absolute()
-        .top(px(48.0))
-        .right(px(12.0))
-        .w(px(420.0))
-        .flex()
-        .flex_col()
-        .gap_2();
-    for notice in notices {
-        let close = handle.clone();
-        let id = notice.id;
-        let color = match notice.tone {
-            crate::run::NoticeTone::Info => ColorName::Blue,
-            crate::run::NoticeTone::Success => ColorName::Green,
-            crate::run::NoticeTone::Warning => ColorName::Orange,
-            crate::run::NoticeTone::Error => ColorName::Red,
-        };
-        stack = stack.child(
-            Alert::new(SharedString::from(notice.message))
-                .title(SharedString::from(notice.title))
-                .color(color)
-                .on_close(move |_, _, cx| {
-                    close.update(cx, |root, cx| {
-                        root.dismiss_notice(id);
-                        cx.notify();
-                    });
-                }),
-        );
-    }
-    stack
-}
-
-fn confirm_bar(action: crate::run::ConfirmAction, handle: Entity<Root>) -> impl IntoElement {
-    let confirm = handle.clone();
-    let cancel = handle;
-    div()
-        .absolute()
-        .bottom(px(38.0))
-        .left(px(300.0))
-        .right(px(12.0))
-        .p_3()
-        .border_1()
-        .rounded(px(6.0))
-        .bg(gpui::rgb(0x1f2937))
-        .flex()
-        .flex_row()
-        .items_center()
-        .gap_3()
-        .child(
-            div()
-                .flex_1()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(Text::new(action.title()).bold())
-                .child(Text::new(action.message()).size(Size::Xs).dimmed()),
-        )
-        .child(
-            Button::new("confirm-cancel", "Cancel")
-                .size(Size::Sm)
-                .variant(Variant::Subtle)
-                .on_click(move |_, _, cx| {
-                    cancel.update(cx, |root, cx| {
-                        root.confirm = None;
-                        cx.notify();
-                    });
-                }),
-        )
-        .child(
-            Button::new("confirm-action", "Confirm")
-                .size(Size::Sm)
-                .variant(Variant::Filled)
-                .on_click(move |_, _, cx| {
-                    confirm.update(cx, |root, cx| {
-                        root.confirm_action(cx);
-                        cx.notify();
-                    });
-                }),
-        )
-}
 
 impl Render for Root {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -388,6 +54,10 @@ impl Render for Root {
         let project_id = self.project_id;
         let task_id = self.task_id;
         let handle = cx.entity();
+        // Theme colors (owned, so the immutable theme borrow ends here).
+        // Read early so both the onboarding screen and the main shell can
+        // use the same snapshot.
+        let colors = Colors::from(cx);
 
         // No projects yet → onboarding.
         if self.is_empty() {
@@ -409,6 +79,7 @@ impl Render for Root {
                 self.pending_project.clone(),
                 self.agent_reports(),
                 self.notices.clone(),
+                colors.primary,
             )
             .into_any_element();
         }
@@ -476,9 +147,6 @@ impl Render for Root {
         let compose = self.compose.clone().unwrap();
         let review_note = self.review_note.clone().unwrap();
 
-        // Theme colors (owned, so the immutable theme borrow ends here).
-        let colors = Colors::from(cx);
-
         // Snapshot the pane/tab layout, cloning each active tab's kind so the
         // workspace borrow is released before we build content.
         let active_pane = self.workspace.active_pane;
@@ -519,8 +187,13 @@ impl Render for Root {
         }
         let main = area.into_any_element();
 
+        let sidebar_extent = if self.sidebar_collapsed {
+            SIDEBAR_COLLAPSED
+        } else {
+            self.sidebar_width
+        };
         let shell = AppShell::new()
-            .header(40.0, {
+            .header(HEADER_HEIGHT, {
                 let palette = palette.clone();
                 let quickopen = quickopen.clone();
                 let h = handle.clone();
@@ -533,31 +206,28 @@ impl Render for Root {
                     )
                 }
             })
-            .navbar(
-                if self.sidebar_collapsed {
-                    52.0
-                } else {
-                    self.sidebar_width
-                },
-                {
-                    let handle = handle.clone();
-                    let collapsed = self.sidebar_collapsed;
-                    move |window, cx| {
-                        sidebar::navbar(
-                            active_view,
-                            unread,
-                            tree.clone(),
-                            project_id,
-                            task_id,
-                            collapsed,
-                            handle.clone(),
-                            window,
-                            cx,
-                        )
-                    }
-                },
-            )
-            .footer(28.0, move |_window, _cx| footer(counts, unread))
+            .navbar(sidebar_extent, {
+                let handle = handle.clone();
+                let collapsed = self.sidebar_collapsed;
+                let more_shown = self.settings.sidebar_more;
+                let keymap = config::Keymap::from_settings(&self.settings.keybindings);
+                move |window, cx| {
+                    sidebar::navbar(
+                        active_view,
+                        unread,
+                        tree.clone(),
+                        project_id,
+                        task_id,
+                        collapsed,
+                        more_shown,
+                        &keymap,
+                        handle.clone(),
+                        window,
+                        cx,
+                    )
+                }
+            })
+            .footer(FOOTER_HEIGHT, move |_window, _cx| footer(counts, unread))
             .child(main)
             .child(palette)
             .child(quickopen);
@@ -580,51 +250,19 @@ impl Render for Root {
             .child(shell);
         // A thin draggable divider on the navbar's right edge (expanded only).
         if !self.sidebar_collapsed {
-            root = root.child(sidebar_resizer(self.sidebar_width));
+            root = root.child(sidebar_resizer(sidebar_extent));
         }
         if !self.notices.is_empty() {
             root = root.child(notice_stack(self.notices.clone(), handle.clone()));
         }
         if let Some(action) = self.confirm.clone() {
-            root = root.child(confirm_bar(action, handle.clone()));
+            root = root.child(confirm_bar(action, sidebar_extent, &colors, handle.clone()));
         }
         if let Some(menu) = self.context_menu.clone() {
             root = root.child(menu);
         }
         root.into_any_element()
     }
-}
-
-/// The draggable divider on the expanded navbar's right edge. Sits between the
-/// header and footer at `x = width`; dragging it is followed by the root
-/// wrapper's `on_drag_move`, which updates `Root::sidebar_width`.
-fn sidebar_resizer(width: f32) -> impl IntoElement {
-    div()
-        .id("sidebar-resizer")
-        .absolute()
-        .top(px(40.0))
-        .bottom(px(28.0))
-        .left(px(width - 3.0))
-        .w(px(6.0))
-        .cursor_col_resize()
-        .hover(|s| s.bg(gpui::hsla(0.0, 0.0, 1.0, 0.12)))
-        .on_drag(SidebarDrag, |_, _, _, cx| cx.new(|_| Empty))
-}
-
-/// A render-time snapshot of a pane (owned; the workspace borrow is released).
-struct PaneSnap {
-    index: usize,
-    active: bool,
-    kind: Option<crate::workspace::TabKind>,
-    tabs: Vec<TabSnap>,
-}
-
-struct TabSnap {
-    index: usize,
-    id: u64,
-    title: String,
-    icon: &'static str,
-    active: bool,
 }
 
 /// Theme colors captured once per render.
@@ -670,130 +308,6 @@ fn view_for_key(key: crate::workspace::TabKey) -> View {
         K::Browser => View::Browser,
         K::Preview => View::Preview,
     }
-}
-
-/// One pane: a tab bar over the active tab's content.
-fn pane_view(
-    snap: PaneSnap,
-    content: gpui::AnyElement,
-    handle: Entity<Root>,
-    colors: &Colors,
-) -> impl IntoElement {
-    div()
-        .flex()
-        .flex_col()
-        .flex_1()
-        .min_w(px(120.0))
-        .h_full()
-        .overflow_hidden()
-        .when(!snap.active, |d| d.border_r_1().border_color(colors.border))
-        .child(tab_bar(&snap, handle, colors))
-        .child(div().flex_1().overflow_hidden().child(content))
-}
-
-/// A pane's tab strip: each tab (icon + title + close), plus a split button.
-fn tab_bar(snap: &PaneSnap, handle: Entity<Root>, colors: &Colors) -> impl IntoElement {
-    let pane = snap.index;
-    let mut bar = div()
-        .flex()
-        .flex_row()
-        .items_center()
-        .gap_1()
-        .w_full()
-        .px(px(6.0))
-        .py(px(4.0))
-        .bg(colors.surface)
-        .border_b_1()
-        .border_color(colors.border);
-
-    for tab in &snap.tabs {
-        let ti = tab.index;
-        let icon_color = if tab.active {
-            colors.primary
-        } else {
-            colors.dimmed
-        };
-        let text_color = if tab.active {
-            colors.text
-        } else {
-            colors.dimmed
-        };
-        let activate = handle.clone();
-        let close = handle.clone();
-
-        let mut chip = div()
-            .flex()
-            .flex_row()
-            .items_center()
-            .gap(px(6.0))
-            .pl(px(8.0))
-            .pr(px(4.0))
-            .py(px(3.0))
-            .rounded(px(6.0))
-            .cursor_pointer();
-        if tab.active {
-            chip = chip.bg(colors.hover);
-        }
-        bar = bar.child(
-            chip.child(
-                div()
-                    .id(SharedString::from(format!("tab-{}", tab.id)))
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .gap(px(6.0))
-                    .tab_index(0)
-                    .role(gpui::accesskit::Role::Tab)
-                    .aria_label(SharedString::from(tab.title.clone()))
-                    .aria_selected(tab.active)
-                    .focus_visible(move |style| style.border_1().border_color(colors.primary))
-                    .child(icon(tab.icon, 13.0).text_color(icon_color))
-                    .child(
-                        div()
-                            .text_color(text_color)
-                            .text_size(px(12.5))
-                            .child(SharedString::from(tab.title.clone())),
-                    )
-                    .on_click(move |_, _, cx| {
-                        activate.update(cx, |root, cx| {
-                            root.workspace.activate(pane, ti);
-                            cx.notify();
-                        });
-                    }),
-            )
-            .child(icon_button(
-                SharedString::from(format!("tabx-{}", tab.id)),
-                "circle-x",
-                SharedString::from(format!("Close {}", tab.title)),
-                colors.dimmed,
-                colors.hover,
-                move |_, cx| {
-                    close.update(cx, |root, cx| {
-                        root.workspace.close(pane, ti);
-                        cx.notify();
-                    });
-                },
-            )),
-        );
-    }
-
-    // Split button: opens a terminal in a new pane to the right.
-    let split = handle.clone();
-    bar = bar.child(div().ml_auto().child(icon_button(
-        SharedString::from(format!("split-{pane}")),
-        "plus",
-        "Split terminal right",
-        colors.dimmed,
-        colors.hover,
-        move |window, cx| {
-            split.update(cx, |root, cx| {
-                root.workspace.active_pane = pane;
-                root.split_terminal_pane(window, cx);
-                cx.notify();
-            });
-        },
-    )));
-    bar
 }
 
 impl Root {
@@ -875,6 +389,7 @@ impl Root {
                 self.branches(),
                 self.runs(),
                 self.diff_split,
+                self.review_staging(),
                 review_note.clone(),
                 handle,
                 window,
@@ -912,10 +427,15 @@ impl Root {
             .into_any_element(),
             TabKind::Inbox => notifications::inbox_view(self.notifications(), handle, window, cx)
                 .into_any_element(),
-            TabKind::Plugins => {
-                crate::plugins::plugins_view(self.plugins(), self.plugins_dir(), handle, window, cx)
-                    .into_any_element()
-            }
+            TabKind::Plugins => crate::plugins::plugins_view(
+                self.plugins(),
+                self.plugins_dir(),
+                self.settings.enabled_plugins.clone(),
+                handle,
+                window,
+                cx,
+            )
+            .into_any_element(),
             TabKind::Settings => match self.settings_inputs.clone() {
                 Some(inputs) => crate::settings::settings_view(
                     self.settings.clone(),
@@ -942,6 +462,7 @@ impl Root {
                     self.pending_capture.clone(),
                     self.design_annotations.clone(),
                     note,
+                    guise::theme::theme(cx).primary().hsla(),
                     handle,
                 )
                 .into_any_element(),
@@ -961,223 +482,4 @@ impl Root {
         let id = self.next_tab_id();
         self.workspace.split(id, TabKind::Terminal(term));
     }
-
-    /// Build the command palette and quick-open overlays once. The palette lists
-    /// view-switch and action commands; quick-open lists the project's files.
-    pub fn ensure_palettes(&mut self, cx: &mut Context<Self>) {
-        if self.palette.is_none() {
-            let handle = cx.entity();
-            let palette = cx.new(|cx| {
-                let mut s = Spotlight::new(cx);
-                for (view, _glyph, label) in View::BAR {
-                    let view = *view;
-                    let h = handle.clone();
-                    s = s.item(format!("Go to {label}"), move |window, cx| {
-                        h.update(cx, |root, cx| {
-                            root.open_view(view, window, cx);
-                            cx.notify();
-                        });
-                    });
-                }
-                let h = handle.clone();
-                s = s.item("Run fan-out", move |window, cx| {
-                    h.update(cx, |root, cx| {
-                        root.run_fanout(window, cx);
-                        cx.notify();
-                    });
-                });
-                let h = handle.clone();
-                s = s.item("Run checks", move |_, cx| {
-                    h.update(cx, |root, cx| {
-                        root.run_checks(cx);
-                        cx.notify();
-                    });
-                });
-                let h = handle.clone();
-                s = s.item("Open selected run terminal", move |_, cx| {
-                    h.update(cx, |root, cx| {
-                        if let Some(id) = root.current_run_id() {
-                            root.open_run_terminal(id);
-                            cx.notify();
-                        } else {
-                            root.push_error("No run selected", "Select a run first.");
-                        }
-                    });
-                });
-                let h = handle.clone();
-                s = s.item("Cancel selected run", move |_, cx| {
-                    h.update(cx, |root, cx| {
-                        if let Some(id) = root.current_run_id() {
-                            root.cancel_run(id, cx);
-                            cx.notify();
-                        } else {
-                            root.push_error("No run selected", "Select a run first.");
-                        }
-                    });
-                });
-                let h = handle.clone();
-                s = s.item("Retry selected run", move |window, cx| {
-                    h.update(cx, |root, cx| {
-                        if let Some(id) = root.current_run_id() {
-                            root.retry_run(id, window, cx);
-                            cx.notify();
-                        } else {
-                            root.push_error("No run selected", "Select a run first.");
-                        }
-                    });
-                });
-                let h = handle.clone();
-                s = s.item("Merge selected run", move |_, cx| {
-                    h.update(cx, |root, cx| {
-                        if let Some(id) = root.current_run_id() {
-                            root.request_merge(id);
-                            cx.notify();
-                        } else {
-                            root.push_error("No run selected", "Select a run first.");
-                        }
-                    });
-                });
-                let h = handle.clone();
-                s = s.item("Open Settings", move |window, cx| {
-                    h.update(cx, |root, cx| {
-                        root.open_view(View::Settings, window, cx);
-                        cx.notify();
-                    });
-                });
-                let h = handle.clone();
-                s = s.item("Open settings.json", move |_, cx| {
-                    if let Err(error) = crate::menus::open_settings_file(cx) {
-                        h.update(cx, |root, cx| {
-                            root.push_error("Could not open settings", error);
-                            cx.notify();
-                        });
-                    }
-                });
-                s.item("Toggle theme", move |_, cx| crate::theme::toggle(cx))
-            });
-            self.palette = Some(palette);
-        }
-
-        if self.quickopen.is_none() {
-            let handle = cx.entity();
-            let files = self.project_files();
-            let quickopen = cx.new(|cx| {
-                let mut s = Spotlight::new(cx);
-                for name in files {
-                    let h = handle.clone();
-                    let file = name.clone();
-                    s = s.item(name, move |_, cx| {
-                        let file = file.clone();
-                        h.update(cx, |root, cx| {
-                            root.open_file(&file, cx);
-                            cx.notify();
-                        });
-                    });
-                }
-                s
-            });
-            self.quickopen = Some(quickopen);
-        }
-    }
-}
-
-/// The titlebar. With a transparent native titlebar, this *is* the window's top
-/// chrome: the macOS traffic lights float into the left inset, the brand sits
-/// beside them, a draggable filler moves the window (double-click zooms), and
-/// the actions live on the right.
-fn header(
-    palette: Entity<guise::overlay::Spotlight>,
-    quickopen: Entity<guise::overlay::Spotlight>,
-    handle: Entity<Root>,
-    colors: Colors,
-) -> impl IntoElement {
-    let palette_btn = icon_button(
-        "tb-palette",
-        "command",
-        "Command palette",
-        colors.text,
-        colors.hover,
-        move |window, cx| palette.update(cx, |spotlight, cx| spotlight.open(window, cx)),
-    );
-    let search_btn = icon_button(
-        "tb-quickopen",
-        "search",
-        "Quick open",
-        colors.text,
-        colors.hover,
-        move |window, cx| quickopen.update(cx, |spotlight, cx| spotlight.open(window, cx)),
-    );
-    let open_btn = icon_button(
-        "tb-open",
-        "folder",
-        "Open repository",
-        colors.text,
-        colors.hover,
-        move |_, cx| open_project(handle.clone(), cx),
-    );
-    let theme_btn = icon_button(
-        "tb-theme",
-        "sun",
-        "Toggle theme",
-        colors.text,
-        colors.hover,
-        move |_, cx| theme::toggle(cx),
-    );
-
-    div()
-        .id("titlebar")
-        .flex()
-        .flex_row()
-        .items_center()
-        .justify_between()
-        .w_full()
-        .h_full()
-        .pl(px(TRAFFIC_LIGHT_INSET))
-        .pr(px(10.0))
-        // The whole bar drags the window (double-click zooms); the buttons on
-        // top handle their own clicks - a press with no movement isn't a drag.
-        .window_control_area(WindowControlArea::Drag)
-        .on_mouse_down(MouseButton::Left, |_, window, _| window.start_window_move())
-        // Brand.
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .gap_2()
-                .child(icon("git-branch", 15.0).text_color(colors.primary))
-                .child(Title::new("Asylum").order(5)),
-        )
-        // Actions.
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .gap_1()
-                .child(palette_btn)
-                .child(search_btn)
-                .child(open_btn)
-                .child(theme_btn),
-        )
-}
-
-/// The bottom status strip.
-fn footer(counts: (usize, usize, usize), unread: usize) -> impl IntoElement {
-    let (projects, tasks, runs) = counts;
-    div()
-        .flex()
-        .flex_row()
-        .items_center()
-        .gap_3()
-        .w_full()
-        .h_full()
-        .px(px(16.0))
-        .child(
-            Text::new(SharedString::from(format!(
-                "{projects} projects · {tasks} tasks · {runs} runs · {unread} unread"
-            )))
-            .size(Size::Xs)
-            .dimmed(),
-        )
 }

@@ -87,6 +87,7 @@ fn bytes(name: &str) -> Option<&'static [u8]> {
         "github",
         "terminal",
         "file-pen",
+        "file-code",
         "eye",
         "globe",
         "puzzle",
@@ -94,6 +95,7 @@ fn bytes(name: &str) -> Option<&'static [u8]> {
         "inbox",
         "chevron-right",
         "chevron-down",
+        "ellipsis",
         "folder",
         "git-branch",
         "play",
@@ -107,6 +109,7 @@ fn bytes(name: &str) -> Option<&'static [u8]> {
         "plus",
         "panelleftclose",
         "panelleftopen",
-        "settings"
+        "settings",
+        "message-square"
     )
 }

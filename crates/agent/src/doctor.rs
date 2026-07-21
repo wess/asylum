@@ -104,8 +104,11 @@ fn first_line(text: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-/// A best-effort install command or docs URL for a known agent CLI. Returns
-/// `None` for agents we don't have a canonical install line for.
+/// A best-effort install command or docs pointer for an agent CLI. Confident
+/// cases carry a real one-liner; the rest fall back to a hint that names the
+/// tool and points at the vendor's docs. Always `Some` - an enabled-but-missing
+/// agent deserves *some* next step rather than a blank row. The `Option` wrapper
+/// is kept for the caller's convenience (`report.install.map(..)`).
 pub fn install_hint(id: &str) -> Option<&'static str> {
     Some(match id {
         "claude-code" => {
@@ -126,7 +129,26 @@ pub fn install_hint(id: &str) -> Option<&'static str> {
         "amp" => "npm i -g @sourcegraph/amp",
         "qwen-code" => "npm i -g @qwen-code/qwen-code",
         "codebuff" => "npm i -g codebuff",
-        _ => return None,
+        "auggie" => "npm i -g @augmentcode/auggie  ·  https://augmentcode.com",
+        "charm" => {
+            "brew install charmbracelet/tap/crush  ·  https://github.com/charmbracelet/crush"
+        }
+        "droid" => "Factory Droid  ·  https://docs.factory.ai",
+        "devin" => "Devin  ·  https://devin.ai",
+        "kiro" => "Kiro  ·  https://kiro.dev",
+        "kilocode" => "Kilo Code (kilocode)  ·  see the vendor's install docs",
+        "kimi" => "Kimi CLI (kimi)  ·  see Moonshot AI's install docs",
+        "mistral-vibe" => "Mistral Vibe (vibe)  ·  see Mistral AI's install docs",
+        "rovo-dev" => "Atlassian Rovo Dev (rovodev)  ·  install via the Atlassian CLI (acli)",
+        "hermes" => "Hermes Agent (hermes)  ·  see the vendor's install docs",
+        "pi" => "Pi (pi)  ·  see the vendor's install docs",
+        "oh-my-pi" => "oh-my-pi (ohmypi)  ·  see the project's install docs",
+        "autohand" => "Autohand Code (autohand)  ·  see the vendor's install docs",
+        "command-code" => "Command Code (command-code)  ·  see the vendor's install docs",
+        "mimo-code" => "MiMo Code (mimo)  ·  see the vendor's install docs",
+        "openclaude" => "OpenClaude (openclaude)  ·  see the project's install docs",
+        "antigravity" => "Antigravity (antigravity)  ·  see Google's install docs",
+        _ => "install this agent's CLI per the vendor's docs, then ensure it is on your PATH",
     })
 }
 

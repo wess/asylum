@@ -1,5 +1,7 @@
 use super::*;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
 
 static SEQ: AtomicU32 = AtomicU32::new(0);
 
@@ -178,4 +180,119 @@ fn overall_precedence() {
     );
     assert_eq!(overall(&[mk(Status::Skipped)]), Status::Skipped);
     assert_eq!(overall(&[]), Status::Skipped);
+}
+
+#[cfg(unix)]
+#[test]
+fn run_kills_on_timeout_and_reports_fail() {
+    let d = scratch();
+    let check = Check {
+        id: "slow".into(),
+        label: "slow".into(),
+        program: "sh".into(),
+        args: vec!["-c".into(), "sleep 5".into()],
+    };
+    let result = run_with_timeout(&d, &check, Duration::from_millis(200));
+    assert_eq!(result.status, Status::Fail);
+    assert!(
+        result.summary.contains("timed out"),
+        "summary: {}",
+        result.summary
+    );
+    // Killed promptly, nowhere near the full 5s sleep.
+    assert!(
+        result.duration_ms < 4000,
+        "duration_ms: {}",
+        result.duration_ms
+    );
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[cfg(unix)]
+#[test]
+fn run_closes_stdin_so_reads_do_not_hang() {
+    let d = scratch();
+    // `cat` with no args reads stdin until EOF; with stdin closed it should
+    // return almost immediately instead of blocking for input.
+    let check = Check {
+        id: "stdin".into(),
+        label: "stdin".into(),
+        program: "cat".into(),
+        args: vec![],
+    };
+    let result = run_with_timeout(&d, &check, Duration::from_secs(5));
+    assert_eq!(result.status, Status::Pass);
+    assert!(
+        result.duration_ms < 2000,
+        "duration_ms: {}",
+        result.duration_ms
+    );
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
+fn python_prefers_venv_script_over_path() {
+    let d = scratch();
+    std::fs::write(d.join("pyproject.toml"), "[project]\nname='x'").unwrap();
+    let bin = d.join(".venv").join(VENV_BIN);
+    std::fs::create_dir_all(&bin).unwrap();
+    let ruff = bin.join(venv_exe_name("ruff"));
+    std::fs::write(&ruff, "").unwrap();
+
+    let checks = detect(&d);
+    let lint = checks.iter().find(|c| c.id == "python/lint").unwrap();
+    assert_eq!(PathBuf::from(&lint.program), ruff);
+    assert_eq!(lint.args, vec!["check".to_string(), ".".to_string()]);
+
+    // pytest has neither a venv script nor a detectable module - falls
+    // through to the bare PATH name unchanged.
+    let test = checks.iter().find(|c| c.id == "python/test").unwrap();
+    assert_eq!(test.program, "pytest");
+    assert_eq!(test.args, vec!["-q".to_string()]);
+
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
+fn python_falls_back_to_venv_module_invocation() {
+    let d = scratch();
+    std::fs::write(d.join("pyproject.toml"), "[project]\nname='x'").unwrap();
+    let bin = d.join(".venv").join(VENV_BIN);
+    std::fs::create_dir_all(&bin).unwrap();
+    let python = bin.join(if cfg!(windows) {
+        "python.exe"
+    } else {
+        "python"
+    });
+    std::fs::write(&python, "").unwrap();
+    let site_packages = if cfg!(windows) {
+        d.join(".venv").join("Lib").join("site-packages")
+    } else {
+        d.join(".venv")
+            .join("lib")
+            .join("python3.11")
+            .join("site-packages")
+    };
+    std::fs::create_dir_all(site_packages.join("pytest")).unwrap();
+
+    let checks = detect(&d);
+    let test = checks.iter().find(|c| c.id == "python/test").unwrap();
+    assert_eq!(PathBuf::from(&test.program), python);
+    assert_eq!(
+        test.args,
+        vec!["-m".to_string(), "pytest".to_string(), "-q".to_string()]
+    );
+
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
+fn python_without_venv_uses_path() {
+    let d = scratch();
+    std::fs::write(d.join("pyproject.toml"), "[project]\nname='x'").unwrap();
+    let checks = detect(&d);
+    let lint = checks.iter().find(|c| c.id == "python/lint").unwrap();
+    assert_eq!(lint.program, "ruff");
+    assert_eq!(lint.args, vec!["check".to_string(), ".".to_string()]);
+    let _ = std::fs::remove_dir_all(&d);
 }

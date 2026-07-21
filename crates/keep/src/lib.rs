@@ -239,6 +239,19 @@ impl Keep {
             .collect()
     }
 
+    /// Every scope holding at least one secret, each paired with its sorted
+    /// secret names. The scope key is the stable string form (`global`,
+    /// `project:<id>`); values are never returned. Empty scopes are omitted, so
+    /// a UI can list what the keep actually holds without knowing which projects
+    /// exist. Names only - listing a keep must never surface a value.
+    pub fn scopes(&self) -> Vec<(String, Vec<String>)> {
+        self.data
+            .iter()
+            .filter(|(_, secrets)| !secrets.is_empty())
+            .map(|(scope, secrets)| (scope.clone(), secrets.keys().cloned().collect()))
+            .collect()
+    }
+
     /// Resolve `name` for an agent in `project` (or `None` for a global-only
     /// caller): the project's keep wins, falling back to the global keep.
     pub fn resolve(&self, project: Option<i64>, name: &str) -> Option<&str> {

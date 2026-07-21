@@ -64,9 +64,10 @@ fn responses_are_hardened_and_mutations_need_csrf() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let serve_path = db_path.clone();
-    // Empty token: loopback-only mode, where CSRF is the only mutation guard.
+    // A set token, so every request below authenticates and CSRF - not auth -
+    // is the thing under test on the mutation.
     std::thread::spawn(move || {
-        let _ = serve_on(listener, serve_path, "");
+        let _ = serve_on(listener, serve_path, "s3cret");
     });
 
     // The status page ships a CSP and nosniff, and no wildcard CORS.
@@ -90,13 +91,13 @@ fn responses_are_hardened_and_mutations_need_csrf() {
         "no nosniff: {response}"
     );
 
-    // A follow-up POST without the CSRF header is refused...
+    // A follow-up POST without the CSRF header is refused, even authenticated...
     let mut stream = TcpStream::connect(addr).unwrap();
     let body = r#"{"message":"hi"}"#;
     stream
         .write_all(
             format!(
-                "POST /api/tasks/{tid}/followup HTTP/1.1\r\nHost: x\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                "POST /api/tasks/{tid}/followup HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer s3cret\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                 body.len()
             )
             .as_bytes(),
@@ -111,7 +112,7 @@ fn responses_are_hardened_and_mutations_need_csrf() {
     stream
         .write_all(
             format!(
-                "POST /api/tasks/{tid}/followup HTTP/1.1\r\nHost: x\r\nX-Asylum-Companion: 1\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                "POST /api/tasks/{tid}/followup HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer s3cret\r\nX-Asylum-Companion: 1\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                 body.len()
             )
             .as_bytes(),
@@ -120,6 +121,55 @@ fn responses_are_hardened_and_mutations_need_csrf() {
     let mut response = String::new();
     stream.read_to_string(&mut response).unwrap();
     assert!(response.starts_with("HTTP/1.1 200"), "response: {response}");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn empty_token_denies_reads_and_mutations() {
+    // Defense in depth: `config::bind::guard` should never let the app start
+    // the companion with an empty token, but the server must not trust that -
+    // it denies every /api/* request on its own when misconfigured this way.
+    let dir = std::env::temp_dir().join(format!("asylum-companion-noauth-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let db_path = dir.join("store.sqlite");
+    let tid = {
+        let db = Db::open(&db_path).unwrap();
+        let p = db.create_project("acme", "/tmp/acme", "main", 1).unwrap();
+        db.create_task(p.id, "Add login", "do it", 1).unwrap().id
+    };
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let serve_path = db_path.clone();
+    std::thread::spawn(move || {
+        let _ = serve_on(listener, serve_path, "");
+    });
+
+    // A read is denied...
+    let mut stream = TcpStream::connect(addr).unwrap();
+    stream
+        .write_all(b"GET /api/projects HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+        .unwrap();
+    let mut response = String::new();
+    stream.read_to_string(&mut response).unwrap();
+    assert!(response.starts_with("HTTP/1.1 401"), "response: {response}");
+
+    // ...and so is a mutation, even one carrying a valid CSRF header.
+    let mut stream = TcpStream::connect(addr).unwrap();
+    let body = r#"{"message":"hi"}"#;
+    stream
+        .write_all(
+            format!(
+                "POST /api/tasks/{tid}/followup HTTP/1.1\r\nHost: x\r\nX-Asylum-Companion: 1\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+    let mut response = String::new();
+    stream.read_to_string(&mut response).unwrap();
+    assert!(response.starts_with("HTTP/1.1 401"), "response: {response}");
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -184,9 +234,11 @@ fn oversized_and_malformed_requests_get_correct_status() {
 }
 
 #[test]
-fn authorized_requires_matching_bearer_when_token_set() {
-    assert!(authorized(None, ""));
-    assert!(authorized(Some("Bearer anything"), ""));
+fn authorized_denies_empty_token_and_requires_a_matching_bearer() {
+    // An empty configured token denies every request - it is not "no auth
+    // required", it is fail-closed defense in depth (see `authorized`'s doc).
+    assert!(!authorized(None, ""));
+    assert!(!authorized(Some("Bearer anything"), ""));
     assert!(authorized(Some("Bearer good"), "good"));
     assert!(!authorized(None, "good"));
     assert!(!authorized(Some("Bearer bad"), "good"));

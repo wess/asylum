@@ -178,6 +178,55 @@ const MIGRATIONS: &[&str] = &[
     UPDATE controlrequests SET status = 'succeeded', attempts = 1 WHERE processed = 1;
     ALTER TABLE controlrequests DROP COLUMN processed;
     CREATE INDEX idx_controlrequests_pending ON controlrequests(status, next_attempt_at);",
+    // 10 - full-text search over task prompts and run transcripts. The bundled
+    // SQLite is compiled with FTS5 (ENABLE_FTS5 in pragma_compile_options; the
+    // `search` tests assert this), so we add two external-content FTS5 indexes
+    // that mirror the `tasks` and `runs` base tables. External content keeps the
+    // text stored once, in the base tables; the FTS tables hold only the index.
+    // Triggers on the base tables keep the index in sync, so the existing write
+    // paths (create_task, save_run_output, finish_run_with_output, …) need no
+    // changes. Backfill from current rows first, then install the triggers. The
+    // UPDATE triggers fire only when an *indexed* column changes (UPDATE OF …),
+    // so frequent status/activity writes never re-index a run's transcript.
+    "CREATE VIRTUAL TABLE tasks_fts USING fts5(
+        title, prompt, content = 'tasks', content_rowid = 'id'
+    );
+    INSERT INTO tasks_fts(rowid, title, prompt)
+        SELECT id, title, prompt FROM tasks;
+    CREATE TRIGGER tasks_fts_ai AFTER INSERT ON tasks BEGIN
+        INSERT INTO tasks_fts(rowid, title, prompt)
+            VALUES (new.id, new.title, new.prompt);
+    END;
+    CREATE TRIGGER tasks_fts_ad AFTER DELETE ON tasks BEGIN
+        INSERT INTO tasks_fts(tasks_fts, rowid, title, prompt)
+            VALUES ('delete', old.id, old.title, old.prompt);
+    END;
+    CREATE TRIGGER tasks_fts_au AFTER UPDATE OF title, prompt ON tasks BEGIN
+        INSERT INTO tasks_fts(tasks_fts, rowid, title, prompt)
+            VALUES ('delete', old.id, old.title, old.prompt);
+        INSERT INTO tasks_fts(rowid, title, prompt)
+            VALUES (new.id, new.title, new.prompt);
+    END;
+
+    CREATE VIRTUAL TABLE runs_fts USING fts5(
+        agent, branch, output, error, content = 'runs', content_rowid = 'id'
+    );
+    INSERT INTO runs_fts(rowid, agent, branch, output, error)
+        SELECT id, agent, branch, output, coalesce(error, '') FROM runs;
+    CREATE TRIGGER runs_fts_ai AFTER INSERT ON runs BEGIN
+        INSERT INTO runs_fts(rowid, agent, branch, output, error)
+            VALUES (new.id, new.agent, new.branch, new.output, coalesce(new.error, ''));
+    END;
+    CREATE TRIGGER runs_fts_ad AFTER DELETE ON runs BEGIN
+        INSERT INTO runs_fts(runs_fts, rowid, agent, branch, output, error)
+            VALUES ('delete', old.id, old.agent, old.branch, old.output, coalesce(old.error, ''));
+    END;
+    CREATE TRIGGER runs_fts_au AFTER UPDATE OF agent, branch, output, error ON runs BEGIN
+        INSERT INTO runs_fts(runs_fts, rowid, agent, branch, output, error)
+            VALUES ('delete', old.id, old.agent, old.branch, old.output, coalesce(old.error, ''));
+        INSERT INTO runs_fts(rowid, agent, branch, output, error)
+            VALUES (new.id, new.agent, new.branch, new.output, coalesce(new.error, ''));
+    END;",
 ];
 
 /// Apply pragmas and any pending migrations.

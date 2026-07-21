@@ -19,6 +19,23 @@ fn partial_overrides_defaults() {
 }
 
 #[test]
+fn enabled_plugins_survive_edit_and_load() {
+    // Writing the enabled list through the comment-preserving editor and
+    // reloading round-trips the value; removing the key restores the default.
+    let base = "// my settings\n{\n    \"theme\": \"nord\"\n}\n";
+    let with = crate::edit::upsert(base, "enabled_plugins", "[\"acme.hello\", \"beta\"]").unwrap();
+    let loaded = load_str(&with);
+    assert!(loaded.diagnostics.is_empty());
+    assert_eq!(loaded.settings.enabled_plugins, vec!["acme.hello", "beta"]);
+    // The user's comment and other keys are untouched by the write.
+    assert!(with.contains("// my settings"));
+    assert_eq!(loaded.settings.theme, "nord");
+
+    let without = crate::edit::remove(&with, "enabled_plugins").unwrap();
+    assert!(load_str(&without).settings.enabled_plugins.is_empty());
+}
+
+#[test]
 fn comments_are_allowed() {
     let src = r#"{
         // pick a theme
@@ -116,6 +133,32 @@ fn missing_file_is_clean_defaults() {
     let loaded = load(std::path::Path::new("/nonexistent/asylum/settings.json"));
     assert!(loaded.diagnostics.is_empty());
     assert_eq!(loaded.settings, Settings::default());
+}
+
+/// `validate` (see `validate.rs`) runs at the tail of `load_str`, so a
+/// type-valid but semantically bad value - unlike a typo'd key - keeps the
+/// rest of the document and still earns a diagnostic naming the key.
+#[test]
+fn semantically_bad_value_surfaces_as_a_diagnostic() {
+    let loaded = load_str(r#"{ "theme": "nord", "worktree_dir": "" }"#);
+    assert_eq!(loaded.settings.theme, "nord");
+    assert_eq!(
+        loaded.settings.worktree_dir,
+        Settings::default().worktree_dir
+    );
+    assert_eq!(loaded.diagnostics.len(), 1);
+    assert_eq!(loaded.diagnostics[0].key, "worktree_dir");
+}
+
+/// Two type-valid keys that are individually fine but jointly nonsensical
+/// (colliding server ports) are still caught once the document deserializes.
+#[test]
+fn cross_key_semantic_problem_surfaces_as_a_diagnostic() {
+    let loaded = load_str(r#"{ "control": { "bind": "127.0.0.1:8787" } }"#);
+    assert_eq!(loaded.diagnostics.len(), 2);
+    let keys: Vec<&str> = loaded.diagnostics.iter().map(|d| d.key.as_str()).collect();
+    assert!(keys.contains(&"companion.bind"), "{keys:?}");
+    assert!(keys.contains(&"control.bind"), "{keys:?}");
 }
 
 #[test]

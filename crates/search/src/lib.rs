@@ -14,6 +14,8 @@ use std::process::Command;
 pub enum Error {
     #[error("no search backend: install ripgrep (rg) or run inside a git repo")]
     NoBackend,
+    #[error("invalid search pattern: {0}")]
+    InvalidPattern(String),
     #[error("search failed: {0}")]
     Failed(String),
 }
@@ -49,13 +51,19 @@ impl Default for Options {
 }
 
 /// Search `dir` for `pattern`, preferring ripgrep. Returns matches in file
-/// order. An empty result is `Ok(vec![])`, not an error.
+/// order. An empty result is `Ok(vec![])`, not an error. Returns `InvalidPattern`
+/// if the pattern is malformed; returns `NoBackend` if neither rg nor git grep
+/// is available.
 pub fn search(dir: &Path, pattern: &str, opts: &Options) -> Result<Vec<Match>, Error> {
-    if let Some(out) = run_rg(dir, pattern, opts) {
-        return Ok(cap(parse_vimgrep(&out), opts.max_results));
+    match try_rg(dir, pattern, opts) {
+        Ok(Some(out)) => return Ok(cap(parse_vimgrep(&out), opts.max_results)),
+        Err(e) => return Err(e),
+        Ok(None) => {}
     }
-    if let Some(out) = run_git_grep(dir, pattern, opts) {
-        return Ok(cap(parse_vimgrep(&out), opts.max_results));
+    match try_git_grep(dir, pattern, opts) {
+        Ok(Some(out)) => return Ok(cap(parse_vimgrep(&out), opts.max_results)),
+        Err(e) => return Err(e),
+        Ok(None) => {}
     }
     Err(Error::NoBackend)
 }
@@ -67,7 +75,7 @@ fn cap(mut matches: Vec<Match>, max: usize) -> Vec<Match> {
     matches
 }
 
-fn run_rg(dir: &Path, pattern: &str, opts: &Options) -> Option<String> {
+fn try_rg(dir: &Path, pattern: &str, opts: &Options) -> Result<Option<String>, Error> {
     let mut args = vec!["--vimgrep", "--no-heading", "--color=never"];
     if opts.ignore_case {
         args.push("-i");
@@ -76,19 +84,24 @@ fn run_rg(dir: &Path, pattern: &str, opts: &Options) -> Option<String> {
         args.push("-F");
     }
     args.push(pattern);
-    let out = Command::new("rg")
-        .args(&args)
-        .current_dir(dir)
-        .output()
-        .ok()?;
+    let out = match Command::new("rg").args(&args).current_dir(dir).output() {
+        Ok(o) => o,
+        Err(_) => return Ok(None), // rg not installed
+    };
     // rg exits 2 on a real error; 0/1 are match/no-match (both fine).
     if out.status.code() == Some(2) {
-        return None;
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        // Extract the first line of the error message, trimming whitespace.
+        if let Some(line) = stderr.lines().next() {
+            let msg = line.trim().to_string();
+            return Err(Error::InvalidPattern(msg));
+        }
+        return Ok(None); // Couldn't parse stderr, treat as tool missing.
     }
-    Some(String::from_utf8_lossy(&out.stdout).into_owned())
+    Ok(Some(String::from_utf8_lossy(&out.stdout).into_owned()))
 }
 
-fn run_git_grep(dir: &Path, pattern: &str, opts: &Options) -> Option<String> {
+fn try_git_grep(dir: &Path, pattern: &str, opts: &Options) -> Result<Option<String>, Error> {
     // git grep -n --column emits `file:line:col:text`.
     let mut args = vec!["grep", "-n", "--column", "--no-color"];
     if opts.ignore_case {
@@ -99,16 +112,21 @@ fn run_git_grep(dir: &Path, pattern: &str, opts: &Options) -> Option<String> {
     }
     args.push("-e");
     args.push(pattern);
-    let out = Command::new("git")
-        .args(&args)
-        .current_dir(dir)
-        .output()
-        .ok()?;
+    let out = match Command::new("git").args(&args).current_dir(dir).output() {
+        Ok(o) => o,
+        Err(_) => return Ok(None), // git not available or not a repo
+    };
     // git grep exits 1 when nothing matches; >1 is a real error.
     if out.status.code().unwrap_or(1) > 1 {
-        return None;
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        // Extract the first line of the error message, trimming whitespace.
+        if let Some(line) = stderr.lines().next() {
+            let msg = line.trim().to_string();
+            return Err(Error::InvalidPattern(msg));
+        }
+        return Ok(None); // Couldn't parse stderr, treat as tool missing.
     }
-    Some(String::from_utf8_lossy(&out.stdout).into_owned())
+    Ok(Some(String::from_utf8_lossy(&out.stdout).into_owned()))
 }
 
 /// Parse `file:line:col:text` lines (ripgrep `--vimgrep` / `git grep --column`).

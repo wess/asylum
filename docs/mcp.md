@@ -37,9 +37,8 @@ environment. An agent reaches the endpoint at `$ASYLUM_MCP_URL/mcp` with
 
 The gateway toggles — enable, bind address, and exposure mode — live in
 **Settings → MCP gateway**, which also lists the configured servers and their
-status. The server list itself is edited in `settings.json`.
-
-Enable the gateway and list your servers in `settings.json`:
+status with add/edit/remove controls, so you rarely need to touch JSON by hand.
+The same list is also edited in `settings.json`, if you prefer:
 
 ```jsonc
 {
@@ -98,7 +97,7 @@ fleet. Two levers keep it in check:
 ## Auditing
 
 Because the gateway knows *which run* is calling (from the token), every
-`tools/call` is recorded as an `mcp_call` event against that run. The Diff surface
+`tools/call` is recorded as an `mcp_call` event against that run. The Review surface
 and sibling agents can see what a run reached for — something no standalone MCP
 aggregator can know.
 

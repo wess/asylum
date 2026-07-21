@@ -179,6 +179,29 @@ jobs:
             echo "signed=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # The shipped binary is crates/app's gpui GUI (renamed above from
+      # asylumdev). `--version` is a fast-path checked before any gpui/display
+      # init, so it's safe to actually execute here rather than just file-type
+      # checking it. Check first that `file` reports a real, correctly-
+      # architected Mach-O, then run it and assert it reports the version
+      # being released.
+      - name: Smoke test
+        run: |
+          bin="target/aarch64-apple-darwin/release/bundle/osx/Asylum.app/Contents/MacOS/asylum"
+          test -s "$bin" || { echo "::error::$bin is missing or empty" >&2; exit 1; }
+          report="$(file "$bin")"
+          echo "$report"
+          case "$report" in
+            *"Mach-O 64-bit executable arm64"*) ;;
+            *) echo "::error::unexpected binary format: $report" >&2; exit 1 ;;
+          esac
+          out="$("$bin" --version)" || { echo "::error::$bin --version failed" >&2; exit 1; }
+          echo "$out"
+          case "$out" in
+            *"${{ needs.check-version.outputs.version }}"*) ;;
+            *) echo "::error::unexpected version output: $out" >&2; exit 1 ;;
+          esac
+
       - name: Upload DMG
         run: gh release upload "v${{ needs.check-version.outputs.version }}" dist/Asylum.dmg --clobber
         env:
@@ -233,6 +256,36 @@ jobs:
       - name: Build + package
         run: packaging/linux.sh ${{ matrix.arch }}
 
+      # Same rationale as the macOS smoke step: `--version` is a fast-path
+      # checked before any gpui/display init, so it's safe to actually
+      # execute here. Check first that the tar.gz ships a real,
+      # correctly-architected ELF, then run it and assert it reports the
+      # version being released. Both matrix legs build natively on an
+      # arch-matched runner (ubuntu-22.04 / ubuntu-22.04-arm) - neither is
+      # cross-compiled, so both are executed the same way.
+      - name: Smoke test
+        run: |
+          tmp="$(mktemp -d)"
+          tar -C "$tmp" -xzf dist/linux/asylum-*-linux-${{ matrix.arch }}.tar.gz
+          bin="$(find "$tmp" -type f -path '*/usr/bin/asylum')"
+          test -s "$bin" || { echo "::error::asylum binary is missing or empty" >&2; exit 1; }
+          test -x "$bin" || { echo "::error::asylum binary is not executable" >&2; exit 1; }
+          report="$(file "$bin")"
+          echo "$report"
+          want="x86-64"
+          [ "${{ matrix.arch }}" = "aarch64" ] && want="ARM aarch64"
+          case "$report" in
+            *"$want"*) ;;
+            *) echo "::error::unexpected binary format: $report" >&2; exit 1 ;;
+          esac
+          out="$("$bin" --version)" || { echo "::error::$bin --version failed" >&2; exit 1; }
+          echo "$out"
+          case "$out" in
+            *"${{ needs.check-version.outputs.version }}"*) ;;
+            *) echo "::error::unexpected version output: $out" >&2; exit 1 ;;
+          esac
+          rm -rf "$tmp"
+
       - name: Upload to release
         run: gh release upload "v${{ needs.check-version.outputs.version }}" dist/linux/*.tar.gz dist/linux/*.deb dist/linux/*.AppImage --clobber
         env:
@@ -246,6 +299,27 @@ jobs:
     needs: [check-version, build, build-linux, build-windows]
     if: needs.check-version.outputs.changed == 'true'
     steps:
+      # One aggregate checksums.txt plus a per-file .sha256 sidecar for each
+      # artifact - trivial here since every platform's upload already landed
+      # on the draft release by this point, so one download pass can hash
+      # them all in one place instead of computing shas separately in each
+      # platform job. The Homebrew cask and Scoop manifest compute their own
+      # sha256 independently (below) and are untouched by this.
+      - name: Generate checksums
+        run: |
+          V="${{ needs.check-version.outputs.version }}"
+          dir="$(mktemp -d)"
+          gh release download "v${V}" --repo "${{ github.repository }}" --dir "$dir"
+          cd "$dir"
+          sha256sum -- * > checksums.txt
+          while read -r sum name; do
+            echo "$sum  $name" > "$name.sha256"
+          done < checksums.txt
+          gh release upload "v${V}" --repo "${{ github.repository }}" --clobber \
+            -- checksums.txt *.sha256
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       # Every line stays indented inside this block scalar on purpose: an
       # unindented `---` would read as a YAML document separator and silently
       # drop every job defined below this one.
@@ -412,6 +486,41 @@ jobs:
       - name: Build + package (.zip + .msi)
         shell: pwsh
         run: packaging/windows.ps1 -Arch x86_64
+
+      # Same rationale as the macOS/Linux smoke steps: `--version` is a
+      # fast-path checked before any gpui/display init, so it's safe to
+      # actually execute here (no window, no GPU, headless CI is fine). Check
+      # first that the zipped exe is a real, non-empty PE binary, then run it
+      # and assert it reports the version being released.
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ needs.check-version.outputs.version }}"
+          $zip = Get-ChildItem "dist/windows/asylum-*-windows-x86_64.zip" | Select-Object -First 1
+          if (-not $zip) { throw "no windows zip found in dist/windows" }
+          $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid())
+          Expand-Archive -Path $zip.FullName -DestinationPath $tmp
+          $bin = Get-ChildItem -Path $tmp -Filter "asylum.exe" -Recurse | Select-Object -First 1
+          if (-not $bin) { throw "asylum.exe not found in $($zip.Name)" }
+          if ($bin.Length -eq 0) { throw "asylum.exe is empty" }
+          # Read just the DOS header's magic bytes rather than the whole
+          # binary - cheap is the point of this check.
+          $stream = [System.IO.File]::OpenRead($bin.FullName)
+          try { $b0 = $stream.ReadByte(); $b1 = $stream.ReadByte() }
+          finally { $stream.Dispose() }
+          if ($b0 -ne 0x4D -or $b1 -ne 0x5A) {
+              throw "asylum.exe is not a valid PE binary (missing MZ header)"
+          }
+          $out = & $bin.FullName --version
+          if ($LASTEXITCODE -ne 0) {
+              throw "asylum.exe --version exited with code $LASTEXITCODE"
+          }
+          if ($out -notmatch [regex]::Escape($version)) {
+              throw "asylum.exe --version did not report ${version}: $out"
+          }
+          Write-Host "smoke test OK: $($bin.FullName) ($($bin.Length) bytes) - $out"
+          Remove-Item -Recurse -Force $tmp
 
       - name: Pack Chocolatey (.nupkg)
         shell: pwsh

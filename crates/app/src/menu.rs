@@ -169,6 +169,14 @@ pub fn run(handle: Entity<Root>, id: i64, pos: Point<Pixels>, window: &mut Windo
                 });
 
                 let a = h.clone();
+                m = m.item("Squash merge winner", move |_, cx| {
+                    a.update(cx, |r, c| {
+                        r.request_squash_merge(id);
+                        c.notify();
+                    });
+                });
+
+                let a = h.clone();
                 m = m.item("Create PR", move |_, cx| {
                     a.update(cx, |r, c| {
                         r.create_pr_for_run(id);

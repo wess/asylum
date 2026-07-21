@@ -64,7 +64,8 @@ run = "sync"
 keybind = "cmd-shift-l"
 
 # A hook on an ADE event. Action is `notify` or `invoke` (a runtime method).
-# Parsed and validated; the app does not dispatch triggers yet.
+# Dispatched by the app once the plugin is enabled — the optional `when` filter
+# matches the event's status (`zero`/`nonzero` alias `success`/`failure`).
 [[trigger]]
 on = "run_finished"
 when = "nonzero"
@@ -80,14 +81,31 @@ param = [{ name = "title", type = "string", required = true }]
 
 ## What reaches the user today
 
-Of the five contribution types, only **`[[command]]`** is wired end to end: the
+Two of the five contribution types are wired end to end. **`[[command]]`**: the
 Plugins surface lists an installed plugin and the app invokes its commands
-through the runtime. `[panel]`, `[webview]`, `[[trigger]]`, and `[[tool]]` parse
-and validate — the manifest vocabulary is stable and a plugin can declare them
-today — but nothing in the app renders a panel or webview, fires a trigger on an
-ADE event, or offers a tool to an agent. Host dispatch is on the roadmap
-(`docs/roadmap.md`). Write them into your manifest if you want to be ready; do
-not expect them to run yet.
+through the runtime. **`[[trigger]]`**: the app dispatches triggers on ADE
+events — but only for a plugin the user has **enabled** (see "Enabling and
+trust" below), and off the UI thread with a per-invocation timeout, so a slow or
+hung plugin never wedges the fleet and a failure surfaces as an Inbox
+notification naming the plugin.
+
+`[panel]`, `[webview]`, and `[[tool]]` still parse and validate — the manifest
+vocabulary is stable and a plugin can declare them today — but nothing in the
+app renders a panel or webview or offers a tool to an agent yet. The Plugins
+surface labels them "not yet active" rather than implying they run. Their host
+dispatch is on the roadmap (`docs/roadmap.md`).
+
+## Enabling and trust
+
+Every plugin is **disabled by default** and inert until the user enables it in
+the Plugins surface: a disabled plugin's triggers never fire and its commands
+never run. The enabled set is persisted as `enabled_plugins` in `settings.json`.
+
+Enabling a **process** runtime — which runs with the user's full privileges and
+whose capabilities are only advisory — requires confirming a trust disclosure
+that restates the exact command and its authority. A **WASM** (or runtime-less)
+plugin is capability-sandboxed and enables directly. Disabling takes effect on
+the next event.
 
 ## Capabilities
 
@@ -111,8 +129,13 @@ A `[[trigger]]` may name any of these events, and the parser validates the name:
 `task_created`, `run_started`, `run_finished`, `run_failed`,
 `worktree_created`, `worktree_removed`, `diff_ready`, `task_merged`.
 
-The app does not emit these events to plugins yet, so a declared trigger never
-fires. The list is the vocabulary a manifest can target, not a working hook.
+The app emits these to enabled plugins. A terminal run fires `run_finished`
+(with `status` `success`/`failure`) for every completion — a failure additionally
+fires `run_failed`, and a success additionally fires `diff_ready`. Each event
+carries a JSON payload with the fields it knows: `event`, and where applicable
+`task`, `run`, `project` (repo path), `worktree`, `status`, and `code`. A
+trigger's optional `when` filter is matched against `status`, with `zero` and
+`nonzero` accepted as aliases for `success` and `failure`.
 
 ## Runtime protocol
 

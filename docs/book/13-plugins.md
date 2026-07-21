@@ -67,29 +67,45 @@ param = [{ name = "title", type = "string", required = true }]
 
 ### Extension points
 
-A manifest describes five contribution types. One of them runs today; be clear
-on which as you read:
+A manifest describes five contribution types. Two run today; be clear on which
+as you read:
 
-- **`[[command]]`** — a command-palette action, and the one extension point wired
-  end to end. Its `mode` decides what running it does: `invoke` calls a runtime
-  method, `panel` opens the plugin's panel, `webview` opens its web surface. It
-  can carry a `keybind`. Only `invoke` has a host behind it today.
+- **`[[command]]`** — a command-palette action, wired end to end. Its `mode`
+  decides what running it does: `invoke` calls a runtime method, `panel` opens
+  the plugin's panel, `webview` opens its web surface. It can carry a
+  `keybind`. Only `invoke` has a host behind it today.
 - **`[panel]`** — a side-drawer panel rendered from the runtime's responses.
   Declared and validated; the app does not render it yet.
 - **`[webview]`** — a native web surface placed as a panel, tab, or window,
   sourced from a `url`, a bundled `entry`, or a `service`. Declared and
   validated; the app does not render it yet.
-- **`[[trigger]]`** — a hook meant to fire on an ADE event. Its action is `notify`
-  (post a desktop notification) or `invoke` (call a runtime method), and it can
-  be conditioned with `when`. Declared and validated; the app does not dispatch
-  triggers yet, so a trigger you write never fires.
+- **`[[trigger]]`** — a hook that fires on an ADE event, for a plugin you have
+  **enabled** (see "Enabling and trust" below). Its action is `notify` (post a
+  desktop notification) or `invoke` (call a runtime method), and it can be
+  conditioned with `when`. Dispatch runs off the UI thread with a
+  per-invocation timeout, so a slow or hung plugin never wedges the fleet, and
+  a failure surfaces as an Inbox notification naming the plugin.
 - **`[[tool]]`** — a tool meant to be exposed to the coding agents, with typed
   parameters. Declared and validated; the app does not offer plugin tools to
   agents yet.
 
-Treat the four unwired points as available at the manifest level rather than as
-working features: the vocabulary is stable and your manifest will validate, but
-host dispatch is still on the roadmap (`docs/roadmap.md`).
+Treat the three still-unwired points — `[panel]`, `[webview]`, `[[tool]]` — as
+available at the manifest level rather than as working features: the
+vocabulary is stable and your manifest will validate, but host dispatch for
+them is still on the roadmap (`docs/roadmap.md`). The Plugins surface labels
+each "not yet active" rather than implying it runs.
+
+### Enabling and trust
+
+A plugin is **disabled by default**: install it and it sits inert until you
+turn it on in the Plugins surface, at which point its `[[trigger]]`s start
+firing and its `[[command]]`s become runnable. The enabled set is persisted as
+`enabled_plugins` in `settings.json`. Enabling a **process** runtime — which
+runs with your full user privileges and whose `capabilities` are only
+advisory — asks you to confirm a trust disclosure naming its exact launch
+command first. A **WASM** (or runtime-less) plugin is capability-sandboxed and
+enables directly, no confirmation needed. Disabling takes effect on the next
+event.
 
 ### Trigger events
 
@@ -98,8 +114,11 @@ A `[[trigger]]` may name any of these ADE events, and the parser checks the name
 `task_created`, `run_started`, `run_finished`, `run_failed`, `worktree_created`,
 `worktree_removed`, `diff_ready`, `task_merged`.
 
-The app does not emit these to plugins yet — this is the target vocabulary, not a
-live hook.
+The app emits these live to every **enabled** plugin. A terminal run fires
+`run_finished` (carrying a `success`/`failure` status) on every completion — a
+failure additionally fires `run_failed`, and a success additionally fires
+`diff_ready`. A trigger's optional `when` filter matches against that status,
+with `zero`/`nonzero` accepted as aliases for `success`/`failure`.
 
 ## Capabilities
 
@@ -212,8 +231,9 @@ Drop the directory under the plugins path (or `asylum plugin install` it), and
 
 1. `asylum plugin search --limit 10` to see community plugins tagged
    `asylum-plugin`.
-2. Create the `hello` plugin above under your plugins directory and confirm it
-   shows in `asylum plugin list`.
+2. Create the `hello` plugin above under your plugins directory, confirm it
+   shows in `asylum plugin list`, then enable it from the Plugins surface (a
+   process runtime like this one asks you to confirm a trust disclosure first).
 3. Run its command from the palette; then add a `[[trigger]]` on `run_finished`
    and watch it fire when a run completes.
 
@@ -223,6 +243,9 @@ Drop the directory under the plugins path (or `asylum plugin install` it), and
   manifests are reported, not fatal.
 - The manifest contributes commands, a panel, a webview, triggers, and tools, and
   declares capabilities.
+- A plugin is disabled until you enable it in the Plugins surface — a process
+  runtime asks you to confirm a trust disclosure first — after which its
+  commands run and its triggers fire live on ADE events.
 - The process runtime speaks newline-JSON over stdio (one-shot or warm); the WASM
   runtime is sandboxed and enforces capabilities by linking only allowed host
   functions.

@@ -1,7 +1,8 @@
 //! The low-level `git` invocation helper shared by every submodule.
 
+use std::io::Write;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 /// A git operation failure. Either the process could not be launched, or git
 /// exited non-zero and we carry its trimmed stderr.
@@ -15,12 +16,22 @@ pub enum Error {
     Git(String),
 }
 
+/// Build a `git` invocation in `dir` with `args`, pinned to the `C` locale so
+/// output this crate pattern-matches on (e.g. [`crate::branch::merge`]'s
+/// "Fast-forward") stays in English regardless of the caller's system locale.
+fn command(dir: &Path, args: &[&str]) -> Command {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(dir)
+        .args(args)
+        .env("LC_ALL", "C")
+        .env("LANG", "C");
+    cmd
+}
+
 /// Run `git` in `dir` with `args`, returning stdout on success or git's stderr
 /// (trimmed) as [`Error::Git`].
 pub(crate) fn git(dir: &Path, args: &[&str]) -> Result<String, Error> {
-    let out = Command::new("git")
-        .current_dir(dir)
-        .args(args)
+    let out = command(dir, args)
         .output()
         .map_err(|e| Error::Spawn(e.to_string()))?;
     if out.status.success() {
@@ -48,10 +59,39 @@ pub(crate) struct Output {
 /// Run `git` capturing status + both streams, without treating non-zero as an
 /// error. Returns [`Error::Spawn`] only when git could not be launched.
 pub(crate) fn git_capture(dir: &Path, args: &[&str]) -> Result<Output, Error> {
-    let out = Command::new("git")
-        .current_dir(dir)
-        .args(args)
+    let out = command(dir, args)
         .output()
+        .map_err(|e| Error::Spawn(e.to_string()))?;
+    Ok(Output {
+        success: out.status.success(),
+        stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+    })
+}
+
+/// Run `git` with `input` fed to its stdin (e.g. `git apply` reading a patch),
+/// capturing status + both streams like [`git_capture`]. The stdin pipe is
+/// closed before waiting, so a git that reads to EOF never deadlocks against a
+/// child that is also filling its stdout.
+pub(crate) fn git_stdin(dir: &Path, args: &[&str], input: &str) -> Result<Output, Error> {
+    let mut child = command(dir, args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| Error::Spawn(e.to_string()))?;
+    {
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| Error::Spawn("git stdin was not captured".to_string()))?;
+        stdin
+            .write_all(input.as_bytes())
+            .map_err(|e| Error::Spawn(e.to_string()))?;
+        // `stdin` drops here, closing the pipe so git sees EOF.
+    }
+    let out = child
+        .wait_with_output()
         .map_err(|e| Error::Spawn(e.to_string()))?;
     Ok(Output {
         success: out.status.success(),

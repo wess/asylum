@@ -19,17 +19,22 @@ pub fn ensure_input(root: &mut Root, cx: &mut Context<Root>) {
     });
     cx.subscribe(&input, |root, _input, event: &TextInputEvent, cx| {
         match event {
-            TextInputEvent::Change(query) => root.search_query = query.clone(),
+            // Live search: each keystroke schedules a debounced background query.
+            TextInputEvent::Change(query) => {
+                root.search_query = query.clone();
+                root.run_search(cx);
+            }
+            // Enter runs immediately (still debounced, but flushes the latest).
             TextInputEvent::Submit(query) => {
                 root.search_query = query.clone();
-                root.run_search();
+                root.run_search(cx);
             }
         }
         cx.notify();
     })
     .detach();
     root.search_input = Some(input);
-    root.run_search();
+    root.run_search(cx);
 }
 
 pub fn search_view(
@@ -63,7 +68,7 @@ pub fn search_view(
                         .variant(Variant::Filled)
                         .on_click(move |_, _, cx| {
                             run.update(cx, |root, cx| {
-                                root.run_search();
+                                root.run_search(cx);
                                 cx.notify();
                             });
                         }),

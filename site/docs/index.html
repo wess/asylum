@@ -211,7 +211,7 @@ asylum wait run 42 --status succeeded # block until a sibling finishes</code></p
           <h1>Review and merge</h1>
           <p class="doclead">Select a run, then review its code, transcript, and checks together. Merge and pull-request actions stay blocked until the run is safe to finish.</p>
           <h2>Inline feedback</h2>
-          <p>Click a diff line to attach a comment. “Send review to agent” batches unresolved comments into one continuation prompt and resolves them only after the queue operation succeeds.</p>
+          <p>A successful run's changes stay uncommitted in its worktree until merge, so hunks (or whole files) can be staged and unstaged independently — a counter tracks how many are staged. Click a diff line to attach a comment. “Send review to agent” batches unresolved comments into one continuation prompt and resolves them only after the queue operation succeeds.</p>
           <h2>Automatic checks</h2>
           <p>Asylum detects checks by project ecosystem. JavaScript projects use declared Bun scripts; Rust projects use Cargo. Each result is classified as pass, fail, or skipped.</p>
           <h2>Merge preflight</h2>
@@ -221,7 +221,7 @@ asylum wait run 42 --status succeeded # block until a sibling finishes</code></p
             <li>The base worktree has no uncommitted user changes.</li>
             <li>The selected branch can merge without conflicts.</li>
           </ul>
-          <p>The final confirmation performs the merge. Cleanup removes clean finished worktrees and preserves dirty worktrees and branches.</p>
+          <p>The final confirmation performs the merge — as a regular merge or a squash merge — which is also when the accepted changes are committed onto the run's branch. A separate cleanup step removes clean finished worktrees and deletes any branch that is now safely merged, leaving dirty worktrees and unmerged branches alone.</p>
         </article>
 
         <article id="memory" data-article data-title="Project memory" data-keywords="notes markdown wiki links backlinks tags properties yaml templates context task run">
@@ -278,7 +278,7 @@ setup = ["bun install"]
 [env]
 RUST_BACKTRACE = "1"</code></pre>
           </div>
-          <p>Setup commands run once in every new worktree before the agent starts. A failed command creates a durable failed run with the worktree path and error.</p>
+          <p>Setup commands run once in every new worktree before the agent starts, one at a time with its own output, shown in a cancellable "Preparing" banner. Each command gets a 10-minute timeout; a failed command names the command and its exit code, and creates a durable failed run with the worktree path and error.</p>
           <h2>User settings</h2>
           <p>Open Settings or edit <code>$XDG_CONFIG_HOME/asylum/settings.json</code>. The file accepts JSON with comments and live-reloads theme and keybindings. Invalid values produce diagnostics while valid settings remain active. Alongside agents and the editor, it holds <code>layouts</code> (named fan-out presets), <code>companion</code> (the mobile server), and <code>control</code> (the agent control surface).</p>
         </article>

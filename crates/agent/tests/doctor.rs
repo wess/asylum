@@ -85,3 +85,12 @@ fn only_ok_counts_as_ok() {
     assert!(!Probe::Missing("gone".into()).ok());
     assert_eq!(Probe::Failed("boom".into()).message(), "boom");
 }
+
+#[test]
+fn every_builtin_agent_has_an_install_hint() {
+    for a in crate::registry::builtins() {
+        assert!(install_hint(a.id).is_some(), "no install hint for {}", a.id);
+    }
+    // An unknown id still yields a generic next step rather than nothing.
+    assert!(install_hint("totally-unknown-agent").is_some());
+}

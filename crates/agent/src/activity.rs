@@ -93,7 +93,11 @@ const DONE_SCAN: usize = 3;
 ///
 /// Precedence is deliberate: a live input prompt ([`Activity::Blocked`]) is the
 /// most useful thing to surface, so it is checked first, then completion, then
-/// activity.
+/// activity. A completion marker is held to a higher bar than the others - it
+/// must lead its line (not sit inside prose like "not done yet") and it is
+/// vetoed by any live spinner still turning in the window - because a
+/// working-run mislabelled `Done` corrupts the board's core "who needs me"
+/// signal, whereas a late `Done` merely lags by one snapshot.
 pub fn classify(tail: &str, rules: &ActivityRules) -> Option<Activity> {
     let clean = strip_ansi(tail);
     let lines: Vec<String> = clean
@@ -106,22 +110,67 @@ pub fn classify(tail: &str, rules: &ActivityRules) -> Option<Activity> {
     }
     let recent: Vec<&String> = lines.iter().rev().take(RECENT).collect();
 
-    let hit = |window: usize, needles: &[String]| {
+    let contains_hit = |window: usize, needles: &[String]| {
         recent[..window.min(recent.len())]
             .iter()
             .any(|line| needles.iter().any(|n| line.contains(n.as_str())))
     };
 
-    if hit(BLOCKED_SCAN, &rules.blocked) {
+    if contains_hit(BLOCKED_SCAN, &rules.blocked) {
         return Some(Activity::Blocked);
     }
-    if hit(DONE_SCAN, &rules.done) {
+    // A completion marker counts only at the head of a line (behind at most a
+    // run of decoration - a check glyph or bullet), and only when no live
+    // spinner is still turning in the window. That anchoring drops prose false
+    // positives ("not done yet", "on success we…"); the spinner veto is the
+    // quiescence corroboration available to a pure snapshot classifier, which
+    // is never handed how long the pty has been quiet.
+    let done = recent[..DONE_SCAN.min(recent.len())]
+        .iter()
+        .any(|line| leads_with_any(line.as_str(), &rules.done));
+    if done && !recent.iter().any(|line| is_active(line.as_str())) {
         return Some(Activity::Done);
     }
-    if hit(RECENT, &rules.working) {
+    if contains_hit(RECENT, &rules.working) {
         return Some(Activity::Working);
     }
     None
+}
+
+/// Markers of work happening *right now* - the spinner frames plus the interrupt
+/// hint most TUIs print while streaming. Their presence vetoes a completion
+/// marker: the pure classifier is never told how long the pty has been quiet, so
+/// a spinner still turning is the strongest "not actually finished" signal it
+/// has.
+const ACTIVE: &[&str] = &[
+    "esc to interrupt",
+    "…",
+    "⠋",
+    "⠙",
+    "⠹",
+    "⠸",
+    "⠼",
+    "⠴",
+    "⠦",
+    "⠧",
+    "⠇",
+    "⠏",
+];
+
+/// Whether a line shows a live-work signal.
+fn is_active(line: &str) -> bool {
+    ACTIVE.iter().any(|s| line.contains(s))
+}
+
+/// Whether `line` begins with one of `needles`, allowing a leading run of
+/// decoration (a spinner glyph, bullet, or check mark) before it. Anchoring to
+/// the head is what keeps a marker word buried in prose from reading as a
+/// completion, while still catching the common "✓ Done" / "◆ done" shapes.
+fn leads_with_any(line: &str, needles: &[String]) -> bool {
+    let core = line.trim_start_matches(|c: char| !c.is_alphanumeric());
+    needles
+        .iter()
+        .any(|n| line.starts_with(n.as_str()) || core.starts_with(n.as_str()))
 }
 
 /// The generic rules, broad enough to cover most CLI agents out of the box.
@@ -162,8 +211,6 @@ pub fn default_rules() -> ActivityRules {
             "paste your",
             "(a)llow",
             "[a]llow",
-            "❯",
-            "› ",
         ],
         // done - turn finished
         &[

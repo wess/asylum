@@ -38,8 +38,8 @@ rest.
 5. [Layouts and Presets](05-layouts-and-presets.md) — declarative fan-out
    presets, defining your own, concurrency, and `asylum layout`.
 6. [Diffs, Checks, and Review](06-diffs-checks-and-review.md) — the annotatable
-   diff, PASS/FAIL checks by ecosystem, shipping annotations back to an agent,
-   and merging.
+   diff, per-hunk staging, PASS/FAIL checks by ecosystem, shipping annotations
+   back to an agent, and merging (or squash-merging) a winner.
 7. [Notes and Knowledge](07-notes-and-knowledge.md) — the Markdown vault, wiki
    links, backlinks, tags, templates, and durable task/run/check/PR references.
 8. [Integrations](08-integrations.md) — GitHub PRs and issues, issue →
@@ -59,7 +59,8 @@ rest.
     the companion server, the append-only event stream, and following the fleet
     from a phone.
 13. [Plugins](13-plugins.md) — the `plugin.toml` manifest, process vs. WASM
-    runtimes, installing and discovering plugins, and writing a simple one.
+    runtimes, enabling and trust, event triggers, installing and discovering
+    plugins, and writing a simple one.
 14. [Configuration Reference](14-configuration-reference.md) — a complete,
     annotated `settings.json` reference: every key, keybindings, per-agent
     overrides, custom agents, and control/companion prefs.

@@ -60,7 +60,7 @@ attend to instead of scanning five terminals. (Activity is covered in depth in
 
 ## Step 4: Review a diff
 
-When a run finishes (or even while it works), select it and open the **Diff**
+When a run finishes (or even while it works), select it and open the **Review**
 surface. A **diff** shows the run's changes line by line against the project's
 base branch: added lines, removed lines, and context. Each run's work is on its
 own branch, so you compare the two agents' diffs independently.
@@ -70,8 +70,9 @@ it touch anything it should not have?
 
 ## Step 5: Run the checks
 
-A correct-looking diff is not the same as a working one. On the Diff surface you
-can run the project's **checks** — Asylum detects them from your project's shape:
+A correct-looking diff is not the same as a working one. On the Review surface
+you can run the project's **checks** — Asylum detects them from your project's
+shape:
 
 - **Rust** (`Cargo.toml`): `cargo check`, `cargo clippy`, `cargo test`.
 - **JavaScript/TypeScript**: your package manager's type-check, lint, and test
@@ -85,7 +86,7 @@ merge — and Asylum will block the merge for you.
 
 ## Step 6: Annotate a line
 
-Suppose one agent's diff is close but a single line is wrong. On the Diff
+Suppose one agent's diff is close but a single line is wrong. On the Review
 surface, click that line and attach a comment — this is an **annotation**. You
 can leave several. Annotations are anchored to a specific line and side of the
 diff, and they survive an app restart.
@@ -100,9 +101,10 @@ conversation. (Full detail in [Chapter 6](06-diffs-checks-and-review.md).)
 Once a run's diff looks right and its checks pass, make it the winner and merge.
 Asylum runs a safe merge: it blocks if checks failed, verifies the base worktree
 is clean, runs a non-destructive conflict preflight, and asks for explicit
-confirmation before it merges the run's branch back to the base branch. Afterward
-it cleans up the finished worktrees (keeping the branches) so your workspace does
-not fill with stale checkouts.
+confirmation before it merges the run's branch back to the base branch — as a
+regular merge or a squash merge. When you are ready, **Clean up finished
+worktrees** removes the finished worktrees and deletes any branch that is now
+safely merged, leaving a losing run's branch untouched.
 
 If you would rather review the change on GitHub, you can open a **pull request**
 from the winning run instead of merging locally

@@ -34,35 +34,64 @@ fn unresolvable_is_not_loopback() {
 }
 
 #[test]
-fn token_gates_remote_allows_loopback_without_token() {
+fn token_required_refuses_empty_token_on_ipv4_loopback() {
     assert_eq!(
-        guard("127.0.0.1:8787", "", Policy::TokenGatesRemote),
-        Ok(())
+        guard("127.0.0.1:8787", "", Policy::TokenRequired),
+        Err(Refusal::MissingToken("127.0.0.1:8787".into()))
     );
-    assert_eq!(guard("[::1]:8787", "", Policy::TokenGatesRemote), Ok(()));
-}
-
-#[test]
-fn token_gates_remote_refuses_wildcard_without_token() {
+    // Whitespace-only is treated the same as empty.
     assert_eq!(
-        guard("0.0.0.0:8787", "", Policy::TokenGatesRemote),
-        Err(Refusal::NonLoopbackWithoutToken("0.0.0.0:8787".into()))
-    );
-    assert_eq!(
-        guard("0.0.0.0:8787", "   ", Policy::TokenGatesRemote),
-        Err(Refusal::NonLoopbackWithoutToken("0.0.0.0:8787".into()))
-    );
-    assert_eq!(
-        guard("[::]:8787", "", Policy::TokenGatesRemote),
-        Err(Refusal::NonLoopbackWithoutToken("[::]:8787".into()))
+        guard("127.0.0.1:8787", "   ", Policy::TokenRequired),
+        Err(Refusal::MissingToken("127.0.0.1:8787".into()))
     );
 }
 
 #[test]
-fn token_gates_remote_allows_wildcard_with_token() {
+fn token_required_refuses_empty_token_on_ipv6_loopback() {
     assert_eq!(
-        guard("0.0.0.0:8787", "s3cret", Policy::TokenGatesRemote),
+        guard("[::1]:8787", "", Policy::TokenRequired),
+        Err(Refusal::MissingToken("[::1]:8787".into()))
+    );
+}
+
+#[test]
+fn token_required_allows_loopback_with_a_token() {
+    assert_eq!(
+        guard("127.0.0.1:8787", "s3cret", Policy::TokenRequired),
         Ok(())
+    );
+    assert_eq!(guard("[::1]:8787", "s3cret", Policy::TokenRequired), Ok(()));
+}
+
+#[test]
+fn token_required_refuses_wildcard_without_token() {
+    assert_eq!(
+        guard("0.0.0.0:8787", "", Policy::TokenRequired),
+        Err(Refusal::MissingToken("0.0.0.0:8787".into()))
+    );
+    assert_eq!(
+        guard("[::]:8787", "", Policy::TokenRequired),
+        Err(Refusal::MissingToken("[::]:8787".into()))
+    );
+}
+
+#[test]
+fn token_required_allows_wildcard_with_token() {
+    assert_eq!(
+        guard("0.0.0.0:8787", "s3cret", Policy::TokenRequired),
+        Ok(())
+    );
+}
+
+#[test]
+fn missing_token_refusal_names_the_settings_key_and_env_var() {
+    let message = guard("127.0.0.1:8787", "", Policy::TokenRequired)
+        .unwrap_err()
+        .to_string();
+    assert!(message.contains("companion.token"), "message: {message}");
+    assert!(
+        message.contains("ASYLUM_COMPANION_TOKEN"),
+        "message: {message}"
     );
 }
 
@@ -78,7 +107,7 @@ fn loopback_only_refuses_wildcard_even_with_token() {
 #[test]
 fn unresolvable_bind_is_refused_under_any_policy() {
     assert_eq!(
-        guard("nonsense", "tok", Policy::TokenGatesRemote),
+        guard("nonsense", "tok", Policy::TokenRequired),
         Err(Refusal::Unresolvable("nonsense".into()))
     );
     assert_eq!(

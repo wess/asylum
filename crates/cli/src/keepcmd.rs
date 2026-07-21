@@ -14,6 +14,8 @@ use std::io::Read;
 
 use keep::{Keep, Scope};
 
+use crate::help;
+
 pub fn keep(args: &[String]) -> Result<(), String> {
     let sub = args.first().map(String::as_str).unwrap_or("");
     let pass = std::env::var("ASYLUM_KEEP_PASSPHRASE")
@@ -39,10 +41,12 @@ pub fn keep(args: &[String]) -> Result<(), String> {
 
     match sub {
         "set" => {
-            let name = crate::positionals(rest)
-                .into_iter()
-                .next()
-                .ok_or("usage: asylum keep set <name> [--project <id>] [--value <v>]")?;
+            let name = crate::positionals(rest).into_iter().next().ok_or_else(|| {
+                format!(
+                    "usage: asylum keep set <name> [--project <id>] [--value <v>] {}",
+                    help::hint(&["keep", "set"])
+                )
+            })?;
             let value = match crate::flag(rest, "--value") {
                 Some(v) => v.to_string(),
                 None => read_stdin_value()?,
@@ -52,10 +56,12 @@ pub fn keep(args: &[String]) -> Result<(), String> {
             println!("set {name} in {}", scope.key());
         }
         "rm" | "remove" => {
-            let name = crate::positionals(rest)
-                .into_iter()
-                .next()
-                .ok_or("usage: asylum keep rm <name> [--project <id>]")?;
+            let name = crate::positionals(rest).into_iter().next().ok_or_else(|| {
+                format!(
+                    "usage: asylum keep rm <name> [--project <id>] {}",
+                    help::hint(&["keep", "rm"])
+                )
+            })?;
             if store.remove(&scope, &name) {
                 store.save(&path).map_err(|e| e.to_string())?;
                 println!("removed {name} from {}", scope.key());
@@ -68,7 +74,12 @@ pub fn keep(args: &[String]) -> Result<(), String> {
                 println!("{name}");
             }
         }
-        _ => return Err("usage: asylum keep <set|rm|list> [--project <id>]".into()),
+        _ => {
+            return Err(format!(
+                "usage: asylum keep <set|rm|list> [--project <id>] {}",
+                help::hint(&["keep"])
+            ))
+        }
     }
     Ok(())
 }

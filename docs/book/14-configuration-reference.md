@@ -15,6 +15,11 @@ if malformed, is reported as a diagnostic rather than aborting the load.
   // Chrome theme: "dark" or "light".
   "theme": "dark",
 
+  // Reveal the full activity rail (Notes, Integrations, Terminal, Editor,
+  // Preview, Browser, Plugins, Accounts, Inbox) instead of collapsing it
+  // behind the rail's "MORE" toggle.
+  "sidebar_more": false,
+
   // Where per-task worktrees are created, relative to a project root.
   "worktree_dir": ".asylum/worktrees",
 
@@ -57,12 +62,16 @@ if malformed, is reported as a diagnostic rather than aborting the load.
   // Keybindings layered over the defaults, as "chord=action" strings.
   "keybindings": [],
 
+  // Plugin ids enabled from the Plugins surface. A disabled plugin's triggers
+  // never fire and its commands never run (see Chapter 13).
+  "enabled_plugins": [],
+
   // Linear API token. Empty disables Linear.
   "linear_token": "",
 
-  // Mobile companion server.
+  // Mobile companion server. Off by default; a token is required once enabled.
   "companion": {
-    "enabled": true,
+    "enabled": false,
     "bind": "127.0.0.1:8787",
     "token": ""
   },
@@ -102,6 +111,13 @@ if malformed, is reported as a diagnostic rather than aborting the load.
 ### `theme`
 String. The chrome theme, `"dark"` (default) or `"light"`. Reloads live.
 
+### `sidebar_more`
+Bool. Default `false`. The activity rail shows **Tasks**, **Review**, and
+**Search** plus a collapsed **MORE** toggle for the rest of the surfaces
+(Notes, Integrations, Terminal, Editor, Preview, Browser, Plugins, Accounts,
+Inbox); set `true` to keep them revealed instead. Clicking **MORE** in the rail
+toggles this key directly.
+
 ### `worktree_dir`
 String. Where per-task worktrees are created, relative to a project's root.
 Default `".asylum/worktrees"`. This is the folder that fills with isolated
@@ -118,7 +134,8 @@ empty, which means Asylum asks you each time.
 Array of fan-out presets ([Chapter 5](05-layouts-and-presets.md)). Each has
 `name`, `description`, `agents`, and optional `concurrency` (0 defers to
 `max_parallel_runs`). Omit the key to keep the built-in `duel` / `triad` /
-`swarm`.
+`swarm`. Also editable as a list in **Settings → Layouts** (add/edit/remove),
+without hand-editing JSON.
 
 ### `max_parallel_runs`
 Integer. Maximum concurrent agent runs across all tasks. Default 4; `0` means
@@ -127,6 +144,13 @@ unlimited. Runs beyond the cap queue and launch as capacity frees.
 ### `run_timeout_minutes`
 Integer. Stop any run exceeding this many minutes. Default 60; `0` disables the
 timeout.
+
+### `enabled_plugins`
+Array of plugin ids. Default empty. A plugin is disabled — inert, its
+`[[trigger]]`s never fire, its `[[command]]`s never run — until its id is in
+this list. Toggled from the Plugins surface, which asks you to confirm a trust
+disclosure before adding a `process`-runtime plugin (WASM enables directly).
+See [Chapter 13](13-plugins.md).
 
 ### `linear_token`
 String. Your Linear API token (create one at `https://linear.app/settings/api`).
@@ -151,9 +175,10 @@ A map keyed by agent id. Each entry may set:
 
 ## `custom_agents` — bring your own agent
 
-An array of agent definitions added on top of the built-in catalog. A custom
-agent whose `id` matches a built-in overrides it (the custom entry wins, in the
-built-in's position). Each entry:
+An array of agent definitions added on top of the built-in catalog. Also
+editable as a list in **Settings → Custom agents** (add/edit/remove), not just
+by hand here. A custom agent whose `id` matches a built-in overrides it (the
+custom entry wins, in the built-in's position). Each entry:
 
 - **`id`** — stable id, used in fan-out, branch names, and the store.
 - **`name`** — display name (defaults to the id if empty).
@@ -212,22 +237,26 @@ the file and bindings reload live.
 
 ## `companion` — mobile companion server
 
-See [Chapter 12](12-the-mobile-companion-and-events.md).
+See [Chapter 12](12-the-mobile-companion-and-events.md). Also toggled from
+**Settings → Servers**, alongside `control` below.
 
-- **`enabled`** (bool, default `true`) — whether the server runs.
+- **`enabled`** (bool, default `false`) — whether the server runs. Off by
+  default: it exposes projects, tasks, runs, and notifications, and accepts
+  follow-ups into a live agent, so it only starts once you opt in.
 - **`bind`** (string, default `"127.0.0.1:8787"`) — the bind address. Use
-  `"0.0.0.0:8787"` to reach it from a phone on the LAN, **which requires a
-  token**: a non-loopback bind with an empty token is refused at startup and the
-  server does not run (it would expose your store to the network). The refusal
-  appears in the Inbox rather than failing silently.
-- **`token`** (string, default empty) — bearer token. Empty is allowed only on a
-  loopback bind, and means no auth. A non-empty token is required as
-  `Authorization: Bearer <token>` and is what unlocks a non-loopback bind.
+  `"0.0.0.0:8787"` to also reach it from a phone on the LAN.
+- **`token`** (string, default empty) — bearer token, required whenever the
+  server is enabled, **loopback or not**: an empty token is refused at startup
+  and the server does not run (it would let any local process read your store
+  and inject follow-ups into a live agent). The refusal appears in the Inbox
+  rather than failing silently. Sent as `Authorization: Bearer <token>` on
+  every `/api/*` request.
 
 ## `control` — agent control surface
 
 See [Chapter 11](11-agent-orchestration-and-the-control-surface.md). Lets a
-running agent orchestrate the fleet from inside its worktree.
+running agent orchestrate the fleet from inside its worktree. Also toggled from
+**Settings → Servers**, alongside `companion` above.
 
 - **`enabled`** (bool, default `true`) — whether the control server runs. When
   off, `asylum control` commands report that they are not inside a worktree.
@@ -264,7 +293,9 @@ uses a key it never sees and cannot redirect.
 
 ## `upstreams` — what the proxy may forward to
 
-An array of named upstreams. Each binds a stored secret to a fixed destination.
+An array of named upstreams. Also editable as a list in **Settings → Secrets
+proxy** (add/edit/remove), not just by hand here. Each binds a stored secret to
+a fixed destination.
 Secret *values* never appear in `settings.json` — they live in the encrypted keep
 (`~/.config/asylum/keep.enc`, managed with `asylum keep set <name>` and unlocked
 with `ASYLUM_KEEP_PASSPHRASE`); `secret` only names the keep entry.
@@ -303,8 +334,9 @@ One aggregating [Model Context Protocol](https://modelcontextprotocol.io) server
 that every agent connects to, fronting the servers in `mcp_servers` under
 per-service namespaces (a `create_pr` tool on the `github` server is exposed as
 `github__create_pr`, and a call to it is routed back). See `docs/mcp.md`. The
-gateway toggles here are also editable in **Settings → MCP gateway**; the server
-list is edited in this file.
+gateway toggles and the server list are both editable in **Settings → MCP
+gateway** — add, edit, or remove a server without leaving Settings — or by hand
+in this file.
 
 - **`enabled`** (bool, default `false`) — whether the gateway runs. Off by
   default; it only does something once you define `mcp_servers`.
@@ -406,16 +438,18 @@ defaults. Add keys as you hit a reason to.
 
 - `settings.json` is JSONC, live-reloaded, comment-preserving; every key is
   optional.
-- Top-level: `theme`, `worktree_dir`, `default_agents`, `layouts`,
-  `max_parallel_runs`, `run_timeout_minutes`, `linear_token`.
+- Top-level: `theme`, `sidebar_more`, `worktree_dir`, `default_agents`,
+  `layouts`, `max_parallel_runs`, `run_timeout_minutes`, `enabled_plugins`,
+  `linear_token`.
 - `agents` overrides per agent (`program`, `extra_args`, `enabled`);
   `custom_agents` adds your own (`id`/`program`/`args`/`delivery`).
 - `editor`, `keybindings` (chord=action, empty unbinds), `companion`, `control`,
   `proxy`, `upstreams`, `mcp`, and `mcp_servers` round out the file.
 - The control surface, the proxy, and the MCP gateway are loopback-only
   (enforced) and *always* authenticated — an empty `control.token` provisions a
-  per-session token, it does not disable auth. The companion refuses a
-  non-loopback bind without a token.
+  per-session token, it does not disable auth. The companion is off by default
+  and, once enabled, is also always authenticated — an empty `companion.token`
+  refuses to start, loopback or not.
 - `linear_token` and `companion.token` fall back to `ASYLUM_LINEAR_TOKEN` and
   `ASYLUM_COMPANION_TOKEN` when left empty.
 

@@ -10,27 +10,32 @@
 //!   (`run_finished`, `worktree_created`, …; see [`TRIGGER_EVENTS`]).
 //! - `[[tool]]` - tools exposed to the coding agents themselves.
 //!
-//! Of those five, only `[[command]]` reaches the user today: the host (`app`)
-//! invokes commands through the runtime. `[panel]`, `[webview]`, `[[trigger]]`,
-//! and `[[tool]]` are parsed and validated here, but the host does not yet
-//! render the surfaces, dispatch triggers on ADE events, or expose tools to the
-//! agents. They are manifest-level today - a plugin can declare them, and the
-//! vocabulary is stable, but nothing fires them.
+//! Of the five, `[[command]]` and `[[trigger]]` reach the user: the host
+//! (`app`) invokes commands through the runtime, and dispatches triggers on ADE
+//! events using the matcher in [`dispatch`] (the host gates firing on a
+//! per-plugin enabled flag and runs the action off its UI thread). `[panel]`,
+//! `[webview]`, and `[[tool]]` are still parsed and validated but not yet
+//! surfaced — a plugin can declare them and the vocabulary is stable, but the
+//! host does not yet render a panel/webview or expose a tool to the agents.
 //!
 //! Plugins declare `capabilities` (see [`CAPABILITIES`]) - advisory under the
 //! process runtime (`pluginrt`), and the vocabulary the WASM runtime enforces.
-//! This crate is pure parsing + validation; the host drives the runtime.
+//! This crate is pure parsing + validation + trigger matching; the host drives
+//! the runtime and owns all side effects.
 //!
 //! Submodules:
 //! - [`model`] - the parsed manifest types and fixed vocabularies.
 //! - [`parse`] - TOML → [`Plugin`], with friendly [`Diagnostic`]s.
 //! - [`load`] - discover and load plugins from a directory.
+//! - [`dispatch`] - match an ADE event to the triggers that should fire.
 
+pub mod dispatch;
 pub mod install;
 pub mod load;
 pub mod model;
 pub mod parse;
 
+pub use dispatch::{fired, EventPayload, Fired};
 pub use install::{clone_command, discover_command, fetch, Source, TOPIC};
 pub use load::{default_dir, load_dir, Installed};
 pub use model::{

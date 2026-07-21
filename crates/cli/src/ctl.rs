@@ -8,12 +8,13 @@ use std::time::{Duration, Instant};
 use control::Client;
 use serde_json::Value;
 
+use crate::help;
 use crate::{flag, positionals};
 
 /// `asylum control <sub>`.
 pub fn control(args: &[String]) -> Result<(), String> {
     let sub = args.first().map(String::as_str).unwrap_or("");
-    let rest = &args[1..];
+    let rest = &args[1.min(args.len())..];
     match sub {
         "skill" => {
             println!("{}", control::SKILL);
@@ -24,26 +25,35 @@ pub fn control(args: &[String]) -> Result<(), String> {
         "spawn" => spawn(rest),
         "activity" => activity(rest),
         "check" => check(),
-        _ => Err("usage: asylum control <status|read|spawn|activity|check|skill>".into()),
+        _ => Err(format!(
+            "usage: asylum control <status|read|spawn|activity|check|skill> {}",
+            help::hint(&["control"])
+        )),
     }
 }
 
 /// `asylum wait run <id> [--status s] [--activity a] [--timeout secs]`.
 pub fn wait(args: &[String]) -> Result<(), String> {
     if args.first().map(String::as_str) != Some("run") {
-        return Err(
-            "usage: asylum wait run <id> [--status <s>] [--activity <a>] [--timeout <secs>]".into(),
-        );
+        return Err(format!(
+            "usage: asylum wait run <id> [--status <s>] [--activity <a>] [--timeout <secs>] {}",
+            help::hint(&["wait"])
+        ));
     }
     let rest = &args[1..];
-    let id = positionals(rest)
-        .first()
-        .cloned()
-        .ok_or("usage: asylum wait run <id> ...")?;
+    let id = positionals(rest).first().cloned().ok_or_else(|| {
+        format!(
+            "usage: asylum wait run <id> ... {}",
+            help::hint(&["wait", "run"])
+        )
+    })?;
     let want_status = flag(rest, "--status").map(String::from);
     let want_activity = flag(rest, "--activity").map(String::from);
     if want_status.is_none() && want_activity.is_none() {
-        return Err("wait needs --status or --activity".into());
+        return Err(format!(
+            "wait needs --status or --activity {}",
+            help::hint(&["wait", "run"])
+        ));
     }
     let timeout = flag(rest, "--timeout")
         .and_then(|s| s.parse::<u64>().ok())
@@ -116,10 +126,12 @@ fn status() -> Result<(), String> {
 }
 
 fn read(args: &[String]) -> Result<(), String> {
-    let id = positionals(args)
-        .first()
-        .cloned()
-        .ok_or("usage: asylum control read <run-id>")?;
+    let id = positionals(args).first().cloned().ok_or_else(|| {
+        format!(
+            "usage: asylum control read <run-id> {}",
+            help::hint(&["control", "read"])
+        )
+    })?;
     let c = client()?;
     let (code, body) = c.get(&format!("/control/runs/{id}"))?;
     if code != 200 {
@@ -132,9 +144,12 @@ fn read(args: &[String]) -> Result<(), String> {
 
 fn spawn(args: &[String]) -> Result<(), String> {
     let pos = positionals(args);
-    let agent = pos
-        .first()
-        .ok_or("usage: asylum control spawn <agent> <prompt...>")?;
+    let agent = pos.first().ok_or_else(|| {
+        format!(
+            "usage: asylum control spawn <agent> <prompt...> {}",
+            help::hint(&["control", "spawn"])
+        )
+    })?;
     let prompt = pos[1..].join(" ");
     let c = client()?;
     let task = require(control::ENV_TASK)?;
@@ -154,10 +169,12 @@ fn spawn(args: &[String]) -> Result<(), String> {
 }
 
 fn activity(args: &[String]) -> Result<(), String> {
-    let state = positionals(args)
-        .first()
-        .cloned()
-        .ok_or("usage: asylum control activity <working|blocked|done|idle>")?;
+    let state = positionals(args).first().cloned().ok_or_else(|| {
+        format!(
+            "usage: asylum control activity <working|blocked|done|idle> {}",
+            help::hint(&["control", "activity"])
+        )
+    })?;
     let c = client()?;
     let run = require(control::ENV_RUN)?;
     let payload = serde_json::json!({ "activity": state });

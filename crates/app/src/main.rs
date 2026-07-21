@@ -7,15 +7,19 @@
 mod accounts;
 mod browser;
 mod control;
+mod crash;
 mod diff;
 mod fleet;
 mod icons;
 mod integrations;
+mod logs;
 mod menu;
 mod menus;
 mod note;
 mod notifications;
 mod plugins;
+mod prepare;
+mod reap;
 mod reload;
 mod root;
 mod run;
@@ -37,6 +41,31 @@ use zeroize::Zeroizing;
 use state::Root;
 
 fn main() {
+    // Version fast-path: checked before logging, the sitecapture branch, the
+    // instance lock, or anything else, so `asylum --version` is a cheap,
+    // headless-safe check (no gpui/display init) that CI can run on every
+    // platform.
+    if std::env::args()
+        .skip(1)
+        .any(|arg| matches!(arg.as_str(), "--version" | "-V" | "version"))
+    {
+        println!("asylum {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+
+    // Logging comes up before everything else, including the single-instance
+    // lock, so a refusal or an early failure still lands in the log file.
+    // `logs::init` creates `<data dir>/logs` itself (via `RollingFileAppender`),
+    // so nothing here needs the data dir to already exist.
+    let db_path = state::Root::db_path();
+    let _log_guard = logs::init();
+    crash::install();
+    tracing::info!(
+        version = env!("CARGO_PKG_VERSION"),
+        data_dir = %db_path.parent().unwrap_or(std::path::Path::new(".")).display(),
+        "asylum starting"
+    );
+
     // Settings drive the initial theme; a missing file is fine (defaults).
     // Diagnostics are reported when the load is applied (see `reload`).
     let loaded = config::load(&config::default_path());
@@ -47,7 +76,39 @@ fn main() {
         return;
     }
 
-    let db_path = state::Root::db_path();
+    // Single-instance guard: take an exclusive advisory lock beside the database
+    // before opening the store, running interrupted-run recovery, or starting
+    // any server. A second instance would re-run recovery - marking this
+    // instance's live runs failed - and both would drain the followup/control
+    // queues and double-launch queued work, so a contended lock is a hard
+    // refusal, not a warning. `_instance` holds the lock for the whole process
+    // lifetime; the OS releases it on exit (no stale lock to clear).
+    if let Some(parent) = db_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _instance = match store::lock::acquire(&store::lock::path_for(&db_path)) {
+        Ok(Some(guard)) => guard,
+        Ok(None) => {
+            tracing::warn!("refusing to start: another instance holds the workspace lock");
+            eprintln!(
+                "Asylum is already running. Another instance is using this workspace; quit it before relaunching."
+            );
+            let _ = notify::send(&notify::Notification::new(
+                "Asylum is already running",
+                "Another instance is using this workspace; quit it before relaunching.",
+            ));
+            std::process::exit(1);
+        }
+        Err(error) => {
+            tracing::error!(%error, "could not acquire the single-instance lock");
+            eprintln!("Asylum could not acquire its single-instance lock: {error}");
+            let _ = notify::send(&notify::Notification::new(
+                "Asylum could not start",
+                format!("Could not acquire the single-instance lock: {error}"),
+            ));
+            std::process::exit(1);
+        }
+    };
 
     // Read + scrub the keep passphrase while still single-threaded (before any
     // thread starts), so it never lingers in `/proc/<pid>/environ`.
@@ -92,17 +153,19 @@ fn main() {
 
     // Launch the mobile companion server on a background thread, serving the
     // same on-disk store the app uses. Bind, token, and enablement come from
-    // settings. A non-loopback bind without a token is refused (it would expose
-    // the store to the network); the refusal and any bind error are surfaced in
-    // the Inbox rather than silently swallowed.
+    // settings; off by default. Once enabled it always requires a token, even
+    // on loopback (it would otherwise let any local process read the fleet and
+    // inject follow-ups into a live agent) - the refusal and any bind error are
+    // surfaced in the Inbox rather than silently swallowed.
     let companion = loaded.settings.companion.clone();
     if companion.enabled {
         match config::bind::guard(
             &companion.bind,
             &companion.token,
-            config::bind::Policy::TokenGatesRemote,
+            config::bind::Policy::TokenRequired,
         ) {
             Ok(()) => {
+                tracing::info!(bind = %companion.bind, "companion server starting");
                 let db_path = db_path.clone();
                 let report_path = db_path.clone();
                 std::thread::spawn(move || {
@@ -154,6 +217,7 @@ fn main() {
             secrets::set_control_token(token.clone());
             match config::bind::guard(&control.bind, &token, config::bind::Policy::LoopbackOnly) {
                 Ok(()) => {
+                    tracing::info!(bind = %control.bind, "control server starting");
                     let db_path = db_path.clone();
                     let report_path = db_path.clone();
                     let bind = control.bind.clone();
@@ -188,6 +252,7 @@ fn main() {
             secrets::set_proxy_key(key.clone());
             match config::bind::guard(&proxy_prefs.bind, &key, config::bind::Policy::LoopbackOnly) {
                 Ok(()) => {
+                    tracing::info!(bind = %proxy_prefs.bind, "secrets proxy starting");
                     let bind = proxy_prefs.bind.clone();
                     let upstreams = loaded.settings.upstreams.clone();
                     let report_path = db_path.clone();
@@ -227,6 +292,7 @@ fn main() {
             secrets::set_mcp_key(key.clone());
             match config::bind::guard(&mcp_prefs.bind, &key, config::bind::Policy::LoopbackOnly) {
                 Ok(()) => {
+                    tracing::info!(bind = %mcp_prefs.bind, "mcp gateway starting");
                     let bind = mcp_prefs.bind.clone();
                     let servers = loaded.settings.mcp_servers.clone();
                     let expose = mcp::Expose::parse(&mcp_prefs.expose);
@@ -325,6 +391,19 @@ fn main() {
                 )
                 .expect("open window");
 
+            // Agents are real child process groups, and process teardown never
+            // drops the terminal entities that would end them; kill whatever is
+            // still live before the app goes away.
+            let quit_root = root.downgrade();
+            cx.on_app_quit(move |cx| {
+                let pidfiles = quit_root
+                    .update(cx, |root, _| root.take_run_pidfiles())
+                    .unwrap_or_default();
+                reap::terminate_all(pidfiles);
+                async {}
+            })
+            .detach();
+
             // The full menu bar, keybindings, and their handlers.
             menus::install(root, window, &loaded.settings, cx);
 
@@ -355,6 +434,7 @@ fn keep_path() -> std::path::PathBuf {
 /// failed listener is visible in the app instead of being silently discarded.
 /// Best-effort: if the store cannot be opened there is nowhere to report.
 fn report_server_problem(db_path: &std::path::Path, title: &str, body: &str) {
+    tracing::warn!(%title, %body, "server problem");
     let Ok(db) = store::Db::open(db_path) else {
         return;
     };
@@ -387,7 +467,7 @@ fn check_for_update(db_path: std::path::PathBuf) {
     if already {
         return;
     }
-    let body = format!("A newer version is ready. Download: {}", release.url);
+    let body = notifications::update_body(&release.notes, &release.url);
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)

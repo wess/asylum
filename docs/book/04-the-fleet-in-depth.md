@@ -22,8 +22,9 @@ Fanning a task out is a precise sequence:
    terminal pane. The run flips to `running`.
 4. **Track.** As the pty produces output, Asylum snapshots the transcript into
    the store so it survives the pty being gone. On exit it records the exit code,
-   updates status, commits a successful run's changes, and kicks off that
-   worktree's detected checks.
+   updates status, leaves a successful run's changes uncommitted in its worktree
+   so you can stage exactly what you want on the Review surface, and kicks off
+   that worktree's detected checks.
 
 Because every run has its own branch and worktree, the agents never contend. The
 task's own status moves `draft` → `running` → `review` as its runs progress, and
@@ -36,9 +37,11 @@ own branch, living in its own folder (by default under
 `.asylum/worktrees` inside the project). Worktrees share the repository's history
 but have independent files, which is what makes parallel agents safe.
 
-You do not manage these by hand. Asylum creates them on fan-out and removes the
-clean, finished ones after a merge — keeping the branches so the work is never
-lost. You can also inspect and manipulate worktrees directly with the CLI
+You do not manage these by hand. Asylum creates them on fan-out; a **Clean up
+finished worktrees** action removes the clean, finished ones and deletes any
+branch that is now safely merged — Git's safe delete refuses anything that is
+not, so a losing run's branch and work are never lost. You can also inspect and
+manipulate worktrees directly with the CLI
 ([Chapter 10](10-the-cli.md)):
 
 ```sh

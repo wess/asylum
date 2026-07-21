@@ -226,11 +226,13 @@ fn followup(db: &Db, task_id: i64, body: &str) -> Response {
 }
 
 /// Whether a request carrying `auth` (`Authorization` header value) is allowed
-/// when the server is configured with `token`. An empty token disables auth
-/// (localhost-only mode); otherwise a matching `Bearer <token>` is required.
+/// when the server is configured with `token`. An empty configured token
+/// denies every request - `config::bind::guard` should never let the server
+/// start that way, but this check fails closed regardless rather than trust
+/// that. Otherwise a matching `Bearer <token>` is required.
 pub fn authorized(auth: Option<&str>, token: &str) -> bool {
-    if token.is_empty() {
-        return true;
+    if token.trim().is_empty() {
+        return false;
     }
     auth.and_then(|value| value.trim().strip_prefix("Bearer "))
         .is_some_and(|presented| presented.trim() == token)

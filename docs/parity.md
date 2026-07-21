@@ -57,10 +57,11 @@ what actually reaches the user, not just what compiles.
 | Embedded browser (wry/Chromium) | ✅ | ✅ |
 | Design mode (click → HTML/CSS/selector → agent) | ✅ | ✅ |
 
-## Diff review
+## Review
 | Feature | Logic | UI |
 |---|---|---|
 | Diff viewer (added/removed/gutter) | ✅ | ✅ |
+| Per-hunk / per-file staging with a staged-count indicator | ✅ | ✅ |
 | Inline comments + ship review to agent | ✅ | ✅ |
 
 ## Integrations
@@ -135,7 +136,7 @@ what actually reaches the user, not just what compiles.
 | Project config (asylum.toml) + keybindings | ✅ | ✅ |
 | Plugin manifest + process/WASM runtime + command invocation | ✅ | ✅ |
 | Plugin install from GitHub + topic discovery | ✅ | ✅ (CLI) |
-| Plugin trigger dispatch (auto-fire on ADE events) | ✅ | 🟡 (runtime ready; auto-dispatch not wired) |
+| Plugin trigger dispatch (auto-fire on ADE events) | ✅ | ✅ (enabled plugins only, off-thread with a timeout) |
 | Mobile companion (server + web page + token auth) | ✅ | ✅ |
 | Companion follow-up delivery to a live run | ✅ | ✅ |
 | Packaging (dmg/deb) + release workflow | ✅ | ✅ (CI) |
@@ -145,8 +146,8 @@ what actually reaches the user, not just what compiles.
 
 - **Native mobile apps**: a native iOS/Android app is a separate codebase. The
   equivalent capability — monitor runs/notifications and send follow-ups from a
-  phone — is delivered by the `companion` HTTP server (live on `:8787`) and its
-  mobile web page. A native app shell is a separate distribution, not a feature
-  gap in the environment.
+  phone — is delivered by the `companion` HTTP server (opt-in, `:8787` by
+  default) and its mobile web page. A native app shell is a separate
+  distribution, not a feature gap in the environment.
 - **WebGL terminal**: libsinclair paints the terminal grid on gpui's GPU
   pipeline; the capability (GPU-accelerated terminal) is equivalent.

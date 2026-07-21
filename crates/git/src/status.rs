@@ -86,9 +86,10 @@ fn parse(out: &str) -> Vec<Entry> {
                 kind: StatusKind::Ignored,
                 staged: false,
             }),
-            // "u" unmerged (conflict): XY ... <path>
+            // "u" unmerged (conflict): XY sub m1 m2 m3 mW h1 h2 h3 <path> - 9
+            // fixed fields before the path.
             "u" => {
-                if let Some(path) = rest.rsplit(' ').next() {
+                if let Some(path) = fixed_fields_tail(rest, 9) {
                     entries.push(Entry {
                         path: path.to_string(),
                         kind: StatusKind::Conflicted,
@@ -103,8 +104,10 @@ fn parse(out: &str) -> Vec<Entry> {
 }
 
 /// Parse a changed-entry line ("1"/"2"). The XY field is the two-char status;
-/// X is the index (staged) state, Y is the working-tree state. The path is the
-/// last whitespace field (for renames, `<new>\t<old>` - we keep the new path).
+/// X is the index (staged) state, Y is the working-tree state. Whatever
+/// follows the fixed-width fields is the path verbatim - it may itself
+/// contain spaces, so it must not be recovered with a whitespace split. For a
+/// rename ("2") that remainder is `<path>\t<origPath>`; we keep the new path.
 fn parse_changed(tag: &str, rest: &str) -> Option<Entry> {
     let mut fields = rest.split(' ');
     let xy = fields.next()?;
@@ -119,9 +122,25 @@ fn parse_changed(tag: &str, rest: &str) -> Option<Entry> {
         _ if tag == "2" => StatusKind::Renamed,
         _ => StatusKind::Modified,
     };
-    let tail = rest.rsplit(' ').next().unwrap_or("");
+    // "1" (ordinary) has 7 fixed fields before <path>: XY sub mH mI mW hH hI.
+    // "2" (rename/copy) has an eighth, the <X><score> field, before <path>.
+    let fixed = if tag == "2" { 8 } else { 7 };
+    let tail = fixed_fields_tail(rest, fixed)?;
     let path = tail.split('\t').next().unwrap_or(tail).to_string();
     Some(Entry { path, kind, staged })
+}
+
+/// Drop `n` leading space-separated fixed-width fields from `s` and return
+/// whatever follows verbatim. Porcelain v2 pads every record with a known
+/// number of fixed fields before the trailing path, so this recovers a path
+/// that itself contains spaces instead of truncating it the way splitting on
+/// the *last* space would.
+fn fixed_fields_tail(s: &str, n: usize) -> Option<&str> {
+    let mut rest = s;
+    for _ in 0..n {
+        rest = rest.split_once(' ')?.1;
+    }
+    Some(rest)
 }
 
 #[cfg(test)]

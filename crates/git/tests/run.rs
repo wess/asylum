@@ -1,6 +1,23 @@
 use super::*;
 
 #[test]
+fn command_pins_the_c_locale() {
+    // Locale-sensitive git output (e.g. "Fast-forward") must stay in English
+    // no matter the caller's environment, so every invocation carries an
+    // explicit LC_ALL/LANG override rather than inheriting the parent's.
+    let cmd = command(std::path::Path::new("."), &["status"]);
+    let envs: Vec<(&std::ffi::OsStr, Option<&std::ffi::OsStr>)> = cmd.get_envs().collect();
+    assert!(envs.contains(&(
+        std::ffi::OsStr::new("LC_ALL"),
+        Some(std::ffi::OsStr::new("C"))
+    )));
+    assert!(envs.contains(&(
+        std::ffi::OsStr::new("LANG"),
+        Some(std::ffi::OsStr::new("C"))
+    )));
+}
+
+#[test]
 fn error_display() {
     let e = Error::Git("fatal: not a repo".into());
     assert_eq!(e.to_string(), "git: fatal: not a repo");

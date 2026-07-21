@@ -8,8 +8,8 @@
 
 | Time | On screen | Action | Narration |
 |------|-----------|--------|-----------|
-| 0:00 | Board with two finished runs. | Select a run. | "Fanning out is half the value. The other half is choosing well — and that happens on the Diff surface." |
-| 0:16 | The Diff surface opens for the run. | Open Diff. | "Select a run and open Diff. A diff is this run's changes against the project's base branch, parsed into a reviewable tree: files, then hunks, then lines — added, removed, or context." |
+| 0:00 | Board with two finished runs. | Select a run. | "Fanning out is half the value. The other half is choosing well — and that happens on the Review surface." |
+| 0:16 | The Review surface opens for the run. | Open Review. | "Select a run and open Review. A diff is this run's changes against the project's base branch, parsed into a reviewable tree: files, then hunks, then lines — added, removed, or context." |
 | 0:40 | Unified view of a changed file. | Scroll the diff. | "Old and new line numbers are tracked on every line, so a comment can anchor to exactly the right side." |
 | 1:00 | Toggle to side-by-side view. | Switch views. | "There are two views — unified, changes inline in one column, and side-by-side, old on the left and new on the right. Use whichever reads better." |
 | 1:20 | Branch chips on the diff header. | Point at the branch chip. | "Branch chips show which branch the run is on. Because every run has its own branch, you review and compare each agent's attempt independently." |

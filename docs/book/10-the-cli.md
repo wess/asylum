@@ -31,9 +31,11 @@ asylum layout <list | show <name>>
 asylum snapshot [<out.png>]
 asylum click <x> <y>
 asylum fill <text...>
+asylum completions <bash|zsh|fish>
 ```
 
-Run `asylum help` for the same summary, and `asylum --version` for the version.
+Run `asylum help` for the same summary, `asylum <subcommand> --help` for that
+one command's usage, and `asylum --version` for the version.
 
 ## `worktree` — manage git worktrees
 
@@ -237,6 +239,20 @@ any `{secret:NAME}` from the keep when `ASYLUM_KEEP_PASSPHRASE` is set). Use
 `stdio` when an agent CLI speaks MCP only over stdio — it proxies stdin/stdout
 JSON-RPC to the gateway's HTTP endpoint.
 
+## `completions` — shell completions
+
+Print a completion script for your shell to stdout, then source or install it
+the way that shell expects:
+
+```sh
+asylum completions bash > /etc/bash_completion.d/asylum
+asylum completions zsh > "${fpath[1]}/_asylum"
+asylum completions fish > ~/.config/fish/completions/asylum.fish
+```
+
+Exactly three shells are supported — `bash`, `zsh`, `fish` — any other name is
+an error.
+
 ## Computer use: `snapshot`, `click`, `fill`
 
 Three low-level OS automation commands for driving the desktop itself — the
@@ -265,8 +281,9 @@ text. These are platform-aware and shell out to the OS's automation tooling.
 
 - The CLI mirrors the ADE: `worktree`, `run`, `search`, `control`, `wait`,
   `plugin`, `layout`, `keep`, `call`, plus computer-use
-  `snapshot`/`click`/`fill`.
-- `run` echoes the exact launch command — the fastest PATH check.
+  `snapshot`/`click`/`fill` and shell `completions`.
+- Every subcommand answers its own `--help`; `run` echoes the exact launch
+  command — the fastest PATH check.
 - `control` and `wait` are the agent-facing orchestration commands, detailed
   next.
 - `keep` stores credentials encrypted; `call` spends them through the proxy

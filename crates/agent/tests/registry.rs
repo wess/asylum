@@ -83,3 +83,17 @@ fn delivery_parse() {
     assert_eq!(Delivery::parse("arg"), Delivery::Arg);
     assert_eq!(Delivery::parse(""), Delivery::Arg);
 }
+
+#[test]
+fn builtin_icons_are_not_pictographic_emoji() {
+    // Icons are monochrome symbol glyphs, not colour emoji; guard against a
+    // pictographic emoji (U+1F000 and up) creeping back in.
+    for a in builtins() {
+        assert!(
+            a.icon.chars().all(|c| (c as u32) < 0x1F000),
+            "agent {} has an emoji icon: {:?}",
+            a.id,
+            a.icon
+        );
+    }
+}

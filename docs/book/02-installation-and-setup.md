@@ -43,7 +43,9 @@ The development build you launch with `cargo run -p app` installs itself as
 **`asylumdev`**. That name is deliberate: it never collides with a released copy
 of the app installed as **`asylum`**. When you package a real release, the same
 binary ships as `asylum`. Throughout this book, "the app" means whichever you are
-running; the behavior is identical.
+running; the behavior is identical. Either one also answers `--version` directly
+— printing `asylum <version>` and exiting without opening the window — handy for
+confirming what you have installed.
 
 The command-line tool is a separate binary, also named `asylum` (from the `cli`
 crate). In a source checkout you can invoke it with cargo:

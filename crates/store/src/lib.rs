@@ -14,13 +14,14 @@
 
 use std::path::Path;
 
-use rusqlite::Connection;
+use rusqlite::{Connection, OpenFlags};
 
 pub mod account;
 pub mod annotation;
 pub mod control;
 pub mod event;
 pub mod followup;
+pub mod lock;
 pub mod model;
 pub mod note;
 pub mod notification;
@@ -52,9 +53,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// The database handle: a single owned SQLite connection plus the ADE's schema.
 ///
-/// One [`Db`] per running app. Not `Sync` - wrap it in the app's state cell and
-/// touch it from one place, or clone the underlying file path and open a second
-/// connection for a worker thread.
+/// One writable [`Db`] per running app. Not `Sync` - wrap it in the app's state
+/// cell and touch it from one place. For concurrent background reads (search),
+/// open a second, read-only handle with [`Db::open_readonly`]: WAL mode lets it
+/// run alongside the writer without blocking it.
 pub struct Db {
     conn: Connection,
 }
@@ -71,6 +73,25 @@ impl Db {
     pub fn memory() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
         schema::migrate(&conn)?;
+        Ok(Self { conn })
+    }
+
+    /// Open an additional **read-only** handle to an on-disk database for
+    /// concurrent background reads (project search runs on a worker thread).
+    ///
+    /// The app owns one writable [`Db`] on its UI thread; each background search
+    /// opens one of these against the same file and reads without touching the
+    /// writer. WAL mode (set on the primary handle by [`schema::migrate`]) lets
+    /// these readers run in parallel with the writer and each other. This path
+    /// deliberately does **not** migrate - a reader must never change schema - so
+    /// the file must already exist and have been opened writably at least once.
+    pub fn open_readonly(path: impl AsRef<Path>) -> Result<Self> {
+        let conn = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+                | OpenFlags::SQLITE_OPEN_URI
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
         Ok(Self { conn })
     }
 

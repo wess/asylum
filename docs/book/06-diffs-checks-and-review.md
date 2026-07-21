@@ -7,7 +7,7 @@ and the safe path to merging a winner.
 
 ## Reading a diff
 
-Select a run and open the **Diff** surface. A diff is the run's changes against
+Select a run and open the **Review** surface. A diff is the run's changes against
 the project's base branch, parsed into a reviewable tree: each changed **file**
 contains **hunks** (contiguous regions of change), and each hunk contains
 **lines** — added, removed, or unchanged context. Old and new line numbers are
@@ -18,6 +18,16 @@ Asylum offers both a **unified** view (changes inline, one column) and a
 which branch the run is on. Because every run is on its own branch, you review
 and compare each agent's attempt independently — open one run's diff, form an
 opinion, switch to the next.
+
+## Staging what you want
+
+A successful run's changes are deliberately left **uncommitted** in its
+worktree — nothing lands on the run's branch until you merge. That is what
+lets you stage exactly what you want: click a hunk to stage or unstage it, or
+stage a whole file at once, and a counter ("N of M hunks staged") tracks how
+much of the run you have accepted so far. Staging state is read live from Git,
+not from a shadow copy, so it always matches what is actually on disk. Whatever
+is staged when you merge is what gets committed to the branch.
 
 ## Checks: PASS or FAIL
 
@@ -35,7 +45,7 @@ them per project:
 
 Each check reports a status and a short summary, and how long it took. Checks run
 automatically after a successful run finishes, and you can re-run them from the
-Diff surface. A run's health is shown with PASS/FAIL indicators on its card and
+Review surface. A run's health is shown with PASS/FAIL indicators on its card and
 in review, so you can compare two agents' work on *correctness*, not just on how
 the diff looks.
 
@@ -85,9 +95,13 @@ conflicting work by accident:
 3. **Conflict preflight.** It runs a *non-destructive* check for merge conflicts
    first, so a conflict is reported rather than left half-applied.
 4. **Explicit confirmation.** It asks you to confirm before it merges the run's
-   branch back to the base branch.
-5. **Cleanup.** Afterward it removes clean, finished worktrees and keeps their
-   branches, so nothing is lost and your workspace stays tidy.
+   branch back to the base branch — as a regular merge, or a **squash merge**
+   that collapses the run's commits into one. This is also the moment your
+   staged changes are actually committed onto the branch.
+5. **Cleanup.** When you are ready, **Clean up finished worktrees** removes
+   clean, finished worktrees and deletes any branch that is now safely merged —
+   Git refuses to delete anything that is not, so a losing run's branch is
+   always left alone.
 
 The task's status moves to `merged`. If you would rather land the change through
 code review, open a **pull request** from the winning run instead — see
@@ -99,19 +113,22 @@ code review, open a **pull request** from the winning run instead — see
 2. Run checks on each; note which pass.
 3. On the run with the nicer diff but a failing check, annotate the offending
    line with a specific instruction and ship it back.
-4. Re-run checks on the new attempt; when it passes, merge it and watch the
-   worktrees clean up.
+4. Re-run checks on the new attempt; when it passes, unstage any hunk you do not
+   want, merge it, and clean up the finished worktrees.
 
 ## Recap
 
-- The Diff surface parses changes into files → hunks → lines, in unified or
+- The Review surface parses changes into files → hunks → lines, in unified or
   side-by-side view, per branch.
+- A successful run stays uncommitted in its worktree so you can stage or
+  unstage individual hunks or files before merge.
 - Checks run the project's real type-check/lint/test by ecosystem and report
   PASS/FAIL.
 - Annotations are durable, line-anchored comments that ship back to the agent and
   start a new attempt in the same worktree.
 - Merge is guarded: failed checks block, the base is protected, conflicts are
-  pre-flighted, and confirmation is required before cleanup.
+  pre-flighted, and confirmation is required — as a regular or squash merge.
+  Cleanup afterward deletes only branches that are now safely merged.
 
 ## Next
 

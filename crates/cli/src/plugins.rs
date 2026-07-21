@@ -2,6 +2,7 @@
 
 use std::process::Command;
 
+use crate::help;
 use crate::{flag, positionals};
 
 pub fn plugin(args: &[String]) -> Result<(), String> {
@@ -9,15 +10,20 @@ pub fn plugin(args: &[String]) -> Result<(), String> {
         "install" => install(&args[1..]),
         "search" => search(&args[1..]),
         "list" => list(),
-        _ => Err("usage: asylum plugin <install <owner/repo> | search | list>".into()),
+        _ => Err(format!(
+            "usage: asylum plugin <install <owner/repo> | search | list> {}",
+            help::hint(&["plugin"])
+        )),
     }
 }
 
 fn install(args: &[String]) -> Result<(), String> {
-    let spec = positionals(args)
-        .first()
-        .cloned()
-        .ok_or("usage: asylum plugin install <owner/repo>[@ref]")?;
+    let spec = positionals(args).first().cloned().ok_or_else(|| {
+        format!(
+            "usage: asylum plugin install <owner/repo>[@ref] {}",
+            help::hint(&["plugin", "install"])
+        )
+    })?;
     let dir = plugin::default_dir();
     let dest = plugin::fetch(&spec, &dir)?;
     println!("installed {spec} -> {}", dest.display());

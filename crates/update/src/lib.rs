@@ -72,8 +72,14 @@ impl std::fmt::Display for Version {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Release {
     pub tag: String,
+    /// The release title, e.g. "Widgets galore" (distinct from the `tag`).
+    pub name: String,
     pub version: Version,
+    /// The release page on the web (GitHub's `html_url`).
     pub url: String,
+    /// ISO 8601, as GitHub reports it (e.g. `2026-01-02T03:04:05Z`).
+    pub published_at: String,
+    /// Release notes body, truncated to [`NOTES_CAP`] with an ellipsis marker.
     pub notes: String,
 }
 
@@ -94,13 +100,34 @@ struct ReleasePayload {
     #[serde(default)]
     tag_name: String,
     #[serde(default)]
+    name: String,
+    #[serde(default)]
     html_url: String,
+    #[serde(default)]
+    published_at: String,
     #[serde(default)]
     body: String,
     #[serde(default)]
     draft: bool,
     #[serde(default)]
     prerelease: bool,
+}
+
+/// Cap on cached release notes: a long changelog is truncated rather than
+/// held (and later shown) in full.
+const NOTES_CAP: usize = 4096;
+
+/// Truncate `notes` to at most [`NOTES_CAP`] bytes, on a char boundary, and
+/// mark the cut so a shortened changelog doesn't read as complete.
+fn truncate_notes(notes: &str) -> String {
+    if notes.len() <= NOTES_CAP {
+        return notes.to_string();
+    }
+    let mut end = NOTES_CAP;
+    while end > 0 && !notes.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}…\n\n(truncated)", &notes[..end])
 }
 
 /// Compare the running version against a GitHub `releases/latest` JSON payload.
@@ -121,9 +148,11 @@ pub fn evaluate(current: &str, latest_json: &str) -> Status {
     if version > current {
         Status::Available(Release {
             tag: payload.tag_name,
+            name: payload.name,
             version,
             url: payload.html_url,
-            notes: payload.body,
+            published_at: payload.published_at,
+            notes: truncate_notes(&payload.body),
         })
     } else {
         Status::UpToDate

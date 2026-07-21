@@ -73,9 +73,13 @@ debug = "limited"
 
 [profile.release]
 # Fat LTO + a single codegen unit for a smaller, faster release binary, and
-# strip symbols to shrink the artifact. `panic` is deliberately left at the
-# default (unwind): switching to `abort` needs shutdown/crash-reporting
-# validation first (a background-thread panic must not abort the whole app).
+# strip symbols to shrink the artifact. `panic` stays "unwind" - decided, not
+# pending: the companion, control, proxy, and MCP servers, plus the update
+# check, all run as detached background threads (crates/app/src/main.rs), and
+# `abort` would take the whole app down with any one of them instead of
+# containing the panic to that thread. The chained hook (crash.rs) and the
+# non-blocking log writer (logs.rs) also need the process alive past a panic
+# to flush the crash report and buffered log lines to disk before exit.
 lto = "fat"
 codegen-units = 1
 strip = "symbols"
