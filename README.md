@@ -192,3 +192,5 @@ The marketing/docs site is built from `site/` (see [Website](#website) above).
 ## License
 
 Apache-2.0. See [`LICENSE`](LICENSE).
+
+♥ [Sponsor this project](https://github.com/sponsors/wess)
