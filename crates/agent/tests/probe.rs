@@ -157,12 +157,28 @@ fn an_unknown_provider_checks_to_unknown() {
 fn a_probe_that_would_hang_is_killed_at_the_deadline() {
     // The safety property: a command that never returns is killed and reported
     // as a timeout well before it would finish on its own.
+    //
+    // Two assertions with different jobs. `Run::Timeout` is the real one - that
+    // variant exists only on the deadline path. The elapsed bound guards the
+    // failure this cannot otherwise see: waiting for the child anyway and then
+    // *labelling* the result a timeout.
+    //
+    // The child therefore sleeps far longer than the bound, so returning inside
+    // it can only mean the deadline fired, while leaving enough slack that a
+    // loaded runner scheduling the spawn and the reap is not mistaken for a
+    // broken deadline. The previous version bounded a 5s child at 2s - 1.85s of
+    // headroom over a 150ms deadline - which passed on every developer machine
+    // and left CI red on `main` for three weeks.
+    const CHILD_SECS: u64 = 30;
+    const LIMIT: Duration = Duration::from_secs(10);
+
+    let script = format!("sleep {CHILD_SECS}");
     let start = Instant::now();
-    let outcome = run("/bin/sh", &["-c", "sleep 5"], Duration::from_millis(150));
+    let outcome = run("/bin/sh", &["-c", &script], Duration::from_millis(150));
     assert!(matches!(outcome, Run::Timeout));
     assert!(
-        start.elapsed() < Duration::from_secs(2),
-        "the deadline was not honored: {:?}",
+        start.elapsed() < LIMIT,
+        "the deadline was not honored: {:?} elapsed for a {CHILD_SECS}s child",
         start.elapsed()
     );
 }

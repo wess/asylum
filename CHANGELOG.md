@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Quick-open & command-palette indexing reliability.
 - Cross-platform terminal & URL handling edge cases.
 - Version string formatting in `--version` output.
+- Flaky `probe` deadline test that had left CI red on `main` since 2026-07-22. It bounded a 5-second child at 2 seconds — 1.85s of headroom over a 150ms deadline — which passed on developer machines and failed on loaded runners. The child now sleeps far longer than the bound, so the assertion proves the same property with room to spare.
 
 ### Security
 
