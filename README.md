@@ -83,23 +83,16 @@ package. Until the first release is published, build from source as below.
 The installed binary is `asylum`; a local `cargo run -p app` stays `asylumdev`,
 so a dev build never collides with an installed release.
 
-### macOS: unsigned, so Gatekeeper blocks it
+### macOS: signed and notarized
 
-The `.dmg` is **not signed or notarized**. The pipeline signs and notarizes only
-when Developer ID secrets are present, and they are not provisioned yet, so
-published builds carry no signature at all. macOS 15+ therefore refuses to open
-the app, sometimes claiming it is damaged — it isn't, macOS just can't identify
-the publisher. Control-click → Open **no longer** bypasses this. Either:
+Since 1.0.0 the `.dmg` is signed with a Developer ID certificate, notarized by
+Apple, and stapled, so it opens without a Gatekeeper prompt and needs no
+quarantine workaround. `spctl --assess` reports `accepted / source=Notarized
+Developer ID` on the published artifact.
 
-- Open it once, let it be blocked, then go to **System Settings → Privacy &
-  Security → Open Anyway**, or
-- clear the quarantine attribute:
-
-  ```sh
-  xattr -dr com.apple.quarantine /Applications/Asylum.app
-  ```
-
-Once real signing certificates are wired in, this step goes away.
+The pipeline still degrades rather than lies: if the Developer ID secrets are
+ever absent, it publishes an unsigned build and says so in the release notes
+instead of claiming a signature it does not have.
 
 ### Windows: beta
 
