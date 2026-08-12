@@ -78,6 +78,33 @@ failure names the exact command and its exit code, and creates a durable failed
 run with the worktree path and error so you can inspect or remove it from the
 app.
 
+### Repository trust
+
+`asylum.toml` lives in the repository, so `setup` and `[env]` are written by
+whoever authored it — and both execute. `setup` runs in a login shell with your
+privileges, and `[env]` is applied to every agent process, where an entry like
+`PATH` or `NODE_OPTIONS` is code execution by another name.
+
+Because of that, **opening a repository does not grant permission to run it.**
+Until you trust a project, its `setup` commands and `[env]` overrides are
+withheld — the rest of the file (`base_branch`, `default_agents`) still applies,
+since neither runs anything. The readiness panel shows the position and offers
+**Trust**, and confirming restates the exact commands and environment entries
+you are authorising.
+
+Trust is per-repository and revocable from the same panel. Revoking applies to
+the next worktree or run rather than retroactively; nothing can un-run a command
+that already ran. Withheld commands are recorded in the setup transcript, so a
+run that skipped them says so instead of failing later with a missing
+dependency.
+
+Checks are gated the same way, because they run commands the repository declares
+for itself — its own `package.json` scripts, Cargo or Go entry points. An
+untrusted project reports that trust is required rather than running them.
+
+Projects added before this existed start untrusted: having opened a repository
+is not evidence that what it executes was reviewed.
+
 ## Keyboard
 
 Use the command palette for navigation and selected-run actions. The native

@@ -25,6 +25,19 @@ pub struct Check {
     /// (agent name, install command), each rendered with a one-click copy
     /// button rather than left for the user to select and copy by hand.
     pub hints: Vec<(String, String)>,
+    /// A decision this check is asking the user to make, rendered as a button
+    /// beside it. A check that reports a permission the user has not granted is
+    /// useless without the means to grant it.
+    pub action: Option<CheckAction>,
+}
+
+/// A decision offered directly from a readiness check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CheckAction {
+    /// Trust this repository to run the commands it declares for itself.
+    TrustProject(i64),
+    /// Withdraw that trust.
+    RevokeProjectTrust(i64),
 }
 
 impl Check {
@@ -34,11 +47,17 @@ impl Check {
             detail: detail.into(),
             status,
             hints: Vec::new(),
+            action: None,
         }
     }
 
     fn with_hints(mut self, hints: Vec<(String, String)>) -> Self {
         self.hints = hints;
+        self
+    }
+
+    fn with_action(mut self, action: CheckAction) -> Self {
+        self.action = Some(action);
         self
     }
 }
@@ -173,15 +192,60 @@ pub fn inspect(root: &Root) -> Vec<Check> {
             Status::Attention,
         ));
     }
-    if !project_config.setup.is_empty() {
-        checks.push(Check::new(
-            "Worktree setup",
-            format!(
-                "{} setup command(s) will run before each agent starts",
-                project_config.setup.len()
-            ),
-            Status::Attention,
-        ));
+    // Repository trust. `asylum.toml` is written by whoever authored the repo,
+    // and its `setup`/`env` are the two fields that execute, so what this check
+    // reports depends entirely on whether the user has granted permission.
+    let trusted = project.trusted();
+    if project_config.declares_execution() {
+        let commands = project_config.setup.len();
+        let vars = project_config.env.len();
+        if trusted {
+            checks.push(
+                Check::new(
+                    "Worktree setup",
+                    match (commands, vars) {
+                        (0, v) => format!("{v} environment override(s) will be set for each agent"),
+                        (c, 0) => format!("{c} setup command(s) will run before each agent starts"),
+                        (c, v) => format!(
+                            "{c} setup command(s) and {v} environment override(s) will be applied"
+                        ),
+                    },
+                    Status::Attention,
+                )
+                .with_action(CheckAction::RevokeProjectTrust(project.id)),
+            );
+        } else {
+            checks.push(
+                Check::new(
+                    "Repository not trusted",
+                    match (commands, vars) {
+                        (0, v) => format!(
+                            "This repository sets {v} environment override(s) for agents. \
+                             They will not be applied until you trust it."
+                        ),
+                        (c, 0) => format!(
+                            "This repository declares {c} setup command(s). \
+                             They will not run until you trust it."
+                        ),
+                        (c, v) => format!(
+                            "This repository declares {c} setup command(s) and {v} environment \
+                             override(s). Neither will be applied until you trust it."
+                        ),
+                    },
+                    Status::Attention,
+                )
+                .with_action(CheckAction::TrustProject(project.id)),
+            );
+        }
+    } else if trusted {
+        checks.push(
+            Check::new(
+                "Repository trusted",
+                "It declares nothing that runs today; anything it adds later will be applied.",
+                Status::Attention,
+            )
+            .with_action(CheckAction::RevokeProjectTrust(project.id)),
+        );
     }
     for diagnostic in &root.settings_diagnostics {
         checks.push(Check::new(
@@ -235,14 +299,16 @@ pub fn panel(checks: Vec<Check>, open: bool, handle: Entity<Root>) -> impl IntoE
     }
 
     let settings = handle.clone();
+    let actions = handle.clone();
     let hide = handle;
     let mut rows = div().flex().flex_col().gap_1();
-    for check in checks {
+    for (index, check) in checks.into_iter().enumerate() {
         let Check {
             label,
             detail,
             status,
             hints,
+            action,
         } = check;
         let (status_label, color) = match status {
             Status::Pass => ("ready", ColorName::Green),
@@ -277,11 +343,20 @@ pub fn panel(checks: Vec<Check>, open: bool, handle: Entity<Root>) -> impl IntoE
                 .py(px(3.0))
                 .child(left)
                 .child(
-                    div().flex_none().child(
-                        Badge::new(status_label)
-                            .color(color)
-                            .variant(Variant::Light),
-                    ),
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_2()
+                        .flex_none()
+                        .children(
+                            action.map(|action| action_button(index, action, actions.clone())),
+                        )
+                        .child(
+                            Badge::new(status_label)
+                                .color(color)
+                                .variant(Variant::Light),
+                        ),
                 ),
         );
     }
@@ -358,4 +433,28 @@ fn hint_row(index: usize, agent: String, command: String) -> impl IntoElement {
                     cx.write_to_clipboard(ClipboardItem::new_string(clip.clone()));
                 }),
         )
+}
+
+/// The decision button beside a check.
+///
+/// Trusting routes through the confirm bar so the exact commands are restated
+/// before permission is granted; revoking applies immediately, because
+/// withdrawing a permission does not need a second confirmation.
+fn action_button(index: usize, action: CheckAction, handle: Entity<Root>) -> impl IntoElement {
+    let label = match action {
+        CheckAction::TrustProject(_) => "Trust",
+        CheckAction::RevokeProjectTrust(_) => "Revoke trust",
+    };
+    Button::new(SharedString::from(format!("setup-action-{index}")), label)
+        .size(Size::Xs)
+        .variant(match action {
+            CheckAction::TrustProject(_) => Variant::Light,
+            CheckAction::RevokeProjectTrust(_) => Variant::Subtle,
+        })
+        .on_click(move |_, _, cx| {
+            handle.update(cx, |root, _cx| match action {
+                CheckAction::TrustProject(id) => root.request_trust_project(id),
+                CheckAction::RevokeProjectTrust(id) => root.revoke_project_trust(id),
+            });
+        })
 }

@@ -1,6 +1,6 @@
 # Asylum audit backlog
 
-Last reviewed: 2026-07-16. Last worked: 2026-07-16.
+Last reviewed: 2026-08-12. Last worked: 2026-08-12.
 
 This document is a handoff for implementing the performance, stability,
 security, maintainability, testing, documentation, and website findings from a
@@ -26,12 +26,13 @@ section before trusting the summary above for anything secrets-related.
 
 ## Current verification baseline
 
-- `cargo test --workspace`: passes (369 tests: the 253 baseline, the 2026-07-15
-  security/regression tests across `config`, `store`, `companion`, `control`,
-  `pluginrt`, `plugin`, `preview`, `remote`, `linear`, `update`, and the
-  2026-07-16 additions to `keep`, `proxy`, and `config`).
-- `cargo clippy --workspace --all-targets -- -D warnings`: passes.
-- `cargo fmt --all -- --check`: **passes** (formatting failures fixed).
+- `cargo test --workspace`: passes (**682 tests** as of 2026-08-12, including the
+  repository-trust regressions; was 369 at the 2026-07-16 review).
+- `cargo clippy --workspace --all-targets -- -D warnings`: passes (2026-08-12).
+- `cargo fmt --all -- --check`: passes (2026-08-12).
+- `cargo audit`: **0 vulnerabilities** (2026-08-12); 20 allowed warnings, all
+  unmaintained/unsound advisories in the gtk/glib and gpui transitive stacks
+  rather than anything this workspace calls directly.
 - `cd site && bun install --frozen-lockfile && bun run build`: passes; the home
   entry is now ~2 kB and Three.js is a deferred chunk (the large-chunk warning is
   covered by an explicit budget).
@@ -311,6 +312,22 @@ message regardless. Tests: `preview/tests/lib.rs` (script/handler/SVG/URL/CSP).
 Ordinary Markdown, tables, callouts, Mermaid, code highlighting, and local images
 continue to work.
 
+**Follow-up closed 2026-08-12 - CDN assets pinned.** The 2026-07-15 pass secured
+what repository Markdown could contribute but left the preview's *own* helper
+scripts on floating CDN URLs: highlight.js loaded from
+`cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/highlight.min.js`, a jsdelivr
+`/gh/` path carrying **no version at all**, which resolves to whatever sits on
+that repository's default branch; Mermaid floated across `@11`. Neither had
+Subresource Integrity. Both execute in the webview that renders repository
+content, so a change upstream - or a CDN compromise - would have run on every
+preview. Now pinned to `@highlightjs/cdn-assets@11.12.0` and `mermaid@11.16.1`,
+with `integrity` + `crossorigin` on the stylesheet and the injected script.
+Mermaid arrives via dynamic `import()`, which cannot take an integrity
+attribute, so exact-version pinning is the whole of its protection; jsdelivr
+serves versioned npm paths immutably. A hash mismatch fails closed - the asset
+does not load and the preview degrades to unhighlighted source.
+`preview/tests/lib.rs` asserts the pinning so it cannot be silently undone.
+
 Problem: repository Markdown and other preview content are rendered into HTML
 without a clearly enforced sanitization boundary. Repository content is
 untrusted and may contain raw HTML, dangerous URLs, SVG, Mermaid, or event
@@ -558,6 +575,24 @@ git ref rules on branch names. Tests in `remote/tests/lib.rs` cover the
 metacharacter, leading-dash, and branch-validation cases. (Quoting deliberately
 disables `~`/`$VAR` expansion, so remote paths must be absolute.)
 
+**Follow-up closed 2026-08-12 - the connection side is now checked too.** The
+2026-07-15 pass guarded the *git* arguments but left the ssh connection
+parameters unvalidated: `Host::new`, `user`, `identity` and `control_path` went
+into argv verbatim. OpenSSH has no `--` separator before its destination, so a
+value starting with `-` is parsed as an option, and `-oProxyCommand=…` makes ssh
+execute an arbitrary **local** command - the same class of bug the git side had
+already fixed, one layer down. `Host::validate` now refuses empty and
+`-`-leading host/user/identity/control-path, an `@` in the user (which would
+re-point `user@host` at another machine), and a `:` in a forward host (which
+adds fields to the `-L` spec). `exec` and `port_forward` return `Result` and
+validate first, so the git helpers inherit the check. Tests in
+`remote/tests/lib.rs`.
+
+This satisfies item 11 of the sequence below ("fix remote command construction
+before surfacing remote execution") - which mattered now rather than later,
+because wiring `remote` to a UI or a control plane is what turns a host string
+from something typed by hand into something supplied by configuration.
+
 Problem: remote repository paths, worktree paths, and branches are interpolated
 into shell command strings.
 
@@ -678,14 +713,59 @@ Acceptance criteria:
 
 ### Add an untrusted-workspace mode
 
-**Status: DEFERRED (2026-07-15).** One vector is already closed: repository-backed
-`asylum.toml` cannot introduce secrets or server binds (`deny_unknown_fields`;
-`config/tests/project.rs`), and process plugins no longer inherit the app's
-secrets. A full trust-gate subsystem - tracking per-workspace trust and, before
-trust, disabling checks, project plugins, hooks, automatic commands, preview
-scripting, and project-controlled executable configuration - is a substantial
-new feature touching the project-open flow, checks, and plugins. Deferred as a
-focused follow-up rather than rushed alongside the security fixes above.
+**Status: PARTIALLY RESOLVED (2026-08-12).** The direct code-execution path is
+closed; the remaining surfaces are still open and tracked below.
+
+Closed on 2026-08-12 - repository-controlled *execution* now requires explicit
+trust:
+
+- `projects.trusted_at` (migration 11) records the decision; **existing rows
+  default to untrusted**, because having opened a project is not evidence the
+  user vetted what it runs.
+- `config::Trust` is a distinct type, not a `bool`, so a call site cannot pass
+  the wrong argument unnoticed. `ProjectConfig::with_trust` strips `setup` and
+  `env` when untrusted and keeps the inert fields (`base_branch`,
+  `default_agents`), so an untrusted repository stays usable but inert.
+- `prepare::run` **requires** a `Trust` argument - the compiler makes every
+  caller supply one at the single place that hands repository text to a shell -
+  and records a `Disposition::Untrusted` per withheld command rather than
+  skipping silently, so the transcript names what did not run.
+- `run/launch.rs` gates `env` at the load site, where it would otherwise reach
+  the agent's process environment (`PATH`, `NODE_OPTIONS`, `GIT_SSH_COMMAND`).
+- The readiness panel states the trust position and carries the Trust / Revoke
+  decision, with a confirm bar that restates the exact commands and environment
+  entries being authorised. Revoking applies to the next run, not retroactively.
+- Regression tests assert the *side effect*, not just the report: an untrusted
+  repository's `touch` marker must not exist, with a trusted control proving the
+  command would otherwise have run (`app/tests/prepare.rs`,
+  `config/tests/project.rs`, `store/tests/lib.rs`).
+
+Earlier: repository-backed `asylum.toml` cannot introduce secrets or server
+binds (`deny_unknown_fields`; `config/tests/project.rs`), and process plugins no
+longer inherit the app's secrets.
+
+- Checks are gated too (`run/check.rs`): they execute scripts the repository
+  declares for itself (its own `package.json` `scripts`, Cargo/Go/Python entry
+  points), so an untrusted project reports that trust is required instead of
+  running them. Detection still only reads files; it is `run_all` that spawns.
+
+**The rest of the original list is not a repository-controlled vector**, checked
+2026-08-12 rather than assumed:
+
+- *Project plugins* do not exist. `plugin::load_dir(&plugin::default_dir())` is
+  the only load path and `default_dir()` is `$XDG_DATA_HOME/asylum/plugins` - a
+  user data directory. A repository cannot contribute a plugin, so there is
+  nothing here for workspace trust to gate.
+- *Trigger/hook dispatch* fires only **enabled** plugins, and enabling is
+  default-deny with a confirmation that restates the command for a process
+  runtime. The input is user-installed software, not repository content.
+- *Preview scripting* is covered by the P1 item above: repository Markdown
+  contributes no script, and the preview's own helpers are now version-pinned
+  with SRI.
+
+What remains genuinely open is **plugin provenance** (recording the installed
+commit, an integrity/signature policy, detecting manifest changes on update) -
+tracked as its own P2 item below, and bounded by the same default-deny gate.
 
 Problem: checks and agents intentionally execute repository-controlled code.
 Opening an unknown repository must not imply permission to run its scripts or

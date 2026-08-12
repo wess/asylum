@@ -134,6 +134,7 @@ what actually reaches the user, not just what compiles.
 | Multi-surface layout (activity switcher) | ✅ | ✅ |
 | Collapsible icon-only activity rail | ✅ | ✅ |
 | Project config (asylum.toml) + keybindings | ✅ | ✅ |
+| Repository trust gate (`setup`/`env` withheld until trusted, revocable) | ✅ | ✅ (readiness panel + confirm bar) |
 | Plugin manifest + process/WASM runtime + command invocation | ✅ | ✅ |
 | Plugin install from GitHub + topic discovery | ✅ | ✅ (CLI) |
 | Plugin trigger dispatch (auto-fire on ADE events) | ✅ | ✅ (enabled plugins only, off-thread with a timeout) |

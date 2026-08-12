@@ -14,6 +14,7 @@ fn from_row(row: &Row) -> rusqlite::Result<Project> {
         created_at: row.get("created_at")?,
         pinned: row.get::<_, i64>("pinned")? != 0,
         last_opened_at: row.get("last_opened_at")?,
+        trusted_at: row.get("trusted_at")?,
     })
 }
 
@@ -93,6 +94,23 @@ impl Db {
         let n = self.conn().execute(
             "UPDATE projects SET pinned = ?2 WHERE id = ?1",
             params![id, pinned as i64],
+        )?;
+        if n == 0 {
+            return Err(Error::NotFound);
+        }
+        Ok(())
+    }
+
+    /// Trust or untrust a repository to run its own commands.
+    ///
+    /// Trust is what releases `asylum.toml`'s `setup` (a login shell) and `env`
+    /// (injected into agent processes). Revoking sets the stamp back to 0, so
+    /// withdrawing trust takes effect on the next launch rather than needing the
+    /// project to be forgotten and re-added.
+    pub fn set_project_trust(&self, id: i64, trusted: bool, now: i64) -> Result<()> {
+        let n = self.conn().execute(
+            "UPDATE projects SET trusted_at = ?2 WHERE id = ?1",
+            params![id, if trusted { now } else { 0 }],
         )?;
         if n == 0 {
             return Err(Error::NotFound);

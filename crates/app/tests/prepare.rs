@@ -198,6 +198,7 @@ fn run_executes_command_and_succeeds() {
     let report = run(
         &dir,
         &cfg(&["echo hello"]),
+        config::Trust::Trusted,
         &no_cancel(),
         Duration::from_secs(30),
     );
@@ -215,6 +216,7 @@ fn run_stops_at_first_failure_and_records_exit_code() {
     let report = run(
         &dir,
         &cfg(&["exit 3", "echo should-not-run"]),
+        config::Trust::Trusted,
         &no_cancel(),
         Duration::from_secs(30),
     );
@@ -232,6 +234,7 @@ fn run_captures_stdout_and_stderr_separately() {
     let report = run(
         &dir,
         &cfg(&["echo out; echo err 1>&2"]),
+        config::Trust::Trusted,
         &no_cancel(),
         Duration::from_secs(30),
     );
@@ -254,6 +257,7 @@ fn run_kills_on_timeout() {
     let report = run(
         &dir,
         &cfg(&["sleep 5"]),
+        config::Trust::Trusted,
         &no_cancel(),
         Duration::from_millis(200),
     );
@@ -279,7 +283,13 @@ fn run_cancel_kills_the_running_command() {
         flag.store(true, Ordering::Relaxed);
     });
     let start = Instant::now();
-    let report = run(&dir, &cfg(&["sleep 5"]), &cancel, Duration::from_secs(30));
+    let report = run(
+        &dir,
+        &cfg(&["sleep 5"]),
+        config::Trust::Trusted,
+        &cancel,
+        Duration::from_secs(30),
+    );
     killer.join().unwrap();
     assert_eq!(report.outcome(), SetupOutcome::Cancelled);
     assert_eq!(report.results[0].disposition, Disposition::Cancelled);
@@ -296,10 +306,122 @@ fn run_cancel_kills_the_running_command() {
 fn run_cancelled_before_start_runs_nothing() {
     let dir = scratch();
     let cancel = Arc::new(AtomicBool::new(true));
-    let report = run(&dir, &cfg(&["echo nope"]), &cancel, Duration::from_secs(30));
+    let report = run(
+        &dir,
+        &cfg(&["echo nope"]),
+        config::Trust::Trusted,
+        &cancel,
+        Duration::from_secs(30),
+    );
     assert_eq!(report.outcome(), SetupOutcome::Cancelled);
     assert_eq!(report.results.len(), 1);
     assert_eq!(report.results[0].disposition, Disposition::Cancelled);
     assert!(report.results[0].stdout.is_empty());
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+// ── Repository trust ────────────────────────────────────────────────────────
+//
+// Setup is the one place that hands repository-authored text to a shell, so
+// these assert the *side effect*, not just the report: an untrusted project
+// must leave no evidence that its command ever ran.
+
+#[cfg(unix)]
+#[test]
+fn untrusted_project_does_not_execute_setup() {
+    let dir = scratch();
+    let marker = dir.join("executed-untrusted");
+    let _ = std::fs::remove_file(&marker);
+    let command = format!("touch {}", marker.display());
+
+    let report = run(
+        &dir,
+        &cfg(&[command.as_str()]),
+        config::Trust::Untrusted,
+        &no_cancel(),
+        Duration::from_secs(30),
+    );
+
+    // The security property.
+    assert!(
+        !marker.exists(),
+        "an untrusted repository's setup command executed"
+    );
+    // And it is recorded rather than silently dropped, so the UI can say what
+    // was withheld and offer the trust decision.
+    assert_eq!(report.outcome(), SetupOutcome::Withheld);
+    assert_eq!(report.results.len(), 1);
+    assert_eq!(report.results[0].disposition, Disposition::Untrusted);
+    assert_eq!(report.results[0].command, command);
+}
+
+#[cfg(unix)]
+#[test]
+fn trusted_project_executes_the_same_command() {
+    // The control: without it, the test above could pass because the command
+    // was broken rather than because trust withheld it.
+    let dir = scratch();
+    let marker = dir.join("executed-trusted");
+    let _ = std::fs::remove_file(&marker);
+    let command = format!("touch {}", marker.display());
+
+    let report = run(
+        &dir,
+        &cfg(&[command.as_str()]),
+        config::Trust::Trusted,
+        &no_cancel(),
+        Duration::from_secs(30),
+    );
+
+    assert_eq!(report.outcome(), SetupOutcome::Ok);
+    assert!(marker.exists(), "a trusted repository's setup did not run");
+}
+
+#[cfg(unix)]
+#[test]
+fn untrusted_withholds_every_command_not_just_the_first() {
+    let dir = scratch();
+    let first = dir.join("first");
+    let second = dir.join("second");
+    let commands = [
+        format!("touch {}", first.display()),
+        format!("touch {}", second.display()),
+    ];
+
+    let report = run(
+        &dir,
+        &cfg(&[commands[0].as_str(), commands[1].as_str()]),
+        config::Trust::Untrusted,
+        &no_cancel(),
+        Duration::from_secs(30),
+    );
+
+    assert!(!first.exists() && !second.exists());
+    assert_eq!(report.results.len(), 2);
+    assert!(report
+        .results
+        .iter()
+        .all(|r| r.disposition == Disposition::Untrusted));
+}
+
+#[test]
+fn withheld_is_not_reported_as_a_failure() {
+    let report = SetupReport {
+        results: vec![result("bun install", Disposition::Untrusted, "", "")],
+    };
+    assert_eq!(report.outcome(), SetupOutcome::Withheld);
+    // Nothing went wrong, so the failure channel stays quiet.
+    assert!(failure_message(&report).is_none());
+    // The dedicated channel names the command, because "do you want this to
+    // run" is not answerable without seeing it.
+    let message = withheld_message(&report).expect("withheld report explains itself");
+    assert!(message.contains("bun install"), "message was: {message}");
+}
+
+#[test]
+fn no_withheld_message_when_nothing_was_withheld() {
+    let report = SetupReport {
+        results: vec![result("bun install", Disposition::Ok, "done", "")],
+    };
+    assert!(withheld_message(&report).is_none());
 }

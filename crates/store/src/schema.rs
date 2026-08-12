@@ -227,6 +227,13 @@ const MIGRATIONS: &[&str] = &[
         INSERT INTO runs_fts(rowid, agent, branch, output, error)
             VALUES (new.id, new.agent, new.branch, new.output, coalesce(new.error, ''));
     END;",
+    // 11 - explicit repository trust. `asylum.toml` is repository-controlled:
+    // its `setup` commands run through a login shell and its `env` is injected
+    // into agent processes, so merely opening an unknown repository must not
+    // imply permission to run its code. Existing rows default to untrusted --
+    // having opened a project is not evidence the user vetted what it executes,
+    // and a security check is not weakened to preserve compatibility.
+    "ALTER TABLE projects ADD COLUMN trusted_at INTEGER NOT NULL DEFAULT 0;",
 ];
 
 /// Apply pragmas and any pending migrations.

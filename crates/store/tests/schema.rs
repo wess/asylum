@@ -152,3 +152,36 @@ fn foreign_keys_enforced_after_open() {
         .unwrap();
     assert_eq!(fk, 1, "foreign key enforcement must remain on");
 }
+
+#[test]
+fn projects_that_predate_repository_trust_upgrade_to_untrusted() {
+    // The security default has to survive the upgrade, not just apply to new
+    // rows. Repositories added before trust existed are exactly the population
+    // most likely to contain something nobody re-reviewed, so they must arrive
+    // untrusted rather than inheriting a permissive default.
+    let trust_version = 12;
+    let conn = db_at_version(trust_version - 1);
+    conn.execute_batch(
+        "INSERT INTO projects (name, path, base_branch, created_at)
+             VALUES ('Legacy', '/legacy', 'main', 1);",
+    )
+    .unwrap();
+
+    migrate(&conn).unwrap();
+    assert_eq!(user_version(&conn), latest());
+
+    let (name, trusted_at): (String, i64) = conn
+        .query_row(
+            "SELECT name, trusted_at FROM projects WHERE path = '/legacy'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    // The row survived...
+    assert_eq!(name, "Legacy");
+    // ...and did not acquire permission to run anything.
+    assert_eq!(
+        trusted_at, 0,
+        "an upgraded project must not be trusted by the migration"
+    );
+}
