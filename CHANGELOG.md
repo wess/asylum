@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-12
+
 ### Added
 
 - **Fan-out orchestration** — run one prompt across N agents (Claude Code, Codex, OpenCode, Gemini, Aider, Cursor), each in an isolated git worktree; reusable layouts (`duel`, `triad`, `swarm`) race named agent sets in one pick. Merge the winner or open a PR without branch juggling.
