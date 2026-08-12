@@ -26,6 +26,7 @@ members = [
     "crates/pluginrt",
     "crates/cli",
     "crates/app",
+    "crates/devpipe",
 ]
 # `thirdparty/block` is a `[patch.crates-io]` target, not a workspace member.
 exclude = ["thirdparty/block"]

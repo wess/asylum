@@ -158,6 +158,21 @@ pub fn keep_scopes() -> Vec<(String, Vec<String>)> {
     guard.as_ref().map(|k| k.scopes()).unwrap_or_default()
 }
 
+/// Read `name` out of the keep, scoped Global (`project == 0`) or to a project.
+///
+/// The Settings surface never needs this — it lists names and never displays a
+/// value. It exists for the one case where the app itself is the consumer: the
+/// Devpipe session token, which is held here precisely because it should not be
+/// anywhere else on the machine.
+pub fn keep_get(project: i64, name: &str) -> Option<String> {
+    let handle = KEEP.get()?;
+    let guard = handle.lock().unwrap_or_else(|e| e.into_inner());
+    guard
+        .as_ref()
+        .and_then(|k| k.get(&scope_of(project), name))
+        .map(str::to_string)
+}
+
 /// Set `name` to `value` in the keep, scoped Global (`project == 0`) or to a
 /// project, and persist atomically. Requires an unlocked keep.
 pub fn keep_set(project: i64, name: &str, value: &str) -> Result<(), String> {

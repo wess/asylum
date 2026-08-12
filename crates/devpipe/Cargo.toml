@@ -1,0 +1,12 @@
+[package]
+autotests = false
+name = "devpipe"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Devpipe control-plane client: the account vault, read through rather than copied."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

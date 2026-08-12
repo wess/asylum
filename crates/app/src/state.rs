@@ -51,6 +51,8 @@ pub struct Root {
     pub search_generation: u64,
     /// Per-project Markdown vault and editor state.
     pub note: crate::note::State,
+    /// The Devpipe account vault, read through rather than copied here.
+    pub devpipe: crate::devpipevault::State,
     /// GitHub PRs/issues for the Integrations view (loaded on demand).
     pub prs: Vec<github::PullRequest>,
     pub issues: Vec<github::Issue>,
@@ -212,6 +214,7 @@ impl Root {
             search_input: None,
             search_generation: 0,
             note: crate::note::State::default(),
+            devpipe: crate::devpipevault::State::default(),
             prs: Vec::new(),
             issues: Vec::new(),
             linear_issues: Vec::new(),

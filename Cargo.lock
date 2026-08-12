@@ -232,6 +232,7 @@ dependencies = [
  "config",
  "control",
  "designmode",
+ "devpipe",
  "futures",
  "fuzzy",
  "git",
@@ -1730,6 +1731,15 @@ version = "1.0.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "devpipe"
+version = "1.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

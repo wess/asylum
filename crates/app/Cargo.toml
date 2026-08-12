@@ -34,6 +34,7 @@ designmode = { path = "../designmode" }
 fuzzy = { path = "../fuzzy" }
 git = { path = "../git" }
 github = { path = "../github" }
+devpipe = { path = "../devpipe" }
 keep = { path = "../keep" }
 linear = { path = "../linear" }
 mcp = { path = "../mcp" }

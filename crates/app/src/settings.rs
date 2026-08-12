@@ -69,6 +69,10 @@ pub struct Inputs {
     pub programs: std::collections::BTreeMap<String, Entity<guise::TextInput>>,
     /// The keep passphrase field (masked); Unlock reads it, then clears it.
     pub keep_pass: Entity<guise::TextInput>,
+    /// Devpipe sign-in. The password is read once on submit and cleared; only
+    /// the session token that comes back is kept, and it goes in the keep.
+    pub devpipe_email: Entity<guise::TextInput>,
+    pub devpipe_pass: Entity<guise::TextInput>,
     /// The last keep unlock/create error, shown inline until the next attempt.
     pub keep_error: Option<SharedString>,
     /// The open add-secret form, if any.
@@ -284,6 +288,8 @@ pub fn ensure_inputs(root: &mut Root, cx: &mut Context<Root>) {
             .placeholder("keep passphrase")
             .password(true)
     });
+    let devpipe_email = field(cx, "", "you@example.com", false);
+    let devpipe_pass = field(cx, "", "Devpipe password", true);
     root.settings_inputs = Some(Inputs {
         worktree,
         font,
@@ -293,6 +299,8 @@ pub fn ensure_inputs(root: &mut Root, cx: &mut Context<Root>) {
         mcp_bind,
         programs,
         keep_pass,
+        devpipe_email,
+        devpipe_pass,
         keep_error: None,
         secret_form: None,
         server_form: None,
@@ -953,6 +961,18 @@ pub fn settings_view(
         border,
     ));
 
+    // ── Devpipe vault ──
+    let devpipe_state = handle.read(cx).devpipe.clone();
+    col = col.child(section(
+        "devpipe",
+        "Devpipe vault",
+        &collapsed,
+        devpipe_body(&inputs, &devpipe_state, &handle, chrome),
+        &handle,
+        dimmed,
+        border,
+    ));
+
     // ── Secrets proxy ──
     let mut body = section_body();
     body = body.child(
@@ -1146,7 +1166,7 @@ struct Chrome {
 
 /// The Settings accordion section keys, in display order. Stable ids for
 /// collapse state.
-pub const SECTIONS: [&str; 10] = [
+pub const SECTIONS: [&str; 11] = [
     "general",
     "agents",
     "customagents",
@@ -1154,6 +1174,7 @@ pub const SECTIONS: [&str; 10] = [
     "editor",
     "servers",
     "keep",
+    "devpipe",
     "proxy",
     "mcp",
     "keys",
@@ -2973,3 +2994,155 @@ fn secret_form_card(form: &SecretForm, handle: &Entity<Root>, chrome: Chrome) ->
 #[cfg(test)]
 #[path = "../tests/settings.rs"]
 mod tests;
+
+/// The Devpipe vault section: your account's entries, read through rather than
+/// copied here.
+///
+/// Deliberately a window and not a mirror. Two stores holding the same
+/// credential have to agree about deletions, and the way that fails is
+/// resurrection — a key revoked here coming back from there. So nothing on this
+/// screen is cached: the list is fetched, and a value is fetched again each time
+/// it is shown, because the control plane audits every read and a cached value
+/// would make that record a lie.
+fn devpipe_body(
+    inputs: &Inputs,
+    state: &crate::devpipevault::State,
+    handle: &Entity<Root>,
+    chrome: Chrome,
+) -> gpui::Div {
+    let mut body = section_body();
+    body = body.child(
+        Text::new(
+            "Your Devpipe account vault: values your boxes read freely, and secrets they cannot \
+             read unless you grant a specific box. Managed here, on devpipe.com, or with the \
+             `devpipe` command on a box — it is one store, not a copy.",
+        )
+        .size(Size::Xs)
+        .dimmed(),
+    );
+
+    if crate::secrets::keep_status() != crate::secrets::KeepStatus::Unlocked {
+        // The session token lives in the keep, so there is nothing this section
+        // can do until it is open. Says which thing to go and do, rather than
+        // showing a sign-in form that would fail on submit.
+        body = body.child(
+            Text::new(
+                "Unlock the secrets keep above — your Devpipe session token is stored in it.",
+            )
+            .size(Size::Xs)
+            .dimmed(),
+        );
+        return body;
+    }
+
+    if !crate::devpipevault::signed_in() {
+        body = body.child(row(
+            "Sign in",
+            "Connects this machine to your Devpipe account. Only the session token is stored, in the keep.",
+            false,
+            None,
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .child(div().w(px(180.0)).flex_none().child(inputs.devpipe_email.clone()))
+                .child(div().w(px(160.0)).flex_none().child(inputs.devpipe_pass.clone()))
+                .child(mut_btn(
+                    "devpipe-signin".to_string(),
+                    "Sign in",
+                    Variant::Default,
+                    handle,
+                    |root, cx| root.devpipe_sign_in(cx),
+                ))
+                .into_any_element(),
+            chrome,
+        ));
+    } else {
+        body = body.child(row(
+            "Account",
+            "Signed in on this machine.",
+            false,
+            None,
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .child(mut_btn(
+                    "devpipe-refresh".to_string(),
+                    "Refresh",
+                    Variant::Subtle,
+                    handle,
+                    |root, cx| root.devpipe_refresh(cx),
+                ))
+                .child(mut_btn(
+                    "devpipe-signout".to_string(),
+                    "Sign out",
+                    Variant::Subtle,
+                    handle,
+                    |root, cx| root.devpipe_sign_out(cx),
+                ))
+                .into_any_element(),
+            chrome,
+        ));
+
+        for entry in &state.entries {
+            let key = crate::devpipevault::key_of(entry);
+            let shown = state.shown.get(&key).cloned();
+            let summary = crate::devpipevault::readable_by(&state.grants, entry);
+            let desc = match &shown {
+                Some(value) => format!("{summary} · {value}"),
+                None => summary,
+            };
+            let for_toggle = entry.clone();
+            let for_remove = entry.clone();
+            let control = div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .child(mut_btn(
+                    format!("devpipe-show-{key}"),
+                    if shown.is_some() { "Hide" } else { "Show" },
+                    Variant::Subtle,
+                    handle,
+                    move |root, cx| root.devpipe_toggle_value(for_toggle.clone(), cx),
+                ))
+                .child(mut_btn(
+                    format!("devpipe-remove-{key}"),
+                    "Remove",
+                    Variant::Subtle,
+                    handle,
+                    move |root, cx| root.devpipe_remove(for_remove.clone(), cx),
+                ))
+                .into_any_element();
+            body = body.child(row(
+                SharedString::from(format!("{} ({})", entry.name, entry.kind.as_str())),
+                SharedString::from(desc),
+                false,
+                None,
+                control,
+                chrome,
+            ));
+        }
+
+        if state.loaded && state.entries.is_empty() {
+            body = body.child(
+                Text::new(
+                    "Nothing in the vault yet. Add entries here, on devpipe.com, or from a box.",
+                )
+                .size(Size::Xs)
+                .dimmed(),
+            );
+        }
+        if let Some(error) = &state.error {
+            body = body.child(
+                Text::new(SharedString::from(error.clone()))
+                    .size(Size::Xs)
+                    .dimmed(),
+            );
+        }
+    }
+    body
+}
