@@ -464,10 +464,23 @@ Batch 5B (parallel):
   chapters) and video-course pages reference the old shapes.
   — **model: sonnet**
 
-- [ ] (human) **Cut the 1.0 release**: bump the version, push, verify the
-  tag workflow, publish, confirm Homebrew/Scoop refresh, spot-check installs
-  on clean machines. Gated on the signing secrets being set first (see
-  `packaging/signing.md`).
+- [ ] (human) **Cut the 1.0 release**: bump the version in the root
+  `Cargo.toml` (that path is what `release.yml` triggers on), push, verify the
+  workflow, publish, confirm Homebrew/Scoop refresh, spot-check installs on
+  clean machines.
+
+  **No longer gated on signing.** All six secrets are set on the repository
+  (`MACOS_CERT_P12`, `MACOS_CERT_PASSWORD`, `MACOS_SIGN_IDENTITY`,
+  `AC_USERNAME`, `AC_PASSWORD`, `AC_TEAM_ID`, plus `HOMEBREW_TAP_TOKEN`) as of
+  2026-07-16. Verified 2026-08-12 by signing a real bundle from the local
+  Developer ID identity: full chain to the Apple Root CA, hardened runtime
+  (`flags=0x10000(runtime)`) and a secure timestamp — the two things
+  notarization refuses a build for lacking — and `codesign --verify --strict
+  --deep` clean. `spctl` reports `rejected / source=Unnotarized Developer ID`,
+  which is the expected result for a local build: it clears signature
+  validation and stops only at the notarization step CI performs.
+
+  What remains is the decision to publish, not a missing capability.
 
 ## Backlog (post-1.0)
 
