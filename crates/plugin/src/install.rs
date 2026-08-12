@@ -143,6 +143,42 @@ pub fn fetch(spec: &str, dir: &Path) -> Result<PathBuf, String> {
     Ok(dest)
 }
 
+/// Build the `(program, argv)` that reads the exact commit a plugin sits at.
+/// Pure, so the argv is unit-testable.
+pub fn revision_command(dir: &Path) -> (String, Vec<String>) {
+    (
+        "git".to_string(),
+        vec![
+            // `-C` rather than a shell `cd`: the path stays one argv element and
+            // cannot be read as an option or split on whitespace.
+            "-C".to_string(),
+            dir.to_string_lossy().into_owned(),
+            "rev-parse".to_string(),
+            "HEAD".to_string(),
+        ],
+    )
+}
+
+/// The commit a plugin is installed at, or `None` when its directory is not a
+/// git clone.
+///
+/// Read from the tree rather than recorded at install time. A value written
+/// once can drift from what is actually on disk — through a manual `git pull`,
+/// an edit, or a hand-placed directory — and the question a trust prompt is
+/// asking is "what code am I about to run", which is a property of the tree and
+/// not of a record about it. Shells out; not exercised by unit tests.
+pub fn revision(dir: &Path) -> Option<String> {
+    let (program, argv) = revision_command(dir);
+    let out = Command::new(program).args(argv).output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let sha = String::from_utf8(out.stdout).ok()?.trim().to_string();
+    // Hex only: anything else means we are not looking at a rev-parse result.
+    let looks_like_a_sha = sha.len() >= 7 && sha.chars().all(|c| c.is_ascii_hexdigit());
+    looks_like_a_sha.then_some(sha)
+}
+
 #[cfg(test)]
 #[path = "../tests/install.rs"]
 mod tests;

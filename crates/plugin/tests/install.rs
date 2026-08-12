@@ -64,3 +64,12 @@ fn discover_command_filters_by_topic() {
     assert!(argv.contains(&"--limit=20".to_string()));
     assert_eq!(TOPIC, "asylum-plugin");
 }
+
+#[test]
+fn revision_command_reads_head_without_a_shell() {
+    let (program, argv) = revision_command(std::path::Path::new("/plugins/some thing"));
+    assert_eq!(program, "git");
+    // `-C <dir>` keeps the directory as one argv element. A shell `cd` would
+    // split on the space and let a crafted directory name change the command.
+    assert_eq!(argv, vec!["-C", "/plugins/some thing", "rev-parse", "HEAD"]);
+}

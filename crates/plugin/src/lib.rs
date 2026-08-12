@@ -36,7 +36,9 @@ pub mod model;
 pub mod parse;
 
 pub use dispatch::{fired, EventPayload, Fired};
-pub use install::{clone_command, discover_command, fetch, Source, TOPIC};
+pub use install::{
+    clone_command, discover_command, fetch, revision, revision_command, Source, TOPIC,
+};
 pub use load::{default_dir, load_dir, Installed};
 pub use model::{
     Command, CommandMode, Diagnostic, Panel, Placement, Plugin, Runtime, RuntimeKind, Tool,

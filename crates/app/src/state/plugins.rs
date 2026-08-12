@@ -39,7 +39,11 @@ impl Root {
                 self.confirm = Some(crate::run::ConfirmAction::EnablePlugin {
                     id: plugin.id.clone(),
                     name: plugin.name.clone(),
-                    disclosure: runtime.trust_summary(),
+                    disclosure: format!(
+                        "{}\n\n{}",
+                        runtime.trust_summary(),
+                        provenance(&plugin.path)
+                    ),
                 });
                 cx.notify();
                 return;
@@ -156,5 +160,25 @@ impl Root {
             Err(error) => self.push_error("Plugin command failed", error.to_string()),
         }
         cx.notify();
+    }
+}
+
+/// What the code being authorised actually *is*, for the trust prompt.
+///
+/// A prompt that names only the plugin asks the user to trust a moving target:
+/// the same name can be any commit. Naming the revision makes the decision
+/// checkable against the repository it came from. When there is no revision to
+/// name, say so plainly rather than omitting the line — an absent provenance
+/// statement reads as "fine", and a hand-placed directory is exactly the case
+/// worth noticing.
+fn provenance(dir: &std::path::Path) -> String {
+    match plugin::revision(dir) {
+        Some(sha) => {
+            let short: String = sha.chars().take(12).collect();
+            format!("Installed from commit {short}.")
+        }
+        None => "Provenance unknown: this plugin's directory is not a git clone, \
+                 so there is no commit tying it to a source repository."
+            .to_string(),
     }
 }

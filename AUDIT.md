@@ -685,15 +685,31 @@ Acceptance criteria:
 
 ### Add plugin integrity and provenance
 
-**Status: DEFERRED (2026-07-15).** The trust foundation is in place - process
-plugins run with a scrubbed environment and a UI trust disclosure, and the
-install spec already records the requested `owner/repo@ref` (`plugin::install`).
-Full provenance (recording/displaying the exact installed commit, an integrity
-hash/signature policy, detecting manifest/runtime changes on update, and never
-auto-enabling a newly installed process runtime) is a larger feature that spans
-install, the store, and the Plugins UI. It is lower-risk to defer because the
-app does not yet *execute* process plugins - it hosts the runtime and discloses
-trust, but nothing runs a plugin automatically. Tracked for a follow-up.
+**Status: PARTIALLY RESOLVED (2026-08-12).**
+
+Already true, and re-checked rather than assumed: process plugins run with a
+scrubbed environment; **nothing is enabled by default** (`enabled_plugins` is an
+opt-in allow-list, so a plugin not on it is inert - its triggers never fire and
+its commands never run); and enabling a *process* runtime routes through a
+confirm bar restating the exact command and its authority. "Never auto-enable a
+newly installed process runtime" is therefore already satisfied - install cannot
+enable anything.
+
+Closed 2026-08-12 - **the trust prompt now names the code it is authorising.**
+`plugin::revision` reads the installed commit and the disclosure carries it, so
+the decision is checkable against the source repository instead of being made
+about a name that could be any commit. It is read from the tree rather than
+recorded at install: a stored value drifts (a manual `git pull`, an edit, a
+hand-placed directory) and the question being asked is about the code on disk,
+not a record about it. When there is no revision - the directory is not a clone -
+the prompt says so, because an omitted provenance line reads as "fine" and a
+hand-placed plugin is exactly the case worth noticing. `revision_command` uses
+`git -C <dir>` so a directory name cannot change the command; unit-tested.
+
+**Still open:** an integrity hash/signature policy, and detecting
+manifest/runtime changes when a plugin is updated. Both are bounded by the
+default-deny gate above - a changed plugin still cannot act until a human
+enables it - so this stays a follow-up rather than a release blocker.
 
 Problem: GitHub plugins are cloned without signature verification, immutable
 revision recording, publisher identity, or a complete permission summary.
