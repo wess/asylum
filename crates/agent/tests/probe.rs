@@ -247,3 +247,29 @@ fn installed_provider_clis_return_a_real_verdict() {
         }
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn a_forking_child_does_not_outlive_the_deadline() {
+    // The failure the test above could not see, and the reason CI was red while
+    // every developer machine was green.
+    //
+    // `sh -c "sleep N"` is *exec*ed by macOS's shell, so the direct child *is*
+    // the sleep and killing it closed the pipes. Ubuntu's `/bin/sh` forks
+    // instead, leaving a grandchild holding the inherited stdout/stderr — and
+    // the wait then blocked draining those pipes for the grandchild's full
+    // lifetime, which turned the deadline into a suggestion. Backgrounding
+    // forces the fork on every platform, so this reproduces it anywhere.
+    const CHILD_SECS: u64 = 30;
+    const LIMIT: Duration = Duration::from_secs(10);
+
+    let script = format!("sleep {CHILD_SECS} & wait");
+    let start = Instant::now();
+    let outcome = run("/bin/sh", &["-c", &script], Duration::from_millis(150));
+    assert!(matches!(outcome, Run::Timeout));
+    assert!(
+        start.elapsed() < LIMIT,
+        "a forked grandchild kept the deadline waiting: {:?} for a {CHILD_SECS}s child",
+        start.elapsed()
+    );
+}

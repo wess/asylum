@@ -274,13 +274,24 @@ enum Run {
 /// child can never deadlock the wait. This is the only function here that
 /// touches a process.
 fn run(program: &str, args: &[&str], timeout: Duration) -> Run {
-    let mut child = match Command::new(program)
+    let mut command = Command::new(program);
+    command
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+    #[cfg(unix)]
     {
+        use std::os::unix::process::CommandExt;
+        // A fresh process group (pgid == the child's pid) so the deadline can
+        // signal the whole tree. Killing only the direct child is not enough:
+        // a shell that forks rather than execs leaves the grandchild holding
+        // the inherited output pipes, and the drain below then blocks for as
+        // long as *it* runs - which is exactly the hang this deadline exists
+        // to prevent. Mirrors `checks` and the worktree setup runner.
+        command.process_group(0);
+    }
+    let mut child = match command.spawn() {
         Ok(child) => child,
         Err(e) => return Run::SpawnFailed(e.to_string()),
     };
@@ -294,30 +305,51 @@ fn run(program: &str, args: &[&str], timeout: Duration) -> Run {
             Ok(Some(status)) => break Some(status),
             Ok(None) => {
                 if Instant::now() >= deadline {
-                    let _ = child.kill();
+                    kill_tree(&mut child);
                     let _ = child.wait();
                     break None;
                 }
                 thread::sleep(POLL);
             }
             Err(_) => {
-                let _ = child.kill();
+                kill_tree(&mut child);
                 let _ = child.wait();
                 break None;
             }
         }
     };
 
-    let stdout = stdout.join().unwrap_or_default();
-    let stderr = stderr.join().unwrap_or_default();
-    match status {
-        Some(status) => Run::Ran {
-            success: status.success(),
-            stdout,
-            stderr,
-        },
-        None => Run::Timeout,
+    let Some(status) = status else {
+        // Deliberately *not* joining the drain threads here. `Run::Timeout`
+        // carries no output, so there is nothing to collect — and joining is
+        // precisely how a bounded deadline turns back into an unbounded block
+        // if anything still holds the pipes open (a descendant that gave itself
+        // a new session, say). Dropping the handles detaches them; they finish
+        // when the pipes close, which no longer gates the caller.
+        return Run::Timeout;
+    };
+
+    Run::Ran {
+        success: status.success(),
+        stdout: stdout.join().unwrap_or_default(),
+        stderr: stderr.join().unwrap_or_default(),
     }
+}
+
+/// Kill a timed-out probe's whole process tree where that's straightforward: on
+/// unix, `process_group(0)` at spawn made the child's pid double as its process
+/// group id, so signalling `-pid` reaches it and every descendant that kept the
+/// inherited group. Elsewhere, just the direct child.
+#[cfg(unix)]
+fn kill_tree(child: &mut std::process::Child) {
+    unsafe {
+        libc::kill(-(child.id() as i32), libc::SIGKILL);
+    }
+}
+
+#[cfg(not(unix))]
+fn kill_tree(child: &mut std::process::Child) {
+    let _ = child.kill();
 }
 
 /// Read a child pipe to end on its own thread so a full pipe buffer never blocks

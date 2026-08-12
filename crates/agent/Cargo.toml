@@ -8,3 +8,9 @@ description = "Agent registry, command building, and fan-out planning for the AD
 
 [dependencies]
 config = { path = "../config" }
+
+# Signalling a probe's whole process group at the deadline, as `checks` and the
+# worktree setup runner already do. Killing only the direct child leaves a
+# forked grandchild holding the output pipes open.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
