@@ -97,12 +97,44 @@ impl Host {
         argv
     }
 
-    /// Build `ssh [opts] target -- <remote_cmd>`.
-    pub fn exec(&self, remote_cmd: &str) -> Vec<String> {
+    /// Check the connection parameters before they become argv.
+    ///
+    /// OpenSSH has no `--` separator before its destination, so a host or user
+    /// beginning with `-` is read as an *option* rather than a target — and
+    /// `-oProxyCommand=…` makes ssh execute an arbitrary local command. The
+    /// git-side arguments were already guarded ([`safe_pathish`]); this closes
+    /// the same class on the connection side, which matters as soon as a host
+    /// can come from configuration or a control plane rather than being typed.
+    pub fn validate(&self) -> Result<(), String> {
+        safe_pathish("host", &self.host)?;
+        if let Some(user) = &self.user {
+            safe_pathish("user", user)?;
+            // `user@host` is split on the first `@`, so an `@` in the user part
+            // silently redirects the connection to another host.
+            if user.contains('@') {
+                return Err(format!("user must not contain '@': {user:?}"));
+            }
+        }
+        if let Some(identity) = &self.identity {
+            safe_pathish("identity", identity)?;
+        }
+        if let Some(control_path) = &self.control_path {
+            safe_pathish("control path", control_path)?;
+        }
+        Ok(())
+    }
+
+    /// Build `ssh [opts] target <remote_cmd>`.
+    ///
+    /// Note that ssh runs `remote_cmd` through the *remote* user's login shell,
+    /// so callers must quote anything interpolated into it ([`shell_quote`]) —
+    /// which is what [`Self::worktree_create`] and [`Self::worktree_remove`] do.
+    pub fn exec(&self, remote_cmd: &str) -> Result<Vec<String>, String> {
+        self.validate()?;
         let mut argv = self.base();
         argv.push(self.target());
         argv.push(remote_cmd.to_string());
-        argv
+        Ok(argv)
     }
 
     /// Build a local port-forward: `ssh -N -L local:remote_host:remote_port target`.
@@ -111,13 +143,22 @@ impl Host {
         local_port: u16,
         remote_host: &str,
         remote_port: u16,
-    ) -> Vec<String> {
+    ) -> Result<Vec<String>, String> {
+        self.validate()?;
+        // The forward spec is colon-separated, so a host carrying a `:` adds
+        // fields and re-points the tunnel somewhere the caller did not ask for.
+        safe_pathish("forward host", remote_host)?;
+        if remote_host.contains(':') {
+            return Err(format!(
+                "forward host must not contain ':': {remote_host:?}"
+            ));
+        }
         let mut argv = self.base();
         argv.push("-N".into());
         argv.push("-L".into());
         argv.push(format!("{local_port}:{remote_host}:{remote_port}"));
         argv.push(self.target());
-        argv
+        Ok(argv)
     }
 
     /// Build the command to create a worktree on the remote host: it changes to
@@ -150,7 +191,7 @@ impl Host {
             }
             _ => format!("git worktree add {}", shell_quote(path)),
         };
-        Ok(self.exec(&format!("cd {} && {add}", shell_quote(repo))))
+        self.exec(&format!("cd {} && {add}", shell_quote(repo)))
     }
 
     /// Build the command to remove a remote worktree. `repo`/`path` are quoted
@@ -158,11 +199,11 @@ impl Host {
     pub fn worktree_remove(&self, repo: &str, path: &str) -> Result<Vec<String>, String> {
         safe_pathish("repo", repo)?;
         safe_pathish("worktree path", path)?;
-        Ok(self.exec(&format!(
+        self.exec(&format!(
             "cd {} && git worktree remove --force {}",
             shell_quote(repo),
             shell_quote(path)
-        )))
+        ))
     }
 }
 

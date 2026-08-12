@@ -575,6 +575,24 @@ git ref rules on branch names. Tests in `remote/tests/lib.rs` cover the
 metacharacter, leading-dash, and branch-validation cases. (Quoting deliberately
 disables `~`/`$VAR` expansion, so remote paths must be absolute.)
 
+**Follow-up closed 2026-08-12 - the connection side is now checked too.** The
+2026-07-15 pass guarded the *git* arguments but left the ssh connection
+parameters unvalidated: `Host::new`, `user`, `identity` and `control_path` went
+into argv verbatim. OpenSSH has no `--` separator before its destination, so a
+value starting with `-` is parsed as an option, and `-oProxyCommand=…` makes ssh
+execute an arbitrary **local** command - the same class of bug the git side had
+already fixed, one layer down. `Host::validate` now refuses empty and
+`-`-leading host/user/identity/control-path, an `@` in the user (which would
+re-point `user@host` at another machine), and a `:` in a forward host (which
+adds fields to the `-L` spec). `exec` and `port_forward` return `Result` and
+validate first, so the git helpers inherit the check. Tests in
+`remote/tests/lib.rs`.
+
+This satisfies item 11 of the sequence below ("fix remote command construction
+before surfacing remote execution") - which mattered now rather than later,
+because wiring `remote` to a UI or a control plane is what turns a host string
+from something typed by hand into something supplied by configuration.
+
 Problem: remote repository paths, worktree paths, and branches are interpolated
 into shell command strings.
 
