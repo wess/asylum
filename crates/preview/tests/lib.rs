@@ -183,3 +183,39 @@ fn nul_bytes_fall_back_to_binary() {
     assert!(matches!(preview(&f).unwrap(), Preview::Binary { .. }));
     let _ = std::fs::remove_dir_all(&d);
 }
+
+#[test]
+fn cdn_assets_are_version_pinned_and_integrity_checked() {
+    // These scripts run in the webview that renders repository content, so what
+    // they are must not be able to change underneath us. jsdelivr's `/gh/` form
+    // carries no version and serves the repository's default branch, so every
+    // render would execute whatever had been published there since.
+    assert!(
+        !MARKDOWN_SCRIPTS.contains("/gh/"),
+        "jsdelivr /gh/ paths are unversioned; pin an exact npm version instead"
+    );
+    assert!(
+        MARKDOWN_SCRIPTS.contains("@highlightjs/cdn-assets@11.12.0/"),
+        "highlight.js must be pinned to an exact version"
+    );
+    assert!(
+        MARKDOWN_SCRIPTS.contains("mermaid@11.16.1/"),
+        "mermaid must be pinned to an exact version, not a floating major"
+    );
+    // The stylesheet and the injected script both carry SRI. (Mermaid arrives
+    // through a dynamic `import()`, which cannot take an integrity attribute —
+    // exact-version pinning is the whole of its protection.)
+    assert_eq!(
+        MARKDOWN_SCRIPTS.matches("sha384-").count(),
+        2,
+        "both the stylesheet and the highlight script must carry an SRI hash"
+    );
+    assert_eq!(
+        MARKDOWN_SCRIPTS
+            .matches("crossorigin=\"anonymous\"")
+            .count()
+            + MARKDOWN_SCRIPTS.matches("crossOrigin='anonymous'").count(),
+        2,
+        "SRI is only enforced on a CORS-enabled fetch"
+    );
+}

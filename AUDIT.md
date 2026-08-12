@@ -312,6 +312,22 @@ message regardless. Tests: `preview/tests/lib.rs` (script/handler/SVG/URL/CSP).
 Ordinary Markdown, tables, callouts, Mermaid, code highlighting, and local images
 continue to work.
 
+**Follow-up closed 2026-08-12 - CDN assets pinned.** The 2026-07-15 pass secured
+what repository Markdown could contribute but left the preview's *own* helper
+scripts on floating CDN URLs: highlight.js loaded from
+`cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/highlight.min.js`, a jsdelivr
+`/gh/` path carrying **no version at all**, which resolves to whatever sits on
+that repository's default branch; Mermaid floated across `@11`. Neither had
+Subresource Integrity. Both execute in the webview that renders repository
+content, so a change upstream - or a CDN compromise - would have run on every
+preview. Now pinned to `@highlightjs/cdn-assets@11.12.0` and `mermaid@11.16.1`,
+with `integrity` + `crossorigin` on the stylesheet and the injected script.
+Mermaid arrives via dynamic `import()`, which cannot take an integrity
+attribute, so exact-version pinning is the whole of its protection; jsdelivr
+serves versioned npm paths immutably. A hash mismatch fails closed - the asset
+does not load and the preview degrades to unhighlighted source.
+`preview/tests/lib.rs` asserts the pinning so it cannot be silently undone.
+
 Problem: repository Markdown and other preview content are rendered into HTML
 without a clearly enforced sanitization boundary. Repository content is
 untrusted and may contain raw HTML, dangerous URLs, SVG, Mermaid, or event
@@ -715,13 +731,23 @@ longer inherit the app's secrets.
   points), so an untrusted project reports that trust is required instead of
   running them. Detection still only reads files; it is `run_all` that spawns.
 
-**Still open.** Project plugins, trigger/hook dispatch, and preview scripting are
-not yet gated on workspace trust. Each is now a matter of consulting `Trust` at
-the relevant call site rather than new subsystem work — the decision, its
-storage, its disclosure, and its UI all exist. Note that plugins already carry
-their own default-deny gate (nothing runs until explicitly enabled, and a
-process runtime requires a confirmation restating the command), so the exposure
-there is narrower than it was for `setup`.
+**The rest of the original list is not a repository-controlled vector**, checked
+2026-08-12 rather than assumed:
+
+- *Project plugins* do not exist. `plugin::load_dir(&plugin::default_dir())` is
+  the only load path and `default_dir()` is `$XDG_DATA_HOME/asylum/plugins` - a
+  user data directory. A repository cannot contribute a plugin, so there is
+  nothing here for workspace trust to gate.
+- *Trigger/hook dispatch* fires only **enabled** plugins, and enabling is
+  default-deny with a confirmation that restates the command for a process
+  runtime. The input is user-installed software, not repository content.
+- *Preview scripting* is covered by the P1 item above: repository Markdown
+  contributes no script, and the preview's own helpers are now version-pinned
+  with SRI.
+
+What remains genuinely open is **plugin provenance** (recording the installed
+commit, an integrity/signature policy, detecting manifest changes on update) -
+tracked as its own P2 item below, and bounded by the same default-deny gate.
 
 Problem: checks and agents intentionally execute repository-controlled code.
 Opening an unknown repository must not imply permission to run its scripts or

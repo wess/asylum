@@ -344,18 +344,44 @@ const MARKDOWN_HEAD: &str = "<style>\
 
 /// Diagram + highlight scripts appended after the body. Loaded from a CDN and
 /// wrapped so a missing network leaves the source text visible.
-const MARKDOWN_SCRIPTS: &str = "<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/styles/github-dark.min.css\">\
+///
+/// **Pinned to exact versions, with Subresource Integrity where the loader
+/// supports it.** These scripts execute in the webview that renders repository
+/// content, so what they are must not be able to change underneath us. The
+/// earlier URLs used jsdelivr's `/gh/highlightjs/cdn-release/…` form, which
+/// carries no version at all and resolves to whatever sits on that repository's
+/// default branch — every render would run whatever had been published there
+/// since. With an exact version plus `integrity`, the browser refuses anything
+/// but the reviewed bytes, and a CDN compromise degrades the preview to plain
+/// text instead of executing.
+///
+/// Mermaid is reached through a dynamic `import()`, which cannot carry an
+/// integrity attribute, so it gets exact-version pinning only; jsdelivr serves
+/// versioned npm paths immutably and Mermaid's own chunk imports resolve under
+/// that same pinned path.
+///
+/// Bumping either: fetch the file, hash it with
+/// `openssl dgst -sha384 -binary | openssl base64 -A`, and change the version
+/// and hash together. A mismatched pair fails closed — the asset does not load
+/// and the preview falls back to unhighlighted source, which is the correct
+/// direction to fail.
+const MARKDOWN_SCRIPTS: &str = "<link rel=\"stylesheet\" \
+    href=\"https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.12.0/styles/github-dark.min.css\" \
+    integrity=\"sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH\" \
+    crossorigin=\"anonymous\">\
     <script>\
     (function(){\
       var h=document.createElement('script');\
-      h.src='https://cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/highlight.min.js';\
+      h.src='https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.12.0/highlight.min.js';\
+      h.integrity='sha384-wjfDDhOPPdjtva8vWBhWeVprSpmxisEu5aYT3q1JyACqXpdKpo3PWZTMVq24MBix';\
+      h.crossOrigin='anonymous';\
       h.onload=function(){document.querySelectorAll('pre code').forEach(function(b){window.hljs&&window.hljs.highlightElement(b);});};\
       document.head.appendChild(h);\
     })();\
     </script>\
     <script type=\"module\">\
       try{\
-        var m=await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs');\
+        var m=await import('https://cdn.jsdelivr.net/npm/mermaid@11.16.1/dist/mermaid.esm.min.mjs');\
         var dark=matchMedia('(prefers-color-scheme: dark)').matches;\
         m.default.initialize({startOnLoad:true,theme:dark?'dark':'default'});\
       }catch(e){}\
