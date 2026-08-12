@@ -111,16 +111,42 @@ pub fn spawn(runtime: &Runtime, cwd: &std::path::Path) -> Result<Child, Error> {
     }
     let (program, args) =
         split_command(&runtime.command).ok_or_else(|| Error::Spawn("empty command".into()))?;
-    Command::new(program)
+    let mut command = Command::new(program);
+    command
         .args(args)
         .current_dir(cwd)
         .env_clear()
         .envs(scrubbed_env())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .map_err(|e| Error::Spawn(e.to_string()))
+        .stderr(Stdio::inherit());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        // A fresh process group, so a timeout can signal the whole tree. A
+        // plugin command is usually a shell line, and a shell that forks rather
+        // than execs leaves the real work running with the stdout pipe still
+        // open — the plugin looks killed, the process is not, and the reader
+        // thread waits on it forever. Mirrors `checks`, `prepare` and `probe`.
+        command.process_group(0);
+    }
+    command.spawn().map_err(|e| Error::Spawn(e.to_string()))
+}
+
+/// Kill a plugin's whole process tree where that's straightforward: on unix,
+/// `process_group(0)` at spawn made the child's pid double as its process group
+/// id, so signalling `-pid` reaches it and every descendant that kept the
+/// inherited group. Elsewhere, just the direct child.
+#[cfg(unix)]
+pub(crate) fn kill_tree(child: &mut Child) {
+    unsafe {
+        libc::kill(-(child.id() as i32), libc::SIGKILL);
+    }
+}
+
+#[cfg(not(unix))]
+pub(crate) fn kill_tree(child: &mut Child) {
+    let _ = child.kill();
 }
 
 /// Load a `wasm` runtime's module (relative to `plugin_dir`), instantiate it
@@ -243,12 +269,12 @@ pub fn invoke_once_timeout(
             unwrap_response(response?)
         }
         Err(mpsc::RecvTimeoutError::Timeout) => {
-            let _ = child.kill();
+            kill_tree(&mut child);
             let _ = child.wait();
             Err(Error::Timeout(timeout))
         }
         Err(mpsc::RecvTimeoutError::Disconnected) => {
-            let _ = child.kill();
+            kill_tree(&mut child);
             let _ = child.wait();
             Err(Error::Closed)
         }
@@ -292,7 +318,7 @@ impl Session {
 
     /// Terminate the runtime.
     pub fn shutdown(mut self) {
-        let _ = self.child.kill();
+        kill_tree(&mut self.child);
         let _ = self.child.wait();
     }
 }

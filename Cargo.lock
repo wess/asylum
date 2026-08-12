@@ -5080,6 +5080,7 @@ dependencies = [
 name = "pluginrt"
 version = "1.0.0"
 dependencies = [
+ "libc",
  "plugin",
  "serde",
  "serde_json",

@@ -20,3 +20,9 @@ wasmi = "0.31"
 # Compile WAT test fixtures to wasm in-process, so the runtime is tested with no
 # external toolchain.
 wat = "1"
+
+# Signalling a plugin's whole process group on timeout, as `checks`, `prepare`
+# and `probe` already do. Killing only the direct child leaves a forked
+# grandchild holding the stdout pipe.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
