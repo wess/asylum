@@ -77,6 +77,15 @@ pub enum ConfirmAction {
         name: String,
         disclosure: String,
     },
+    /// Trust a repository to run the commands its own `asylum.toml` declares.
+    /// Carries the disclosure so the confirm bar can restate the exact commands
+    /// and environment entries being authorised — the question is "do you want
+    /// *these* to run", which cannot be answered without seeing them.
+    TrustProject {
+        id: i64,
+        name: String,
+        disclosure: String,
+    },
 }
 
 impl ConfirmAction {
@@ -93,6 +102,7 @@ impl ConfirmAction {
             Self::RemoveWorktree { force: false, .. } => "Remove this worktree?".into(),
             Self::CleanupTask(_) => "Clean up finished worktrees?".into(),
             Self::EnablePlugin { name, .. } => format!("Enable {name}?"),
+            Self::TrustProject { name, .. } => format!("Trust {name} to run its own commands?"),
         }
     }
 
@@ -130,6 +140,7 @@ impl ConfirmAction {
                 "Only clean, finished worktrees are removed. Dirty worktrees are preserved.".into()
             }
             Self::EnablePlugin { disclosure, .. } => disclosure.clone(),
+            Self::TrustProject { disclosure, .. } => disclosure.clone(),
         }
     }
 }
@@ -201,6 +212,7 @@ impl Root {
             }
             ConfirmAction::CleanupTask(id) => self.cleanup_task_now(id),
             ConfirmAction::EnablePlugin { id, .. } => self.enable_plugin_now(&id, cx),
+            ConfirmAction::TrustProject { id, .. } => self.trust_project_now(id),
         }
     }
 }

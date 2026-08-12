@@ -282,3 +282,43 @@ fn unified_store_search_finds_tasks_and_transcripts() {
     assert!(records.iter().any(|record| record.kind == SearchKind::Task));
     assert!(records.iter().any(|record| record.kind == SearchKind::Run));
 }
+
+// ── Repository trust ────────────────────────────────────────────────────────
+
+#[test]
+fn project_starts_untrusted() {
+    let db = db();
+    let project = db
+        .create_project("Repo", "/tmp/untrusted-repo", "main", 100)
+        .unwrap();
+    // The default that matters: a freshly added repository has not been
+    // granted permission to run its own commands.
+    assert_eq!(project.trusted_at, 0);
+    assert!(!project.trusted());
+}
+
+#[test]
+fn project_trust_is_granted_and_revocable() {
+    let db = db();
+    let project = db
+        .create_project("Repo", "/tmp/trust-repo", "main", 100)
+        .unwrap();
+
+    db.set_project_trust(project.id, true, 500).unwrap();
+    let trusted = db.project(project.id).unwrap();
+    assert_eq!(trusted.trusted_at, 500);
+    assert!(trusted.trusted());
+
+    // Revoking clears the stamp rather than recording a newer one, so trust
+    // cannot be resurrected by a later comparison against "most recent".
+    db.set_project_trust(project.id, false, 900).unwrap();
+    let revoked = db.project(project.id).unwrap();
+    assert_eq!(revoked.trusted_at, 0);
+    assert!(!revoked.trusted());
+}
+
+#[test]
+fn trusting_an_unknown_project_is_not_found() {
+    let db = db();
+    assert!(db.set_project_trust(9999, true, 100).is_err());
+}

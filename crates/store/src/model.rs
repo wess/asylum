@@ -19,6 +19,17 @@ pub struct Project {
     /// When the project was last opened (unix seconds; 0 = never) - drives the
     /// "recent repositories" ordering.
     pub last_opened_at: i64,
+    /// When the user trusted this repository to run its own commands (unix
+    /// seconds; 0 = never trusted). Until then `asylum.toml`'s `setup` and `env`
+    /// are withheld, because both cause repository-controlled execution.
+    pub trusted_at: i64,
+}
+
+impl Project {
+    /// Whether the user has trusted this repository to run its own commands.
+    pub fn trusted(&self) -> bool {
+        self.trusted_at > 0
+    }
 }
 
 /// Lifecycle of a unit of work on one of the app's drain queues (follow-ups,

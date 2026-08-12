@@ -1,6 +1,6 @@
 # Asylum audit backlog
 
-Last reviewed: 2026-07-16. Last worked: 2026-07-16.
+Last reviewed: 2026-08-12. Last worked: 2026-08-12.
 
 This document is a handoff for implementing the performance, stability,
 security, maintainability, testing, documentation, and website findings from a
@@ -26,12 +26,13 @@ section before trusting the summary above for anything secrets-related.
 
 ## Current verification baseline
 
-- `cargo test --workspace`: passes (369 tests: the 253 baseline, the 2026-07-15
-  security/regression tests across `config`, `store`, `companion`, `control`,
-  `pluginrt`, `plugin`, `preview`, `remote`, `linear`, `update`, and the
-  2026-07-16 additions to `keep`, `proxy`, and `config`).
-- `cargo clippy --workspace --all-targets -- -D warnings`: passes.
-- `cargo fmt --all -- --check`: **passes** (formatting failures fixed).
+- `cargo test --workspace`: passes (**682 tests** as of 2026-08-12, including the
+  repository-trust regressions; was 369 at the 2026-07-16 review).
+- `cargo clippy --workspace --all-targets -- -D warnings`: passes (2026-08-12).
+- `cargo fmt --all -- --check`: passes (2026-08-12).
+- `cargo audit`: **0 vulnerabilities** (2026-08-12); 20 allowed warnings, all
+  unmaintained/unsound advisories in the gtk/glib and gpui transitive stacks
+  rather than anything this workspace calls directly.
 - `cd site && bun install --frozen-lockfile && bun run build`: passes; the home
   entry is now ~2 kB and Three.js is a deferred chunk (the large-chunk warning is
   covered by an explicit budget).
@@ -678,14 +679,49 @@ Acceptance criteria:
 
 ### Add an untrusted-workspace mode
 
-**Status: DEFERRED (2026-07-15).** One vector is already closed: repository-backed
-`asylum.toml` cannot introduce secrets or server binds (`deny_unknown_fields`;
-`config/tests/project.rs`), and process plugins no longer inherit the app's
-secrets. A full trust-gate subsystem - tracking per-workspace trust and, before
-trust, disabling checks, project plugins, hooks, automatic commands, preview
-scripting, and project-controlled executable configuration - is a substantial
-new feature touching the project-open flow, checks, and plugins. Deferred as a
-focused follow-up rather than rushed alongside the security fixes above.
+**Status: PARTIALLY RESOLVED (2026-08-12).** The direct code-execution path is
+closed; the remaining surfaces are still open and tracked below.
+
+Closed on 2026-08-12 - repository-controlled *execution* now requires explicit
+trust:
+
+- `projects.trusted_at` (migration 11) records the decision; **existing rows
+  default to untrusted**, because having opened a project is not evidence the
+  user vetted what it runs.
+- `config::Trust` is a distinct type, not a `bool`, so a call site cannot pass
+  the wrong argument unnoticed. `ProjectConfig::with_trust` strips `setup` and
+  `env` when untrusted and keeps the inert fields (`base_branch`,
+  `default_agents`), so an untrusted repository stays usable but inert.
+- `prepare::run` **requires** a `Trust` argument - the compiler makes every
+  caller supply one at the single place that hands repository text to a shell -
+  and records a `Disposition::Untrusted` per withheld command rather than
+  skipping silently, so the transcript names what did not run.
+- `run/launch.rs` gates `env` at the load site, where it would otherwise reach
+  the agent's process environment (`PATH`, `NODE_OPTIONS`, `GIT_SSH_COMMAND`).
+- The readiness panel states the trust position and carries the Trust / Revoke
+  decision, with a confirm bar that restates the exact commands and environment
+  entries being authorised. Revoking applies to the next run, not retroactively.
+- Regression tests assert the *side effect*, not just the report: an untrusted
+  repository's `touch` marker must not exist, with a trusted control proving the
+  command would otherwise have run (`app/tests/prepare.rs`,
+  `config/tests/project.rs`, `store/tests/lib.rs`).
+
+Earlier: repository-backed `asylum.toml` cannot introduce secrets or server
+binds (`deny_unknown_fields`; `config/tests/project.rs`), and process plugins no
+longer inherit the app's secrets.
+
+- Checks are gated too (`run/check.rs`): they execute scripts the repository
+  declares for itself (its own `package.json` `scripts`, Cargo/Go/Python entry
+  points), so an untrusted project reports that trust is required instead of
+  running them. Detection still only reads files; it is `run_all` that spawns.
+
+**Still open.** Project plugins, trigger/hook dispatch, and preview scripting are
+not yet gated on workspace trust. Each is now a matter of consulting `Trust` at
+the relevant call site rather than new subsystem work — the decision, its
+storage, its disclosure, and its UI all exist. Note that plugins already carry
+their own default-deny gate (nothing runs until explicitly enabled, and a
+process runtime requires a confirmation restating the command), so the exposure
+there is narrower than it was for `setup`.
 
 Problem: checks and agents intentionally execute repository-controlled code.
 Opening an unknown repository must not imply permission to run its scripts or

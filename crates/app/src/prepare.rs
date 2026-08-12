@@ -45,6 +45,10 @@ pub enum Disposition {
     TimedOut,
     /// Killed, or never started, because preparation was cancelled.
     Cancelled,
+    /// Never started because the repository is not trusted to run its own
+    /// commands. Recorded per command rather than dropped silently, so the
+    /// transcript shows exactly what was withheld and why.
+    Untrusted,
 }
 
 impl Disposition {
@@ -77,6 +81,18 @@ impl CommandResult {
         }
     }
 
+    /// A synthetic entry for a command withheld because the repository is not
+    /// trusted. Nothing was executed.
+    fn untrusted(command: &str) -> Self {
+        CommandResult {
+            command: command.to_string(),
+            stdout: String::new(),
+            stderr: String::new(),
+            disposition: Disposition::Untrusted,
+            duration_ms: 0,
+        }
+    }
+
     /// The stream a tool's summary usually lands on: stderr when it has
     /// content, otherwise stdout.
     fn meaningful(&self) -> &str {
@@ -101,6 +117,9 @@ pub enum SetupOutcome {
     Failed,
     /// Preparation was cancelled part-way through.
     Cancelled,
+    /// The repository declares setup commands but is not trusted, so none ran.
+    /// Distinct from `Failed`: nothing went wrong, permission is simply absent.
+    Withheld,
 }
 
 /// The result of running a worktree's whole setup sequence, in order.
@@ -116,6 +135,7 @@ impl SetupReport {
         match self.results.last().map(|r| r.disposition) {
             None | Some(Disposition::Ok) => SetupOutcome::Ok,
             Some(Disposition::Cancelled) => SetupOutcome::Cancelled,
+            Some(Disposition::Untrusted) => SetupOutcome::Withheld,
             Some(_) => SetupOutcome::Failed,
         }
     }
@@ -130,12 +150,28 @@ impl SetupReport {
 /// the first failure. `cancel` is polled while a command runs and between
 /// commands; when it flips, the running command's process group is killed and
 /// no further commands start. Each command is bounded by `timeout`.
+///
+/// `trust` is required rather than inferred: this is the one place that hands
+/// repository text to a shell, so permission is a parameter the compiler makes
+/// every caller supply. It takes the *ungated* config deliberately — an
+/// untrusted run still needs to see the commands in order to report which ones
+/// were withheld, which a stripped config could not tell it.
 pub fn run(
     worktree: &Path,
     config: &config::ProjectConfig,
+    trust: config::Trust,
     cancel: &Arc<AtomicBool>,
     timeout: Duration,
 ) -> SetupReport {
+    if !trust.allows_execution() {
+        return SetupReport {
+            results: config
+                .setup
+                .iter()
+                .map(|c| CommandResult::untrusted(c))
+                .collect(),
+        };
+    }
     let mut results = Vec::new();
     for command in &config.setup {
         if cancel.load(Ordering::Relaxed) {
@@ -302,7 +338,13 @@ fn kill_tree(child: &mut Child) {
 /// (a cancel is not a failure).
 pub fn failure_message(report: &SetupReport) -> Option<String> {
     let failed = report.terminal_command()?;
-    if matches!(failed.disposition, Disposition::Cancelled) {
+    // Neither is a failure: one is the user stopping preparation, the other is
+    // the user not having granted the repository permission to run. Both are
+    // reported through their own paths so they cannot read as a broken setup.
+    if matches!(
+        failed.disposition,
+        Disposition::Cancelled | Disposition::Untrusted
+    ) {
         return None;
     }
     let headline = headline(failed);
@@ -312,6 +354,32 @@ pub fn failure_message(report: &SetupReport) -> Option<String> {
     } else {
         format!("{headline}\n\n{tail}")
     })
+}
+
+/// What to tell the user when a repository's setup commands were withheld.
+///
+/// Names the commands rather than only the fact, because the decision being
+/// offered is "do you want *these* to run", and a prompt that hides them is not
+/// asking a question the user can answer.
+pub fn withheld_message(report: &SetupReport) -> Option<String> {
+    let withheld: Vec<&str> = report
+        .results
+        .iter()
+        .filter(|r| r.disposition == Disposition::Untrusted)
+        .map(|r| r.command.as_str())
+        .collect();
+    if withheld.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "This repository is not trusted, so its setup {} did not run:\n\n{}",
+        if withheld.len() == 1 {
+            "command"
+        } else {
+            "commands"
+        },
+        withheld.join("\n"),
+    ))
 }
 
 /// The one-line headline for a command's disposition.
@@ -325,6 +393,12 @@ fn headline(result: &CommandResult) -> String {
             format!("Setup command could not start: {}", result.command)
         }
         Disposition::Cancelled => format!("Setup cancelled during: {}", result.command),
+        Disposition::Untrusted => {
+            format!(
+                "Setup command withheld (project not trusted): {}",
+                result.command
+            )
+        }
         Disposition::Ok => format!("Setup command succeeded: {}", result.command),
     }
 }
@@ -347,6 +421,7 @@ fn section(result: &CommandResult) -> String {
         Disposition::TimedOut => "timed out".to_string(),
         Disposition::Unstartable => "could not start".to_string(),
         Disposition::Cancelled => "cancelled".to_string(),
+        Disposition::Untrusted => "withheld, project not trusted".to_string(),
     };
     let mut section = format!(
         "$ {}\n[{status}, {}]",

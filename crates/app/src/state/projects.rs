@@ -457,6 +457,58 @@ impl Root {
         self.refresh_setup();
     }
 
+    /// Begin trusting a repository, via the confirm bar.
+    ///
+    /// Routed through a confirmation that restates the exact commands and
+    /// environment entries, because this is the grant that lets text written by
+    /// whoever authored the repository reach a login shell. A prompt that only
+    /// said "trust this project?" would be asking a question the user has no
+    /// basis to answer.
+    pub fn request_trust_project(&mut self, id: i64) {
+        let Ok(project) = self.db.project(id) else {
+            self.push_error("Project unavailable", "That project is no longer open.");
+            return;
+        };
+        let (config, _) = config::load_project(std::path::Path::new(&project.path));
+        self.confirm = Some(crate::run::ConfirmAction::TrustProject {
+            id,
+            name: project.name,
+            disclosure: trust_disclosure(&config),
+        });
+    }
+
+    /// Commit the trust decision made in the confirm bar.
+    pub fn trust_project_now(&mut self, id: i64) {
+        match self.db.set_project_trust(id, true, now()) {
+            Ok(()) => self.push_notice(
+                crate::run::NoticeTone::Success,
+                "Project trusted",
+                "Its setup commands and environment overrides will run from the next worktree \
+                 onward. You can revoke this at any time.",
+            ),
+            Err(error) => self.push_error("Could not trust project", error.to_string()),
+        }
+        // The readiness panel states the trust position; it must not keep
+        // showing the old one after the decision.
+        self.refresh_setup();
+    }
+
+    /// Withdraw trust from a repository.
+    ///
+    /// Takes effect on the next worktree or run rather than retroactively —
+    /// nothing can un-run a command that already ran, and pretending otherwise
+    /// would misrepresent what revoking achieves.
+    pub fn revoke_project_trust(&mut self, id: i64) {
+        match self.db.set_project_trust(id, false, now()) {
+            Ok(()) => self.push_notice(
+                crate::run::NoticeTone::Info,
+                "Trust revoked",
+                "This repository's setup commands and environment overrides will no longer run.",
+            ),
+            Err(error) => self.push_error("Could not revoke trust", error.to_string()),
+        }
+    }
+
     /// The title of the selected task, if any.
     pub fn task_title(&self) -> Option<String> {
         self.task_id
@@ -469,4 +521,48 @@ impl Root {
             .and_then(|id| self.db.task(id).ok())
             .map(|task| task.status)
     }
+}
+
+/// What trusting a repository actually authorises, in plain terms.
+///
+/// Environment entries are shown with their values, not just their keys: the
+/// dangerous part of `PATH=/tmp/evil` or `NODE_OPTIONS=--require=…` *is* the
+/// value, and a disclosure that hid it would omit the thing worth reading.
+/// Values are truncated because a disclosure nobody finishes reading is not one.
+fn trust_disclosure(config: &config::ProjectConfig) -> String {
+    if !config.declares_execution() {
+        return "This repository declares no setup commands or environment overrides today. \
+                Trusting it now also permits any it adds later."
+            .into();
+    }
+    let mut parts = Vec::new();
+    if !config.setup.is_empty() {
+        parts.push(format!(
+            "These commands will run in a login shell with your privileges every time a \
+             worktree is created:\n\n{}",
+            config.setup.join("\n")
+        ));
+    }
+    if !config.env.is_empty() {
+        let entries: Vec<String> = config
+            .env
+            .iter()
+            .map(|(key, value)| format!("{key}={}", truncate(value, 60)))
+            .collect();
+        parts.push(format!(
+            "These environment entries will be set for setup and for every agent run in this \
+             project:\n\n{}",
+            entries.join("\n")
+        ));
+    }
+    parts.join("\n\n")
+}
+
+/// Shorten `value` for display, marking that it was cut.
+fn truncate(value: &str, max: usize) -> String {
+    if value.chars().count() <= max {
+        return value.to_string();
+    }
+    let kept: String = value.chars().take(max).collect();
+    format!("{kept}…")
 }

@@ -27,6 +27,13 @@ enum FanoutResult {
         worktree: PathBuf,
         report: crate::prepare::SetupReport,
     },
+    /// The repository declares setup commands but has not been trusted to run
+    /// them. The worktree is ready and the agent starts; the commands did not.
+    SetupWithheld {
+        plan: agent::plan::RunPlan,
+        worktree: PathBuf,
+        report: crate::prepare::SetupReport,
+    },
     WorktreeFailed {
         agent: String,
         error: String,
@@ -203,6 +210,10 @@ impl Root {
         }
         let base = base.to_string();
         let setup = project_config.clone();
+        // Whether this repository may run its own `setup` commands. Read here,
+        // on the foreground side, so the background job cannot re-read a trust
+        // decision that changed under it mid-fanout.
+        let trust = config::Trust::from_stamp(project.trusted_at);
         let work_repo = repo.clone();
         // A shared cancel flag the preparing UI can flip: the background job
         // polls it to kill the running setup command and stop preparing the
@@ -234,7 +245,7 @@ impl Root {
                         continue;
                     }
                 };
-                let report = crate::prepare::run(&worktree, &setup, &cancel, timeout);
+                let report = crate::prepare::run(&worktree, &setup, trust, &cancel, timeout);
                 results.push(match report.outcome() {
                     crate::prepare::SetupOutcome::Ok => FanoutResult::Ready { plan, worktree },
                     crate::prepare::SetupOutcome::Cancelled => FanoutResult::SetupCancelled {
@@ -243,6 +254,14 @@ impl Root {
                         report,
                     },
                     crate::prepare::SetupOutcome::Failed => FanoutResult::SetupFailed {
+                        plan,
+                        worktree,
+                        report,
+                    },
+                    // The worktree is still usable and the agent still runs —
+                    // only the repository's own commands were withheld, so this
+                    // is surfaced as a warning rather than a failed fanout.
+                    crate::prepare::SetupOutcome::Withheld => FanoutResult::SetupWithheld {
                         plan,
                         worktree,
                         report,
@@ -308,6 +327,35 @@ impl Root {
                         }
                     } else {
                         queued.push(run_id);
+                    }
+                }
+                // Like `Ready`: the worktree exists and the agent runs. Only the
+                // repository's own commands were withheld, so the run proceeds
+                // and the user is told what did not happen — silently skipping
+                // setup would surface later as a confusing missing-dependency
+                // failure inside the agent.
+                FanoutResult::SetupWithheld {
+                    plan,
+                    worktree,
+                    report,
+                } => {
+                    let Some(run_id) = self.record_run(task_id, &plan, &worktree, cx) else {
+                        continue;
+                    };
+                    recorded.push(run_id);
+                    if batch_cancelled {
+                        if let Err(error) = self.db.cancel_run_with_output(run_id, "", now()) {
+                            self.push_error("Could not cancel run", error.to_string());
+                        }
+                    } else {
+                        queued.push(run_id);
+                    }
+                    if let Some(message) = crate::prepare::withheld_message(&report) {
+                        self.push_notice(
+                            crate::run::NoticeTone::Warning,
+                            "Setup withheld",
+                            format!("{message}\n\nTrust this repository to let them run."),
+                        );
                     }
                 }
                 FanoutResult::SetupFailed {

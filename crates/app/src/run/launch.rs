@@ -91,7 +91,12 @@ impl Root {
             return;
         }
         spec.env = self.control_env(run.task_id, run_id);
-        let project_config = config::load_project(Path::new(&project.path)).0;
+        // Gated at the load site: `env` from a repository's `asylum.toml` is
+        // injected straight into the agent's process environment below, where
+        // `PATH`, `NODE_OPTIONS` or `GIT_SSH_COMMAND` would be code execution.
+        let project_config = config::load_project(Path::new(&project.path))
+            .0
+            .with_trust(config::Trust::from_stamp(project.trusted_at));
         let pidfile = crate::reap::pidfile(run_id);
         let _ = std::fs::remove_file(&pidfile);
         let term = match make_term(spec.clone(), project_config.env, &pidfile, window, cx) {

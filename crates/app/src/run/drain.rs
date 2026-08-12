@@ -141,6 +141,7 @@ impl Root {
         let report = crate::prepare::run(
             &worktree,
             &project_config,
+            config::Trust::from_stamp(project.trusted_at),
             &cancel,
             crate::prepare::DEFAULT_TIMEOUT,
         );

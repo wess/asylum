@@ -34,7 +34,7 @@ pub use model::{
     AgentPrefs, CompanionPrefs, ControlPrefs, CustomAgent, EditorPrefs, Layout, McpPrefs,
     McpServer, ProxyPrefs, Settings, Upstream,
 };
-pub use project::{load_project, parse_project, ProjectConfig, PROJECT_FILE};
+pub use project::{load_project, parse_project, ProjectConfig, Trust, PROJECT_FILE};
 pub use watch::{watch, WatchHandle};
 
 /// A non-fatal problem found while loading settings: a JSON parse failure or a
