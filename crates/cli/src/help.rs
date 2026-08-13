@@ -116,6 +116,90 @@ pub(crate) const TOPICS: &[Topic] = &[
         notes: &["Uses ripgrep when available, falling back to `git grep`."],
         examples: &["asylum search TODO", "asylum search 'fn create' --dir crates/git"],
     },
+    // ---- agent -------------------------------------------------------
+    Topic {
+        path: &["agent"],
+        group: Some("worktrees & runs"),
+        summary: "agents that persist between tasks, and what they have learned",
+        usage: &["asylum agent <list | add | show | remember | forget | rm>"],
+        params: &[
+            ("list", "the roster for this project"),
+            ("add <name>", "hire one: --role <brief> --agent <id>"),
+            ("show <name>", "its brief and everything it knows"),
+            ("remember <name> <fact>", "teach it something yourself"),
+            ("forget <name>", "wipe its memory, keep the agent"),
+            ("rm <name>", "remove it (its past runs are kept)"),
+        ],
+        notes: &[
+            "A run is a thing that happened; a named agent is somebody who keeps \
+             happening. The memory is the point: every fresh run otherwise \
+             rediscovers that the tests need a database up and that the generated \
+             files are not the ones to edit.",
+            "Scoped to the project, because a role is about a codebase. Re-adding \
+             an existing name updates its brief and keeps its memory.",
+            "A running agent adds to its own memory with `asylum control remember`.",
+        ],
+        examples: &[
+            "asylum agent add Reviewer --role 'You review diffs for correctness first.'",
+            "asylum agent show Reviewer",
+        ],
+    },
+    Topic {
+        path: &["agent", "add"],
+        group: None,
+        summary: "hire a persistent agent for this project",
+        usage: &["asylum agent add <name> [--role <brief>] [--agent <id>] [--project <name>]"],
+        params: &[
+            ("<name>", "what you will call it, e.g. Reviewer"),
+            ("--role <brief>", "prose prepended to its prompts"),
+            ("--agent <id>", "which agent drives it (default: claude-code)"),
+        ],
+        notes: &[
+            "Re-running this on an existing name changes the brief and leaves the \
+             memory alone — correcting what somebody is for should not erase what \
+             they have learned.",
+        ],
+        examples: &["asylum agent add Reviewer --role 'You review diffs strictly.' --agent codex"],
+    },
+    Topic {
+        path: &["agent", "remember"],
+        group: None,
+        summary: "teach a named agent something",
+        usage: &["asylum agent remember <name> <fact> [--project <name>]"],
+        params: &[("<fact>", "one line, as you would tell a new colleague")],
+        notes: &[
+            "Appends. The same line twice is stored once, so an agent that keeps \
+             writing the same note does not crowd out everything else.",
+        ],
+        examples: &["asylum agent remember Reviewer 'integration tests need postgres running'"],
+    },
+    Topic {
+        path: &["agent", "show"],
+        group: None,
+        summary: "a named agent's brief and memory",
+        usage: &["asylum agent show <name> [--project <name>]"],
+        params: &[("<name>", "the agent to show")],
+        notes: &["This is exactly what gets prepended to its prompts."],
+        examples: &["asylum agent show Reviewer"],
+    },
+    Topic {
+        path: &["agent", "forget"],
+        group: None,
+        summary: "wipe a named agent's memory, keeping the agent",
+        usage: &["asylum agent forget <name> [--project <name>]"],
+        params: &[("<name>", "the agent to clear")],
+        notes: &["For when it learned something wrong. `rm` is for removing it entirely."],
+        examples: &["asylum agent forget Reviewer"],
+    },
+    Topic {
+        path: &["agent", "rm"],
+        group: None,
+        summary: "remove a named agent",
+        usage: &["asylum agent rm <name> [--project <name>]"],
+        params: &[("<name>", "the agent to remove")],
+        notes: &["Its past runs stay on the board — they are the record of what happened."],
+        examples: &["asylum agent rm Reviewer"],
+    },
     // ---- routine -----------------------------------------------------
     Topic {
         path: &["routine"],
@@ -310,6 +394,21 @@ pub(crate) const TOPICS: &[Topic] = &[
         params: &[],
         notes: &[],
         examples: &["asylum control check"],
+    },
+    Topic {
+        path: &["control", "remember"],
+        group: None,
+        summary: "keep one fact for the next time you work here",
+        usage: &["asylum control remember \"<fact>\""],
+        params: &[("<fact>", "one line, written to your own agent's memory")],
+        notes: &[
+            "Only works when this run is a named agent — a one-off run has no \
+             memory to write to, and the server says so rather than storing the \
+             note where nobody will read it.",
+            "Worth remembering: what would have saved you time at the *start* of \
+             this task. Not what you did — the next run can read the diff.",
+        ],
+        examples: &["asylum control remember 'integration tests need postgres running'"],
     },
     Topic {
         path: &["control", "skill"],

@@ -24,10 +24,28 @@ pub fn authorize(auth: Option<&str>, key: &str, path: &str, now: i64, db: &Db) -
     let Some(scope) = token::verify(bearer, key, now) else {
         return Err(401);
     };
+    // Memory is the one thing that outlives the task, so it is the one thing a
+    // sibling may not touch. Everything else on the surface is scoped to a task
+    // and forgotten with it; a line written into a named agent's memory is read
+    // at the start of every future run in that project, which makes "any
+    // sibling may write to any sibling's memory" a way to plant an instruction
+    // that survives long after the run that planted it is gone.
+    if let Some(run) = memory_write(path) {
+        if run != scope.run_id {
+            return Err(403);
+        }
+    }
     match target_task(path, db) {
         Some(task) if task != scope.task_id => Err(403),
         _ => Ok(()),
     }
+}
+
+/// The run whose memory a request writes to, if it is such a request.
+fn memory_write(path: &str) -> Option<i64> {
+    path.strip_prefix("/control/runs/")
+        .and_then(|p| p.strip_suffix("/remember"))
+        .and_then(|s| s.parse().ok())
 }
 
 /// Extract the `Bearer <token>` value from an `Authorization` header.

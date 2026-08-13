@@ -275,6 +275,33 @@ const MIGRATIONS: &[&str] = &[
         last_run_at INTEGER
     );
     CREATE UNIQUE INDEX idx_routines_name ON routines(project_id, name);",
+    // 14 - named agents: colleagues rather than events.
+    //
+    // A run is a thing that happened. A named agent is somebody who keeps
+    // happening: it has a role it always plays, and memory it accumulates
+    // across every task it works on. `runs.named_agent_id` is what ties one
+    // back to the other, so "what has Reviewer done" is a query rather than a
+    // reconstruction.
+    //
+    // Project-scoped, because a role is about a codebase — "Reviewer" means
+    // something different in a Rust workspace and a marketing site, and an
+    // account-wide roster would leak one project's conventions into another.
+    //
+    // `memory` is plain text, appended to. Not JSON, not a vector index: what
+    // makes an agent useful next time is a handful of sentences it or you wrote
+    // down, and the moment this becomes a schema nobody adds to it.
+    "CREATE TABLE named_agents (
+        id           INTEGER PRIMARY KEY,
+        project_id   INTEGER NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
+        name         TEXT NOT NULL,
+        role         TEXT NOT NULL DEFAULT '',
+        agent_id     TEXT NOT NULL,
+        memory       TEXT NOT NULL DEFAULT '',
+        created_at   INTEGER NOT NULL,
+        last_used_at INTEGER
+    );
+    CREATE UNIQUE INDEX idx_named_agents_name ON named_agents(project_id, name);
+    ALTER TABLE runs ADD COLUMN named_agent_id INTEGER REFERENCES named_agents (id) ON DELETE SET NULL;",
 ];
 
 /// Apply pragmas and any pending migrations.

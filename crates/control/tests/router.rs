@@ -151,3 +151,66 @@ fn unknown_route_is_404() {
     let db = Db::memory().unwrap();
     assert_eq!(route("GET", "/control/nope", "", 1, &db).status, 404);
 }
+
+#[test]
+fn a_named_run_writes_to_its_own_memory() {
+    let (db, task, run) = seed();
+    let p = db.projects().unwrap()[0].id;
+    let a = db
+        .save_named_agent(p, "Reviewer", "", "claude-code", 1)
+        .unwrap();
+    db.assign_run_agent(run, a.id, 1).unwrap();
+
+    let r = route(
+        "POST",
+        &format!("/control/runs/{run}/remember"),
+        r#"{"note":"integration tests need postgres running"}"#,
+        7,
+        &db,
+    );
+    assert_eq!(r.status, 200);
+    assert_eq!(body(&r)["agent"], "Reviewer");
+    assert!(db
+        .named_agent(p, "Reviewer")
+        .unwrap()
+        .memory
+        .contains("postgres"));
+
+    // Visible in the thread, because a memory being written is a thing that
+    // happened on this task.
+    let kinds: Vec<String> = db
+        .events_for_task(task, 50)
+        .unwrap()
+        .into_iter()
+        .map(|e| e.kind)
+        .collect();
+    assert!(kinds.contains(&"agent_remembered".to_string()));
+}
+
+#[test]
+fn an_anonymous_run_is_told_it_has_no_memory() {
+    // Storing the note somewhere nobody reads would look like it worked.
+    let (db, _task, run) = seed();
+    let r = route(
+        "POST",
+        &format!("/control/runs/{run}/remember"),
+        r#"{"note":"something"}"#,
+        7,
+        &db,
+    );
+    assert_eq!(r.status, 400);
+    assert!(r.body.contains("not a named agent"), "{}", r.body);
+}
+
+#[test]
+fn remembering_nothing_is_a_400() {
+    let (db, _task, run) = seed();
+    let r = route(
+        "POST",
+        &format!("/control/runs/{run}/remember"),
+        r#"{"note":"   "}"#,
+        7,
+        &db,
+    );
+    assert_eq!(r.status, 400);
+}

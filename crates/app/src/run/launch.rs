@@ -82,7 +82,19 @@ impl Root {
             self.fail_launch(run_id, "The configured agent no longer exists.");
             return;
         };
-        let mut prompt = run.prompt.clone().unwrap_or(task.prompt);
+        // A named agent's brief and memory go *first*, before the task. It is
+        // who is being asked, and it reads as an identity rather than as extra
+        // instructions bolted onto the end of a request.
+        let mut prompt = String::new();
+        if let Ok(Some(preamble)) = self
+            .db
+            .run_agent(run_id)
+            .map(|a| a.and_then(|a| a.preamble()))
+        {
+            prompt.push_str(&preamble);
+            prompt.push_str("\n\n");
+        }
+        prompt.push_str(&run.prompt.clone().unwrap_or(task.prompt));
         prompt.push_str(&self.note_context_for_run(run_id));
         let prefs = self.settings.agents.get(&run.agent);
         let mut spec = agent::command::build(&agent, prefs, &prompt, &run.worktree);

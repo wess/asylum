@@ -33,6 +33,7 @@ asylum control read <run-id>       # a sibling's recent transcript
 asylum control spawn <agent> "<prompt>"   # queue another agent on this task
 asylum control activity <state>    # report yourself: working|blocked|done
 asylum control check               # run this project's checks in your worktree
+asylum control remember "<fact>"   # keep one fact for the next time you work here
 asylum wait run <run-id> --status succeeded   # block until a sibling finishes
 asylum wait run <run-id> --activity blocked   # block until a sibling needs input
 ```
@@ -44,6 +45,10 @@ asylum wait run <run-id> --activity blocked   # block until a sibling needs inpu
 - Spawn a helper only when parallel work genuinely helps (e.g. write tests in a
   sibling while you implement). Helpers cost a worktree each.
 - Reading a sibling is for coordination, not copying: cite what you learned.
+- If you are a named agent, `remember` the things that would have saved you time
+  at the *start* of this task - where a thing lives, what the build actually
+  needs, a convention that is not written down. Not what you did; the next run
+  can read the diff for that.
 
 ## Raw API
 
@@ -53,6 +58,7 @@ If you cannot use the CLI, call the API directly (JSON in, JSON out):
 - `GET  {url}/control/runs/{id}` - one run + a transcript tail
 - `POST {url}/control/runs/{id}/activity` `{"activity":"blocked"}`
 - `POST {url}/control/runs/{id}/check` - queue a checks pass
+- `POST {url}/control/runs/{id}/remember` `{"note":"..."}` - keep one fact for next time
 - `POST {url}/control/tasks/{task}/spawn` `{"agent":"codex","prompt":"..."}`
 - `GET  {url}/control/events?since={cursor}` - follow the fleet without polling
 "#;

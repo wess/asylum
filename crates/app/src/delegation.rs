@@ -92,6 +92,12 @@ pub fn thread(events: &[Event], agent_of: &AgentOf) -> Vec<Line> {
                 Some(other) => format!("is {other}"),
                 None => continue,
             },
+            // Worth a line: it is the only thing an agent does here that
+            // outlives the task, so it should not happen invisibly.
+            "agent_remembered" => match field(&event.data, "note") {
+                Some(note) => format!("will remember: {}", first_clause(&note)),
+                None => continue,
+            },
             "worktree_created" => "started work in its own worktree".to_string(),
             "run_started" => "began".to_string(),
             "run_finished" => "finished".to_string(),

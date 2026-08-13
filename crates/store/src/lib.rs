@@ -23,6 +23,7 @@ pub mod event;
 pub mod followup;
 pub mod lock;
 pub mod model;
+pub mod namedagent;
 pub mod note;
 pub mod notification;
 pub mod project;
@@ -36,9 +37,9 @@ pub mod search;
 pub mod task;
 
 pub use model::{
-    Account, Annotation, ControlRequest, Event, Followup, NoteAttachment, NoteVault, NoteVaultMode,
-    Notification, Project, QueueStatus, Routine, Run, RunCheck, RunStatus, Schedule, SearchKind,
-    SearchRecord, Side, Task, TaskStatus, Usage,
+    Account, Annotation, ControlRequest, Event, Followup, NamedAgent, NoteAttachment, NoteVault,
+    NoteVaultMode, Notification, Project, QueueStatus, Routine, Run, RunCheck, RunStatus, Schedule,
+    SearchKind, SearchRecord, Side, Task, TaskStatus, Usage,
 };
 
 /// A store error: either the SQLite layer failed or a lookup found nothing.

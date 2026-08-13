@@ -11,6 +11,7 @@
 //! | `GET  /control/runs/<id>/checks`    | that run's verification results          |
 //! | `POST /control/runs/<id>/activity`  | self-report semantic state               |
 //! | `POST /control/runs/<id>/check`     | queue a checks pass in the worktree      |
+//! | `POST /control/runs/<id>/remember`  | write a line to the agent's own memory   |
 //! | `POST /control/tasks/<id>/spawn`    | queue a helper run (agent + prompt)      |
 //! | `GET  /control/events?since=<id>`   | replay the event log from a cursor       |
 //!
@@ -76,6 +77,11 @@ pub fn route(method: &str, path: &str, body: &str, now: i64, db: &Db) -> Respons
         }
         ("POST", p) if p.starts_with("/control/runs/") && p.ends_with("/check") => {
             with_id(p, "/control/runs/", "/check", |id| queue_check(db, id, now))
+        }
+        ("POST", p) if p.starts_with("/control/runs/") && p.ends_with("/remember") => {
+            with_id(p, "/control/runs/", "/remember", |id| {
+                remember(db, id, body, now)
+            })
         }
         ("POST", p) if p.starts_with("/control/tasks/") && p.ends_with("/spawn") => {
             with_id(p, "/control/tasks/", "/spawn", |id| {
@@ -160,6 +166,42 @@ fn queue_check(db: &Db, id: i64, now: i64) -> Response {
         }
         Err(_) => Response::text(500, "could not queue check"),
     }
+}
+
+/// A run writing to its own agent's memory.
+///
+/// Only a run *belonging to a named agent* can do this. An anonymous run has
+/// nowhere to write, and inventing a place would mean an agent that exists for
+/// one task accumulating notes nobody will ever read — the answer is to say so,
+/// not to store it somewhere harmless.
+fn remember(db: &Db, run_id: i64, body: &str, now: i64) -> Response {
+    let Ok(run) = db.run(run_id) else {
+        return Response::text(404, "no such run");
+    };
+    let Some(note) = field(body, "note").filter(|n| !n.trim().is_empty()) else {
+        return Response::text(400, "note is required");
+    };
+    let Ok(Some(agent)) = db.run_agent(run_id) else {
+        return Response::text(
+            400,
+            "this run is not a named agent, so it has no memory to write to",
+        );
+    };
+    let learned = match db.remember(agent.id, &note) {
+        Ok(learned) => learned,
+        Err(_) => return Response::text(500, "could not write to memory"),
+    };
+    let _ = db.record_event(
+        "agent_remembered",
+        Some(run.task_id),
+        Some(run_id),
+        &json!({ "agent": agent.name, "note": note }).to_string(),
+        now,
+    );
+    Response::json(
+        200,
+        json!({ "ok": true, "agent": agent.name, "remembered": note, "new": learned }),
+    )
 }
 
 fn spawn(db: &Db, task_id: i64, body: &str, now: i64) -> Response {

@@ -111,3 +111,21 @@ fn the_thread_keeps_the_order_things_happened_in() {
     assert_eq!(said, vec!["Asylum", "claude-code", "claude-code", "codex"]);
     assert!(lines.windows(2).all(|w| w[0].at <= w[1].at));
 }
+
+#[test]
+fn remembering_shows_up_in_the_thread() {
+    // It is the only thing an agent does on the control surface that outlives
+    // the task, so it must not happen invisibly.
+    let lines = thread(
+        &[event(
+            1,
+            "agent_remembered",
+            Some(7),
+            r#"{"agent":"Reviewer","note":"integration tests need postgres running"}"#,
+        )],
+        &|_| Some("claude-code".into()),
+    );
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].what.contains("will remember"));
+    assert!(lines[0].what.contains("postgres"));
+}

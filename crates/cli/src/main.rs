@@ -24,6 +24,7 @@
 //! grouped overview. See `help.rs` for the help table (also the source of
 //! truth `completions.rs` draws the completion scripts from).
 
+mod agentcmd;
 mod call;
 mod completions;
 mod computer;
@@ -60,6 +61,7 @@ const COMMANDS: &[(&str, Handler)] = &[
     ("wait", ctl::wait),
     ("plugin", plugins::plugin),
     ("layout", layouts::layout),
+    ("agent", agentcmd::agent),
     ("schedule", schedulecmd::schedule),
     ("routine", routinecmd::routine),
     ("snapshot", snapshot),

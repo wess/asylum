@@ -183,6 +183,9 @@ pub struct Run {
     /// surface. Ephemeral display state, distinct from the lifecycle `status`;
     /// `None` until first observed.
     pub activity: Option<String>,
+    /// The named agent this run was done by, when it was somebody rather than
+    /// just an agent id. `None` for one-off runs, which stay the common case.
+    pub named_agent_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -450,5 +453,48 @@ impl Routine {
     /// somebody's workflow and stop, which is worse than refusing.
     pub fn step_list(&self) -> Vec<String> {
         serde_json::from_str::<Vec<String>>(&self.steps).unwrap_or_default()
+    }
+}
+
+/// A colleague rather than an event: a named agent with a role it always plays
+/// and memory it keeps across every task it works on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NamedAgent {
+    pub id: i64,
+    pub project_id: i64,
+    pub name: String,
+    /// The durable brief — what this one is for, in your words.
+    pub role: String,
+    /// Which agent CLI actually runs it (`claude-code`, `codex`, …).
+    pub agent_id: String,
+    /// What it has learned, appended to over time.
+    pub memory: String,
+    pub created_at: i64,
+    pub last_used_at: Option<i64>,
+}
+
+impl NamedAgent {
+    /// The role and memory as a preamble for a prompt, or None when it has
+    /// nothing to say yet.
+    ///
+    /// Kept as prose rather than a structured block: this is prepended to a
+    /// prompt an agent reads, and a schema would spend tokens teaching it to
+    /// parse something instead of telling it what it knows.
+    pub fn preamble(&self) -> Option<String> {
+        let role = self.role.trim();
+        let memory = self.memory.trim();
+        if role.is_empty() && memory.is_empty() {
+            return None;
+        }
+        let mut out = format!("You are {}.", self.name);
+        if !role.is_empty() {
+            out.push(' ');
+            out.push_str(role);
+        }
+        if !memory.is_empty() {
+            out.push_str("\n\nWhat you have learned on this project so far:\n");
+            out.push_str(memory);
+        }
+        Some(out)
     }
 }

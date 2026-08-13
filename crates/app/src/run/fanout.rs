@@ -41,6 +41,26 @@ enum FanoutResult {
 }
 
 impl Root {
+    /// What a fan-out entry means: which catalog agent drives it, and who is
+    /// doing it when the entry names somebody on the project's roster.
+    ///
+    /// Entries are matched against the roster first. `asylum agent add` refuses
+    /// a name that is already a catalog id, so a named agent can never shadow
+    /// the agent it is built on.
+    pub fn identity(&self, project_id: i64, entry: &str) -> (String, Option<i64>) {
+        match self.db.named_agent(project_id, entry) {
+            Ok(agent) => (agent.agent_id, Some(agent.id)),
+            Err(_) => (entry.to_string(), None),
+        }
+    }
+
+    /// The project's persistent agents, most recently used first.
+    pub fn roster(&self) -> Vec<store::NamedAgent> {
+        self.project_id
+            .and_then(|id| self.db.named_agents(id).ok())
+            .unwrap_or_default()
+    }
+
     pub fn toggle_agent(&mut self, id: &str) {
         if self.fanout.iter().any(|agent| agent == id) {
             self.fanout.retain(|agent| agent != id);
@@ -186,7 +206,11 @@ impl Root {
         );
         let mut prepared = Vec::new();
         for plan in plans {
-            let Some(agent) = agent::registry::resolve(&plan.agent, &self.settings.custom_agents)
+            // A plan's `agent` is whatever was selected, which may be a person
+            // on the roster; what has to exist on PATH is the catalog agent
+            // behind them.
+            let (catalog, _) = self.identity(project.id, &plan.agent);
+            let Some(agent) = agent::registry::resolve(&catalog, &self.settings.custom_agents)
             else {
                 self.push_error(
                     "Unknown agent",
@@ -194,7 +218,7 @@ impl Root {
                 );
                 continue;
             };
-            let prefs = self.settings.agents.get(&plan.agent);
+            let prefs = self.settings.agents.get(&catalog);
             let spec = agent::command::build(&agent, prefs, &task.prompt, &project.path);
             if agent::doctor::find_program(&spec.program).is_none() {
                 self.push_error(
@@ -440,13 +464,22 @@ impl Root {
         worktree: &Path,
         cx: &mut Context<Self>,
     ) -> Option<i64> {
-        match self.db.create_run(
-            task_id,
-            &plan.agent,
-            &worktree.to_string_lossy(),
-            &plan.branch,
-        ) {
+        // The run stores the *catalog* agent, so everything downstream —
+        // launching, prefs, the doctor — is unchanged by identity. Who did it
+        // is a separate column, which is also why removing somebody from the
+        // roster leaves their runs intact.
+        let project_id = self.db.task(task_id).map(|t| t.project_id).unwrap_or(0);
+        let (catalog, named) = self.identity(project_id, &plan.agent);
+        match self
+            .db
+            .create_run(task_id, &catalog, &worktree.to_string_lossy(), &plan.branch)
+        {
             Ok(run) => {
+                if let Some(named_agent_id) = named {
+                    if let Err(error) = self.db.assign_run_agent(run.id, named_agent_id, now()) {
+                        self.push_error("Could not attribute run", error.to_string());
+                    }
+                }
                 self.inherit_task_notes(task_id, run.id);
                 let created = self.run_event("worktree_created", run.id);
                 self.dispatch_event(created, cx);

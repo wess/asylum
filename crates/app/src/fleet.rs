@@ -32,6 +32,9 @@ pub fn main_content(
     // uses the control surface, which is exactly when it starts being worth
     // reading.
     thread: Vec<crate::delegation::Line>,
+    // The project's persistent agents. Empty for a project that has never named
+    // one, which is most of them, and the row disappears entirely.
+    roster: Vec<store::NamedAgent>,
     layout_names: Vec<String>,
     compose: Entity<guise::TextInput>,
     start_ref: Entity<guise::TextInput>,
@@ -87,6 +90,7 @@ pub fn main_content(
         project_name,
         &fanout,
         reports,
+        roster,
         advanced,
         show_all,
         preparing,

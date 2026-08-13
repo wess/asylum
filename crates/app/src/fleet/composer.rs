@@ -12,6 +12,7 @@ pub(super) fn compose_box(
     project_name: String,
     fanout: &[String],
     reports: Vec<(agent::registry::Agent, agent::doctor::Report)>,
+    roster: Vec<store::NamedAgent>,
     advanced: bool,
     show_all: bool,
     preparing: bool,
@@ -67,6 +68,13 @@ pub(super) fn compose_box(
         .child(compose)
         .child(ready_chips(&reports, fanout, handle.clone()))
         .child(layout_presets(&layouts, ready, handle.clone()));
+
+    // Only shown once somebody has been named. A row of chips explaining an
+    // empty roster would be a feature advertising itself in the place you go to
+    // start work.
+    if !roster.is_empty() {
+        body = body.child(roster_chips(&roster, fanout, handle.clone()));
+    }
 
     if advanced {
         body = body.child(agent_controls(reports, fanout, show_all, handle.clone()));
@@ -245,6 +253,60 @@ fn ready_chips(
             Text::new("No installed agents detected yet.")
                 .size(Size::Xs)
                 .dimmed(),
+        );
+    }
+    row
+}
+
+/// The project's persistent agents, as toggle chips beside the raw agents.
+///
+/// Selecting one runs the same underlying CLI, with its brief and everything it
+/// has learned about this repository in front of the prompt — so the difference
+/// between `claude-code` and `Reviewer` is whether the run starts knowing
+/// anything.
+fn roster_chips(
+    roster: &[store::NamedAgent],
+    fanout: &[String],
+    handle: Entity<Root>,
+) -> impl IntoElement {
+    let mut row = div()
+        .flex()
+        .flex_row()
+        .flex_wrap()
+        .items_center()
+        .gap_1()
+        .child(Text::new("Yours").size(Size::Xs).dimmed());
+    for agent in roster {
+        let name = agent.name.clone();
+        let selected = fanout.contains(&name);
+        let learned = agent
+            .memory
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .count();
+        // The count is the honest signal of whether naming somebody has paid
+        // off yet, so it rides on the chip rather than hiding in a detail view.
+        let label = if learned == 0 {
+            name.clone()
+        } else {
+            format!("{name} · {learned}")
+        };
+        let toggle = handle.clone();
+        let id = name.clone();
+        row = row.child(
+            Chip::new(
+                SharedString::from(format!("roster-{name}")),
+                SharedString::from(label),
+            )
+            .checked(selected)
+            .color(ColorName::Blue)
+            .size(Size::Sm)
+            .on_change(move |_, _, cx| {
+                toggle.update(cx, |root, cx| {
+                    root.toggle_agent(&id);
+                    cx.notify();
+                });
+            }),
         );
     }
     row

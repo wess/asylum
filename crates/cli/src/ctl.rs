@@ -25,8 +25,9 @@ pub fn control(args: &[String]) -> Result<(), String> {
         "spawn" => spawn(rest),
         "activity" => activity(rest),
         "check" => check(),
+        "remember" => remember(rest),
         _ => Err(format!(
-            "usage: asylum control <status|read|spawn|activity|check|skill> {}",
+            "usage: asylum control <status|read|spawn|activity|check|remember|skill> {}",
             help::hint(&["control"])
         )),
     }
@@ -185,6 +186,34 @@ fn activity(args: &[String]) -> Result<(), String> {
     if code != 200 {
         return Err(format!("{code}: {resp}"));
     }
+    Ok(())
+}
+
+/// `asylum control remember "<fact>"` - keep one thing for next time.
+///
+/// Only meaningful for a run that *is* somebody: a one-off run has no memory to
+/// write to, and the server says so rather than storing the note where nobody
+/// will read it.
+fn remember(args: &[String]) -> Result<(), String> {
+    let note = positionals(args).join(" ");
+    if note.trim().is_empty() {
+        return Err(format!(
+            "usage: asylum control remember \"<fact>\" {}",
+            help::hint(&["control", "remember"])
+        ));
+    }
+    let c = client()?;
+    let run = require(control::ENV_RUN)?;
+    let body = serde_json::json!({ "note": note }).to_string();
+    let (code, resp) = c.post(&format!("/control/runs/{run}/remember"), &body)?;
+    if code != 200 {
+        return Err(format!("{code}: {resp}"));
+    }
+    let v: Value = serde_json::from_str(&resp).map_err(|e| e.to_string())?;
+    println!(
+        "{} will remember: {note}",
+        v["agent"].as_str().unwrap_or("this agent")
+    );
     Ok(())
 }
 

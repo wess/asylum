@@ -144,3 +144,52 @@ fn cross_task_requests_are_403() {
         Err(403)
     );
 }
+
+#[test]
+fn a_sibling_may_not_write_to_another_agents_memory() {
+    // Memory is the one thing on the surface that outlives the task: a line
+    // written there is read at the start of every future run in the project,
+    // so a sibling writing it could plant an instruction that survives long
+    // after the run that planted it is gone.
+    let db = Db::memory().unwrap();
+    let p = db
+        .create_project("R", "/tmp/auth-memory", "main", 1)
+        .unwrap();
+    let t = db.create_task(p.id, "T", "do it", 1).unwrap();
+    let mine = db.create_run(t.id, "claude-code", "/tmp/a", "a").unwrap();
+    let theirs = db.create_run(t.id, "codex", "/tmp/b", "b").unwrap();
+
+    let key = "k";
+    let token = token::mint(key, t.id, mine.id, 0);
+    let auth = format!("Bearer {token}");
+
+    // My own memory: allowed.
+    assert!(authorize(
+        Some(&auth),
+        key,
+        &format!("/control/runs/{}/remember", mine.id),
+        1,
+        &db
+    )
+    .is_ok());
+    // A sibling's, on the same task: refused.
+    assert_eq!(
+        authorize(
+            Some(&auth),
+            key,
+            &format!("/control/runs/{}/remember", theirs.id),
+            1,
+            &db
+        ),
+        Err(403)
+    );
+    // Reading that same sibling stays allowed — coordination is the point.
+    assert!(authorize(
+        Some(&auth),
+        key,
+        &format!("/control/runs/{}", theirs.id),
+        1,
+        &db
+    )
+    .is_ok());
+}

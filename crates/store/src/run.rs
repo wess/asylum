@@ -22,6 +22,7 @@ fn from_row(row: &Row) -> rusqlite::Result<Run> {
         attempt: row.get("attempt")?,
         prompt: row.get("prompt")?,
         activity: row.get("activity")?,
+        named_agent_id: row.get("named_agent_id")?,
     })
 }
 
