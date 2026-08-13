@@ -28,6 +28,10 @@ pub fn main_content(
     preparing: bool,
     setup_checks: Vec<crate::setup::Check>,
     setup_open: bool,
+    // What the agents did to each other, in order. Empty until one of them
+    // uses the control surface, which is exactly when it starts being worth
+    // reading.
+    thread: Vec<crate::delegation::Line>,
     layout_names: Vec<String>,
     compose: Entity<guise::TextInput>,
     start_ref: Entity<guise::TextInput>,
@@ -130,6 +134,7 @@ pub fn main_content(
                     grid = grid.child(run_card(run, run_primary, run_border, handle.clone()));
                 }
                 col = col.child(grid);
+                col = col.child(delegation_thread(&thread));
                 if runs.iter().all(|run| run.status.is_terminal()) {
                     if let Some(task_id) = task_id {
                         let cleanup = handle.clone();
@@ -357,4 +362,34 @@ fn next_action(status: Option<TaskStatus>, runs: &[RunRow]) -> impl IntoElement 
         ("Next: review", ColorName::Green)
     };
     Badge::new(label).color(color).variant(Variant::Light)
+}
+
+/// What the agents did to each other, as something you can read.
+///
+/// Renders nothing at all when nothing has been delegated. An empty panel
+/// headed "Delegation" on every task would teach people to ignore the place the
+/// interesting thing appears, so the panel *is* the signal that it happened.
+fn delegation_thread(lines: &[crate::delegation::Line]) -> impl IntoElement {
+    let mut col = div().flex().flex_col().gap_1().pt(px(14.0));
+    if lines.is_empty() {
+        return col;
+    }
+    col = col.child(Text::new("Between the agents").size(Size::Xs).dimmed());
+    // Newest last, matching a conversation rather than a log.
+    for line in lines {
+        col = col.child(
+            div()
+                .flex()
+                .flex_row()
+                .items_start()
+                .gap_2()
+                .child(Text::new(SharedString::from(line.who.label().to_string())).size(Size::Xs))
+                .child(
+                    Text::new(SharedString::from(line.what.clone()))
+                        .size(Size::Xs)
+                        .dimmed(),
+                ),
+        );
+    }
+    col
 }

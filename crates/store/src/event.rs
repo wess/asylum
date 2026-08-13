@@ -53,6 +53,22 @@ impl Db {
         Ok(rows)
     }
 
+    /// Every event belonging to one task, oldest first, capped at `limit`.
+    ///
+    /// The delegation thread reads this. `events_since` is a cursor over the
+    /// whole log, which is the right shape for a subscriber and the wrong one
+    /// for "show me what happened on this task" — that would mean pulling the
+    /// entire log and filtering in the caller.
+    pub fn events_for_task(&self, task_id: i64, limit: i64) -> Result<Vec<Event>> {
+        let conn = self.conn();
+        let mut stmt =
+            conn.prepare("SELECT * FROM events WHERE task_id = ?1 ORDER BY id ASC LIMIT ?2")?;
+        let rows = stmt
+            .query_map(params![task_id, limit.max(0)], from_row)?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
     /// The id of the most recent event, or 0 when the log is empty. Lets a
     /// client subscribe to "only what happens from now on".
     pub fn latest_event_id(&self) -> Result<i64> {

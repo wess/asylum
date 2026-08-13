@@ -8,6 +8,7 @@ mod accounts;
 mod browser;
 mod control;
 mod crash;
+mod delegation;
 mod devpipevault;
 mod diff;
 mod fleet;
