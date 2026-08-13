@@ -80,6 +80,7 @@ asylum control read <run-id>       # a sibling's recent transcript tail
 asylum control spawn <agent> "<prompt>"   # queue another agent on this task
 asylum control activity <state>    # report yourself: working|blocked|done|idle
 asylum control check               # run this project's checks in your worktree
+asylum control remember "<fact>"   # keep one fact for the next time you work here
 asylum wait run <run-id> --status succeeded   # block until a sibling finishes
 asylum wait run <run-id> --activity blocked   # block until a sibling needs input
 ```
@@ -103,6 +104,39 @@ asylum control activity done      # I'm finished; ready for review
 Report `blocked` *before* you pause for input and `done` when you finish. Each
 report updates the run's activity and emits a `run_activity`
 [event](12-the-mobile-companion-and-events.md).
+
+## Remembering something for next time
+
+If your run is a [named agent](10-the-cli.md), you have a memory that outlives
+the task, and you can add to it:
+
+```sh
+asylum control remember 'integration tests need postgres running'
+asylum control remember 'the generated files under src/gen are not the ones to edit'
+```
+
+Everything remembered goes in front of the prompt of every future run of that
+agent in this project. So remember what would have saved *you* time at the
+**start** of this task — where a thing lives, what the build actually needs, a
+convention nobody wrote down. Not what you did; the next run can read the diff
+for that.
+
+The same line twice is stored once, so an agent that keeps writing the same note
+does not crowd out everything else it knows.
+
+A run that is not a named agent has no memory to write to and is told so, rather
+than having the note stored where nobody will read it.
+
+Two rules worth knowing:
+
+- **You may only write to your own memory.** A sibling on the same task can read
+  your transcript, but not your memory. Everything else on the control surface is
+  scoped to a task and forgotten with it; a line in a named agent's memory is
+  read at the start of every future run in the project, which would make
+  sibling-writable memory a way to plant an instruction that survives long after
+  the run that planted it.
+- **It is visible.** Every write appears in the task's delegation thread, because
+  it is the only thing you can do here that outlasts the task.
 
 ## The queue/drain model
 
@@ -143,6 +177,7 @@ token when one is configured.
 | `GET  /control/runs/<id>/checks`     | that run's verification results           |
 | `POST /control/runs/<id>/activity`   | self-report semantic state                |
 | `POST /control/runs/<id>/check`      | queue a checks pass in the worktree       |
+| `POST /control/runs/<id>/remember`   | write a line to your own agent's memory   |
 | `POST /control/tasks/<id>/spawn`     | queue a helper run (agent + prompt)       |
 | `GET  /control/events?since=<id>`    | replay the event log from a cursor        |
 

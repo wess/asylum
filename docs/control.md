@@ -47,6 +47,7 @@ asylum control read <run-id>             # a sibling's recent transcript
 asylum control spawn <agent> "<prompt>"  # queue another agent on this task
 asylum control activity <state>          # report itself: working|blocked|done
 asylum control check                     # run this project's checks in its worktree
+asylum control remember "<fact>"         # keep one fact for the next run of this agent
 asylum wait run <id> --status succeeded  # block until a sibling finishes
 asylum wait run <id> --activity blocked  # block until a sibling needs input
 ```

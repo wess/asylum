@@ -143,6 +143,104 @@ asylum plugin search --limit 20
 
 `search` uses the `gh` CLI, so install and authenticate `gh` for discovery.
 
+## `agent` — persistent agents with their own memory
+
+A run is a thing that happened. A named agent is somebody who keeps happening:
+a name, a brief, and a growing list of what it has learned about *this*
+repository, put in front of every prompt it gets.
+
+The memory is the point. Without it every fresh run rediscovers that the
+integration tests need a database up, that the generated files are not the ones
+to edit, and that one test is flaky — and then the run ends and it is
+rediscovered again tomorrow.
+
+```sh
+# Hire one. --agent picks which CLI drives it (default: claude-code).
+asylum agent add Reviewer --role 'You review diffs for correctness first.'
+asylum agent add Archivist --role 'You keep the docs honest.' --agent codex
+
+# The roster, most recently used first, with how much each one knows.
+asylum agent list
+
+# Its brief and everything it knows - exactly what gets prepended to prompts.
+asylum agent show Reviewer
+
+# Teach it something yourself.
+asylum agent remember Reviewer 'integration tests need postgres running'
+
+# Wipe the memory but keep the agent; or remove the agent entirely.
+asylum agent forget Reviewer
+asylum agent rm Reviewer
+```
+
+Named agents are scoped to a project, because a role is about a codebase:
+"Reviewer" in a Rust workspace and "Reviewer" on a marketing site have nothing
+useful to say to each other.
+
+Re-running `add` on an existing name updates the brief and **keeps** the memory —
+correcting what somebody is for should not erase what they have learned. `forget`
+is the command for that, and `rm` removes the agent while leaving its past runs
+on the board.
+
+A name that is already an agent id (`codex`, `claude-code`) is refused: fan-out
+entries resolve against the roster first, so such a name would shadow the tool
+itself.
+
+Inside the ADE, named agents appear as chips in the composer beside the raw
+agents, each carrying the number of things it knows.
+
+A *running* agent adds to its own memory with
+[`asylum control remember`](11-agent-orchestration-and-the-control-surface.md).
+
+## `schedule` — run a task on a cadence
+
+Work that starts with nobody watching. A schedule creates an ordinary task and
+fans it out through the same path a person uses, so what you find in the morning
+is reviewed exactly like anything else.
+
+```sh
+# Every night, in the most recently opened project.
+asylum schedule add --every 1d --title Flakes 'Find and fix flaky tests'
+
+# Pick who runs it. --agents takes agent ids or names from your roster.
+asylum schedule add --every 12h --agents Archivist \
+  'Find docs that no longer match the code.'
+
+asylum schedule list
+asylum schedule disable 3     # keep it, stop it firing
+asylum schedule enable 3
+asylum schedule rm 3
+```
+
+Cadences are `30m`, `1h`, `1d`, `1w`. The first run is one whole cadence away,
+not immediate — adding a nightly job at 2pm means nightly from tomorrow, rather
+than a fan-out while you are still typing.
+
+A schedule that misses periods (the app was closed over a long weekend) catches
+up rather than replaying: one run now, and the cadence resumes. Three runs at
+once, each fanning out to several agents, for work since done twice over, is not
+what anybody meant.
+
+## `routine` — show Asylum a workflow once, then replay it
+
+Recording instruments a shell rather than watching the screen. What is worth
+replaying in a repository is the commands, and a command does not care where a
+window moved to.
+
+```sh
+# Work through it in an instrumented shell; exit the shell to save.
+asylum routine record release --about 'cut and publish'
+
+asylum routine list
+asylum routine show release   # the steps, in order
+asylum routine run release    # replay, stopping at the first failure
+asylum routine rm release
+```
+
+Leaving the shell is how you stop recording, so `exit` is never a step. A
+command re-run because it failed the first time is one step, not two. Re-recording
+a name replaces it — that is how you correct one.
+
 ## `layout` — inspect fan-out presets
 
 Read the layouts defined in your settings ([Chapter 5](05-layouts-and-presets.md)):
@@ -276,12 +374,18 @@ text. These are platform-aware and shell out to the OS's automation tooling.
 2. `asylum run <agent> "print the current date"` for an agent you have installed.
 3. `asylum search "fanout" --dir ./crates` and read the results.
 4. `asylum layout show duel` to see a preset resolved.
+5. `asylum agent add Reviewer --role 'You review diffs for correctness first.'`,
+   teach it one thing with `asylum agent remember`, then `asylum agent show
+   Reviewer` — that output is what every future run of Reviewer starts with.
 
 ## Recap
 
 - The CLI mirrors the ADE: `worktree`, `run`, `search`, `control`, `wait`,
-  `plugin`, `layout`, `keep`, `call`, plus computer-use
-  `snapshot`/`click`/`fill` and shell `completions`.
+  `plugin`, `agent`, `schedule`, `routine`, `layout`, `keep`, `call`, plus
+  computer-use `snapshot`/`click`/`fill` and shell `completions`.
+- `agent` gives an agent a name and a memory that survives the task; `schedule`
+  runs work on a cadence with nobody watching; `routine` replays a workflow you
+  demonstrated once.
 - Every subcommand answers its own `--help`; `run` echoes the exact launch
   command — the fastest PATH check.
 - `control` and `wait` are the agent-facing orchestration commands, detailed

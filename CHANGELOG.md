@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-13
+
+### Added
+
+- **Named agents with their own memory** (`asylum agent`) — a run is a thing that happened; a named agent is somebody who keeps happening. A name, a brief, and a growing list of what it has learned about *this* repository, put in front of every prompt it gets. Project-scoped, because a role is about a codebase. Selectable as chips in the composer, carrying the count of things each one knows.
+- **`asylum control remember`** — a running agent writes to its own memory the same way it already reports activity and spawns helpers. Only its own: memory is the one thing on the control surface that outlives the task, so a sibling writing to it could plant an instruction that survives long after the run that planted it. Every write shows in the delegation thread.
+- **Scheduled runs** (`asylum schedule`) — work that starts with nobody watching. A scheduled run is an ordinary run: same worktrees, same board, same review. Missed periods are skipped rather than replayed, so a laptop closed over a weekend wakes to one run instead of every night at once.
+- **Routines** (`asylum routine`) — show Asylum a workflow once in an instrumented shell, replay it thereafter. Recording captures commands rather than keystrokes and screenshots, because what is worth replaying in a repository is the commands, and a command does not care where a window moved to.
+- **Delegation thread** — the fleet view now shows what the agents said to each other, in order, built from control-surface events that were already being recorded. Delegation reads as a conversation rather than runs appearing for no stated reason.
+- **Devpipe vault, read-through** — Asylum reads secrets from a Devpipe vault without copying them locally, so revoking a grant takes effect immediately rather than after the next sync.
+
+### Security
+
+- **Repository trust** — a repository's own `setup` commands and `asylum.toml` `env` no longer run until the project is trusted, and a scheduled run is never an exception. `env` is process-environment injection, where `PATH`, `NODE_OPTIONS` or `GIT_SSH_COMMAND` are code execution.
+- **Memory writes are self-only**, enforced in `authorize` against the token's own run id rather than in routing.
+- **A named agent may not take an agent id as its name** — fan-out entries resolve against the roster first, so an agent called `codex` would shadow codex itself and carry somebody else's memory into every run.
+- **Preview CDN assets are pinned** with subresource integrity hashes.
+- **Remote ssh hosts are validated** before being used to build a command.
+
+### Fixed
+
+- A timed-out probe or plugin killed only the shell it started; a forking shell left a grandchild holding the stdout pipe and the drain-thread join blocked until it exited on its own — a deadline that waits for the process it is supposed to bound. Now the whole process group is killed, and a timeout returns without joining.
+
 ## [1.0.0] - 2026-08-12
 
 ### Added
