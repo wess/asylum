@@ -6549,6 +6549,7 @@ name = "store"
 version = "1.0.0"
 dependencies = [
  "rusqlite",
+ "serde_json",
  "thiserror 1.0.69",
 ]
 

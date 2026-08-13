@@ -27,6 +27,7 @@ pub mod note;
 pub mod notification;
 pub mod project;
 mod queue;
+pub mod routine;
 pub mod run;
 pub mod runcheck;
 pub mod schedule;
@@ -36,7 +37,7 @@ pub mod task;
 
 pub use model::{
     Account, Annotation, ControlRequest, Event, Followup, NoteAttachment, NoteVault, NoteVaultMode,
-    Notification, Project, QueueStatus, Run, RunCheck, RunStatus, Schedule, SearchKind,
+    Notification, Project, QueueStatus, Routine, Run, RunCheck, RunStatus, Schedule, SearchKind,
     SearchRecord, Side, Task, TaskStatus, Usage,
 };
 

@@ -11,4 +11,7 @@ description = "SQLite persistence for projects, tasks, agent runs, and worktrees
 # async runtime). The gpui app has no tokio; persistence is blocking calls made
 # off the UI thread when needed.
 rusqlite = { version = "0.32", features = ["bundled"] }
+# Routine steps are an ordered list in one column; JSON is the shape that
+# keeps the order from drifting from itself.
+serde_json = { workspace = true }
 thiserror = { workspace = true }

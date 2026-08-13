@@ -259,6 +259,22 @@ const MIGRATIONS: &[&str] = &[
         created_at    INTEGER NOT NULL
     );
     CREATE INDEX idx_schedules_due ON schedules(enabled, next_at);",
+    // 13 - routines: a workflow shown once and replayed thereafter.
+    //
+    // Steps are stored as a JSON array of strings rather than one row each.
+    // A routine is edited, replayed and deleted whole — there is no query that
+    // wants "step 4 of every routine" — and keeping the order in one column
+    // means it cannot drift from itself.
+    "CREATE TABLE routines (
+        id          INTEGER PRIMARY KEY,
+        project_id  INTEGER NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
+        name        TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        steps       TEXT NOT NULL DEFAULT '[]',
+        created_at  INTEGER NOT NULL,
+        last_run_at INTEGER
+    );
+    CREATE UNIQUE INDEX idx_routines_name ON routines(project_id, name);",
 ];
 
 /// Apply pragmas and any pending migrations.

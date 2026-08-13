@@ -430,3 +430,25 @@ impl Schedule {
             .collect()
     }
 }
+
+/// A workflow shown to Asylum once and replayed thereafter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Routine {
+    pub id: i64,
+    pub project_id: i64,
+    pub name: String,
+    pub description: String,
+    /// The commands, in order, as recorded. Stored as a JSON array.
+    pub steps: String,
+    pub created_at: i64,
+    pub last_run_at: Option<i64>,
+}
+
+impl Routine {
+    /// The steps in order. A routine whose steps will not parse has none rather
+    /// than half — replaying a partially-read sequence would run a prefix of
+    /// somebody's workflow and stop, which is worse than refusing.
+    pub fn step_list(&self) -> Vec<String> {
+        serde_json::from_str::<Vec<String>>(&self.steps).unwrap_or_default()
+    }
+}

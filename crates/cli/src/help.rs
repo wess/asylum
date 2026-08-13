@@ -116,6 +116,60 @@ pub(crate) const TOPICS: &[Topic] = &[
         notes: &["Uses ripgrep when available, falling back to `git grep`."],
         examples: &["asylum search TODO", "asylum search 'fn create' --dir crates/git"],
     },
+    // ---- routine -----------------------------------------------------
+    Topic {
+        path: &["routine"],
+        group: Some("worktrees & runs"),
+        summary: "show Asylum a workflow once, then replay it",
+        usage: &["asylum routine <list | show | record | run | rm>"],
+        params: &[
+            ("list", "routines in this project"),
+            ("show <name>", "the steps, in order"),
+            ("record <name>", "work through it in an instrumented shell"),
+            ("run <name>", "replay it, stopping at the first failure"),
+            ("rm <name>", "delete one"),
+        ],
+        notes: &[
+            "Recording instruments a shell rather than watching the screen: what is \
+             worth replaying in a repository is the commands, and a command does not \
+             care where a window moved to.",
+            "Re-recording a name replaces it — that is how you correct one.",
+        ],
+        examples: &["asylum routine list", "asylum routine run release"],
+    },
+    Topic {
+        path: &["routine", "record"],
+        group: None,
+        summary: "record a workflow by working through it",
+        usage: &["asylum routine record <name> [--about <text>] [--project <name>]"],
+        params: &[
+            ("<name>", "what to call it"),
+            ("--about <text>", "a line describing what it does"),
+            ("--project <name>", "which project; omit for the most recently opened"),
+        ],
+        notes: &[
+            "Starts a shell that reports each command as you run it. Work through the \
+             task, then exit the shell to save.",
+            "Your own rc is sourced first, so aliases, prompt and PATH are the ones you \
+             demonstrated with.",
+            "Consecutive repeats collapse, and `ls`, `pwd`, `clear` and `exit` are \
+             dropped — a routine is the workflow, not the typing.",
+        ],
+        examples: &["asylum routine record release --about 'cut and publish'"],
+    },
+    Topic {
+        path: &["routine", "run"],
+        group: None,
+        summary: "replay a recorded workflow",
+        usage: &["asylum routine run <name> [--project <name>]"],
+        params: &[("<name>", "the routine to replay")],
+        notes: &[
+            "Stops at the first step that fails. The steps after it were demonstrated \
+             on the assumption it succeeded, and running them anyway is how a \
+             half-finished release gets published.",
+        ],
+        examples: &["asylum routine run release"],
+    },
     // ---- schedule ----------------------------------------------------
     Topic {
         path: &["schedule"],
