@@ -464,7 +464,7 @@ Batch 5B (parallel):
   chapters) and video-course pages reference the old shapes.
   — **model: sonnet**
 
-- [ ] (human) **Cut the 1.0 release**: bump the version in the root
+- [x] (human) **Cut the 1.0 release**: bump the version in the root
   `Cargo.toml` (that path is what `release.yml` triggers on), push, verify the
   workflow, publish, confirm Homebrew/Scoop refresh, spot-check installs on
   clean machines.
@@ -480,7 +480,10 @@ Batch 5B (parallel):
   which is the expected result for a local build: it clears signature
   validation and stops only at the notarization step CI performs.
 
-  What remains is the decision to publish, not a missing capability.
+  **Done.** 1.0.0 shipped 2026-08-12 and 1.1.0 on 2026-08-13, both signed,
+  notarized and stapled, with Homebrew and Scoop refreshed by CI. The published
+  dmg reports `accepted / source=Notarized Developer ID` and the cask's sha256
+  matches it byte for byte.
 
 ## Backlog (post-1.0)
 
@@ -489,7 +492,9 @@ remaining deferrals — none gate 1.0:
 
 - Messaging-channel delivery (Slack/Telegram/Discord bridges over the
   companion event stream) so the fleet is reachable where you already are.
-- Scheduled/unattended runs (cron-style task launches with delivery).
+- ~~Scheduled/unattended runs (cron-style task launches with delivery).~~
+  Shipped in 1.1.0 as `asylum schedule`; delivery rides the existing
+  notification path.
 - Headless mode: run fleet + queues without the GUI (CLI/companion-first).
 - Cross-run memory: FTS5 recall over transcripts + notes surfaced as agent
   context automatically (today's notes attach is manual).
