@@ -64,6 +64,26 @@ pub fn init(window: WindowHandle<Root>, loaded: config::Loaded, cx: &mut App) {
         }
     })
     .detach();
+
+    // Start work nobody is present for. On its own timer rather than folded
+    // into the drain above: that runs every few seconds because a person is
+    // waiting on it, and a schedule sweep at that rate would be a query every
+    // four seconds, all day, to find nothing.
+    cx.spawn(async move |cx| loop {
+        cx.background_executor().timer(crate::schedules::TICK).await;
+        if window
+            .update(cx, |root, window, cx| {
+                let fired = root.fire_due_schedules(window, cx);
+                if fired > 0 {
+                    tracing::info!(fired, "scheduled runs started");
+                }
+            })
+            .is_err()
+        {
+            break;
+        }
+    })
+    .detach();
 }
 
 /// Re-load settings.json and apply the result to the running app.

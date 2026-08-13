@@ -116,6 +116,48 @@ pub(crate) const TOPICS: &[Topic] = &[
         notes: &["Uses ripgrep when available, falling back to `git grep`."],
         examples: &["asylum search TODO", "asylum search 'fn create' --dir crates/git"],
     },
+    // ---- schedule ----------------------------------------------------
+    Topic {
+        path: &["schedule"],
+        group: Some("worktrees & runs"),
+        summary: "run a task on a cadence, with nobody watching",
+        usage: &["asylum schedule <list | add | rm | enable | disable>"],
+        params: &[
+            ("list", "every schedule, across all projects"),
+            ("add", "create one (see `asylum help schedule add`)"),
+            ("rm <id>", "delete one"),
+            ("enable <id>", "start firing it again"),
+            ("disable <id>", "stop firing it, keeping the definition"),
+        ],
+        notes: &[
+            "A scheduled run is an ordinary run: same worktrees, same board, same review.",
+            "Missed periods are skipped, not replayed — a laptop closed over a weekend \
+             wakes to one run, not to every night at once.",
+        ],
+        examples: &["asylum schedule list", "asylum schedule disable 3"],
+    },
+    Topic {
+        path: &["schedule", "add"],
+        group: None,
+        summary: "create a scheduled run",
+        usage: &["asylum schedule add --every <cadence> [options] <prompt>"],
+        params: &[
+            ("--every <cadence>", "how often: 30m, 1h, 1d, 1w"),
+            ("--title <text>", "what to call it on the board"),
+            ("--agents <ids>", "comma-separated; omit to use the project's defaults"),
+            ("--project <name>", "which project; omit for the most recently opened"),
+            ("<prompt>", "the task to run, in the words you would type yourself"),
+        ],
+        notes: &[
+            "The first run is one whole cadence away, not immediate — adding a nightly \
+             job at 2pm means nightly from tomorrow, rather than a fan-out while you \
+             are still typing.",
+        ],
+        examples: &[
+            "asylum schedule add --every 1d --title Flakes 'Find and fix flaky tests'",
+            "asylum schedule add --every 6h --agents claude-code,codex 'Triage new issues'",
+        ],
+    },
     // ---- layout ------------------------------------------------------
     Topic {
         path: &["layout"],

@@ -33,6 +33,7 @@ mod keepcmd;
 mod layouts;
 mod mcpcmd;
 mod plugins;
+mod schedulecmd;
 
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -58,6 +59,7 @@ const COMMANDS: &[(&str, Handler)] = &[
     ("wait", ctl::wait),
     ("plugin", plugins::plugin),
     ("layout", layouts::layout),
+    ("schedule", schedulecmd::schedule),
     ("snapshot", snapshot),
     ("click", click),
     ("fill", fill),

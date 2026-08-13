@@ -156,14 +156,10 @@ impl Root {
     /// The on-disk store path: `$XDG_DATA_HOME/asylum/workspace.sqlite` (or
     /// `~/.local/share/asylum/...`). Shared with the companion server.
     pub fn db_path() -> std::path::PathBuf {
-        let base = std::env::var_os("XDG_DATA_HOME")
-            .map(std::path::PathBuf::from)
-            .filter(|p| !p.as_os_str().is_empty())
-            .or_else(|| {
-                std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/share"))
-            })
-            .unwrap_or_else(|| std::path::PathBuf::from(".local/share"));
-        base.join("asylum").join("workspace.sqlite")
+        // Delegated: the companion server and the CLI need the same answer, and
+        // a path computed separately in each eventually differs in one of them —
+        // which shows up as an empty database rather than an error.
+        store::default_path()
     }
 
     /// Open the on-disk store and select the most-recently-opened project (if

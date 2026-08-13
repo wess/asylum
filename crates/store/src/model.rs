@@ -399,3 +399,34 @@ impl RunStatus {
         matches!(self, Self::Succeeded | Self::Failed | Self::Cancelled)
     }
 }
+
+/// A task that runs on its own, on a cadence, with nobody watching.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Schedule {
+    pub id: i64,
+    pub project_id: i64,
+    pub title: String,
+    pub prompt: String,
+    /// Agent ids to fan out to, comma-separated. Empty means the project's
+    /// defaults, decided when it fires rather than when it was written — so
+    /// changing your default agents changes what the schedule races.
+    pub agents: String,
+    pub every_minutes: i64,
+    pub enabled: bool,
+    /// When it next comes due (unix seconds).
+    pub next_at: i64,
+    pub last_run_at: Option<i64>,
+    pub created_at: i64,
+}
+
+impl Schedule {
+    /// The agent ids this schedule names, or an empty list for "use defaults".
+    pub fn agent_ids(&self) -> Vec<String> {
+        self.agents
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .collect()
+    }
+}

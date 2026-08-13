@@ -21,4 +21,5 @@ plugin = { path = "../plugin" }
 proxy = { path = "../proxy" }
 runner = { path = "../runner" }
 search = { path = "../search" }
+store = { path = "../store" }
 serde_json = { workspace = true }

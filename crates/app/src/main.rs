@@ -25,6 +25,7 @@ mod reap;
 mod reload;
 mod root;
 mod run;
+mod schedules;
 mod search;
 mod secrets;
 mod settings;

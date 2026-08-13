@@ -234,6 +234,31 @@ const MIGRATIONS: &[&str] = &[
     // having opened a project is not evidence the user vetted what it executes,
     // and a security check is not weakened to preserve compatibility.
     "ALTER TABLE projects ADD COLUMN trusted_at INTEGER NOT NULL DEFAULT 0;",
+    // 12 - scheduled, unattended runs. A schedule owns a project, a prompt and
+    // the agents to race, and fans out on a cadence without anybody present.
+    //
+    // `every_minutes` rather than a cron expression, deliberately. Cron buys
+    // "the third Tuesday" and costs a parser plus a timezone argument nobody
+    // wins; a cadence plus a first `next_at` expresses the cases that actually
+    // come up — hourly, nightly, weekly — because a schedule created at 02:00
+    // with a 1440-minute cadence fires at 02:00.
+    //
+    // `next_at` is stored rather than derived so a schedule that was disabled,
+    // or an app that was closed over the weekend, resumes on its own cadence
+    // instead of firing once for every period it missed.
+    "CREATE TABLE schedules (
+        id            INTEGER PRIMARY KEY,
+        project_id    INTEGER NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
+        title         TEXT NOT NULL,
+        prompt        TEXT NOT NULL,
+        agents        TEXT NOT NULL DEFAULT '',
+        every_minutes INTEGER NOT NULL,
+        enabled       INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+        next_at       INTEGER NOT NULL,
+        last_run_at   INTEGER,
+        created_at    INTEGER NOT NULL
+    );
+    CREATE INDEX idx_schedules_due ON schedules(enabled, next_at);",
 ];
 
 /// Apply pragmas and any pending migrations.

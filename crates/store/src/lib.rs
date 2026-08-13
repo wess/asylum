@@ -29,14 +29,15 @@ pub mod project;
 mod queue;
 pub mod run;
 pub mod runcheck;
+pub mod schedule;
 mod schema;
 pub mod search;
 pub mod task;
 
 pub use model::{
     Account, Annotation, ControlRequest, Event, Followup, NoteAttachment, NoteVault, NoteVaultMode,
-    Notification, Project, QueueStatus, Run, RunCheck, RunStatus, SearchKind, SearchRecord, Side,
-    Task, TaskStatus, Usage,
+    Notification, Project, QueueStatus, Run, RunCheck, RunStatus, Schedule, SearchKind,
+    SearchRecord, Side, Task, TaskStatus, Usage,
 };
 
 /// A store error: either the SQLite layer failed or a lookup found nothing.
@@ -104,3 +105,21 @@ impl Db {
 #[cfg(test)]
 #[path = "../tests/lib.rs"]
 mod tests;
+
+/// The on-disk store path: `$XDG_DATA_HOME/asylum/workspace.sqlite` (or
+/// `~/.local/share/asylum/...`).
+///
+/// Lives here rather than in the app because three things need to agree on it —
+/// the app, the companion server and the CLI — and a path computed separately
+/// in each is a path that eventually differs in one of them, producing an
+/// empty database rather than an error.
+pub fn default_path() -> std::path::PathBuf {
+    let base = std::env::var_os("XDG_DATA_HOME")
+        .map(std::path::PathBuf::from)
+        .filter(|p| !p.as_os_str().is_empty())
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/share"))
+        })
+        .unwrap_or_else(|| std::path::PathBuf::from(".local/share"));
+    base.join("asylum").join("workspace.sqlite")
+}
