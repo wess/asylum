@@ -58,6 +58,96 @@ impl Kind {
     }
 }
 
+/// A machine on the account.
+///
+/// The fields Asylum needs to decide whether it can be worked on and how to
+/// reach it — not the whole row. A client that deserialises everything breaks
+/// when the control plane adds a column, which is a poor trade for fields
+/// nothing here reads.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct Machine {
+    pub id: i64,
+    pub name: String,
+    pub hostname: String,
+    pub status: String,
+    #[serde(default)]
+    pub status_detail: String,
+    #[serde(default)]
+    pub tools: Vec<String>,
+}
+
+impl Machine {
+    /// Ready to be worked on right now.
+    pub fn awake(&self) -> bool {
+        self.status == "ready"
+    }
+
+    /// Its droplet is gone but its workspace is not; `wake` brings it back.
+    pub fn asleep(&self) -> bool {
+        self.status == "asleep"
+    }
+}
+
+/// Where a box's daemon is, and what proves we may talk to it.
+///
+/// The token is the *box's* bearer, not the account's: it reaches one machine,
+/// belongs to whoever asked, and is useless anywhere else. It is also
+/// long-lived, so it is held in memory and never written down — the same rule
+/// the web client follows, for the same reason.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct Reach {
+    pub url: String,
+    pub token: String,
+}
+
+impl Reach {
+    /// The daemon over plain HTTP. `wss` and `https` are one server on one
+    /// port, differing only in whether the request asks for an upgrade.
+    pub fn http(&self) -> String {
+        self.url
+            .replacen("wss://", "https://", 1)
+            .replacen("ws://", "http://", 1)
+    }
+
+    /// The websocket that carries one session's bytes.
+    pub fn attach(&self, session: &str) -> String {
+        format!("{}/v1/sessions/{session}/attach", self.url)
+    }
+
+    /// The websocket that carries one forwarded TCP connection.
+    ///
+    /// The far end is always loopback on the box; there is deliberately no
+    /// host parameter, because a forward that could be pointed anywhere turns
+    /// every box into a relay for whoever holds its token.
+    pub fn forward(&self, port: u16) -> String {
+        format!("{}/v1/forward?port={port}", self.url)
+    }
+}
+
+/// A terminal running on a box, which outlives whoever was watching it.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct Terminal {
+    pub id: String,
+    #[serde(default)]
+    pub argv: Vec<String>,
+    #[serde(default)]
+    pub title: String,
+    pub alive: bool,
+}
+
+impl Terminal {
+    /// Whether this is the plain login shell rather than a tool someone
+    /// started.
+    ///
+    /// An empty argv means "the login shell", and the daemon resolves it
+    /// before reporting it — asked for `[]`, listed back as `["/bin/zsh"]`.
+    /// Comparing the two literally is what made Devpipe's own CLI open a new
+    /// shell on every connect instead of returning to the running one.
+    pub fn is_shell(&self) -> bool {
+        self.argv.len() <= 1
+    }
+}
+
 /// One vault entry, without its value. Listings never carry plaintext.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Entry {
@@ -238,6 +328,84 @@ impl Client {
             return Err(Error::Api(redact(&message, &self.token)));
         }
         Ok(stdout)
+    }
+
+    // ---- boxes -------------------------------------------------------------
+    //
+    // The vault was the first thing Asylum needed from Devpipe; the machines
+    // are the second. Same client, same token, same transport — a box is not a
+    // different service, it is the same account seen from another angle.
+
+    /// Every machine on the account.
+    pub fn machines(&self) -> Result<Vec<Machine>, Error> {
+        let body = self.send("GET", "/boxes", None)?;
+        serde_json::from_str(&body).map_err(|e| Error::Protocol(e.to_string()))
+    }
+
+    /// The machine with this name, however it was written.
+    ///
+    /// `mybox` and `mybox.devpipe.com` are the same machine to everyone except
+    /// a string comparison.
+    pub fn machine(&self, name: &str) -> Result<Machine, Error> {
+        let want = name.trim().to_lowercase();
+        self.machines()?
+            .into_iter()
+            .find(|m| {
+                let host = m.hostname.to_lowercase();
+                m.name.to_lowercase() == want
+                    || host == want
+                    || host.split('.').next() == Some(want.as_str())
+            })
+            .ok_or_else(|| Error::Api(format!("no box called {name:?}")))
+    }
+
+    /// Build the droplet back for a machine that went to sleep.
+    ///
+    /// Returns as soon as the control plane accepts it, which is long before
+    /// the box answers — waking takes about three minutes. Poll `machine`
+    /// until it is `awake`.
+    pub fn wake(&self, id: i64) -> Result<(), Error> {
+        self.send("POST", &format!("/boxes/{id}/wake"), Some("{}"))?;
+        Ok(())
+    }
+
+    /// Where the box's daemon is. Only answers for a machine that is awake.
+    pub fn reach(&self, id: i64) -> Result<Reach, Error> {
+        let body = self.send("GET", &format!("/boxes/{id}/connection"), None)?;
+        serde_json::from_str(&body).map_err(|e| Error::Protocol(e.to_string()))
+    }
+
+    /// The terminals already running on a box.
+    pub fn terminals(&self, id: i64) -> Result<Vec<Terminal>, Error> {
+        let body = self.send("GET", &format!("/boxes/{id}/sessions"), None)?;
+        serde_json::from_str(&body).map_err(|e| Error::Protocol(e.to_string()))
+    }
+
+    /// Start one. An empty `argv` is the box's own login shell.
+    pub fn start_terminal(
+        &self,
+        id: i64,
+        argv: &[String],
+        cols: u16,
+        rows: u16,
+    ) -> Result<Terminal, Error> {
+        let body = serde_json::json!({ "argv": argv, "cols": cols, "rows": rows }).to_string();
+        let out = self.send("POST", &format!("/boxes/{id}/sessions"), Some(&body))?;
+        serde_json::from_str(&out).map_err(|e| Error::Protocol(e.to_string()))
+    }
+
+    /// The live shell to return to, if there is one.
+    ///
+    /// Reusing rather than starting fresh is the point of the product: the work
+    /// outlives the connection, and a client that opened a new shell each time
+    /// would throw that away exactly as `ssh` does.
+    pub fn existing_shell(&self, id: i64) -> Result<Option<Terminal>, Error> {
+        // The newest: sessions are named in creation order, so the last
+        // match is the one most recently worked in.
+        Ok(self
+            .terminals(id)?
+            .into_iter()
+            .rfind(|t| t.alive && t.is_shell()))
     }
 
     /// Every entry the account holds: names and kinds, never values.

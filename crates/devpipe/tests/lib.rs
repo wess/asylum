@@ -109,3 +109,78 @@ fn the_servers_own_refusal_is_what_the_user_reads() {
     assert_eq!(api_error("not json", "fallback"), "fallback");
     assert_eq!(api_error("{}", "fallback"), "fallback");
 }
+
+// ---- boxes -----------------------------------------------------------------
+
+#[test]
+fn machines_parse_and_know_whether_they_can_be_worked_on() {
+    let json = r#"[
+      {"id":1,"name":"work","hostname":"work.devpipe.com","status":"ready","status_detail":"","ip":"1.2.3.4","tools":["claude-code"]},
+      {"id":2,"name":"spare","hostname":"spare.devpipe.com","status":"asleep","status_detail":"","ip":"","tools":[]}
+    ]"#;
+    let machines: Vec<Machine> = serde_json::from_str(json).expect("parses");
+    assert!(machines[0].awake());
+    assert!(!machines[0].asleep());
+    assert!(machines[1].asleep());
+    assert!(!machines[1].awake());
+}
+
+#[test]
+fn a_field_we_do_not_read_does_not_break_the_client() {
+    // The control plane adds columns. A client that insists on knowing every
+    // one of them stops working the next time somebody ships a feature.
+    let json = r#"[{"id":1,"name":"n","hostname":"h","status":"ready","something_new":true}]"#;
+    let machines: Vec<Machine> = serde_json::from_str(json).expect("parses");
+    assert_eq!(machines[0].id, 1);
+}
+
+#[test]
+fn a_websocket_url_gives_up_its_http_form() {
+    // Sessions are listed over HTTP and attached over a websocket, against one
+    // server on one port. The control plane hands out the wss form.
+    let reach = Reach { url: "wss://b.devpipe.com".into(), token: "t".into() };
+    assert_eq!(reach.http(), "https://b.devpipe.com");
+    assert_eq!(reach.attach("s1"), "wss://b.devpipe.com/v1/sessions/s1/attach");
+
+    let local = Reach { url: "ws://127.0.0.1:7788".into(), token: "t".into() };
+    assert_eq!(local.http(), "http://127.0.0.1:7788");
+}
+
+#[test]
+fn a_forward_names_a_port_and_never_a_host() {
+    // The far end is always loopback on the box. A forward that could be
+    // pointed anywhere turns every box into a relay for whoever holds its
+    // token — which is the abuse that gets the whole provider account locked,
+    // not just one customer's machine.
+    let reach = Reach { url: "wss://b.devpipe.com".into(), token: "t".into() };
+    let url = reach.forward(3000);
+    assert_eq!(url, "wss://b.devpipe.com/v1/forward?port=3000");
+    assert!(!url.contains("host"));
+}
+
+#[test]
+fn a_login_shell_is_recognised_however_the_daemon_reports_it() {
+    // Asked for `[]`, listed back as `["/bin/zsh"]`. Comparing those literally
+    // is what made Devpipe's own CLI start a new shell on every connect
+    // instead of returning to the running one, so the persistence the product
+    // is built on was invisible.
+    let asked = Terminal { id: "s1".into(), argv: vec![], title: String::new(), alive: true };
+    let listed = Terminal {
+        id: "s1".into(),
+        argv: vec!["/bin/zsh".into()],
+        title: String::new(),
+        alive: true,
+    };
+    assert!(asked.is_shell());
+    assert!(listed.is_shell());
+
+    let agent = Terminal {
+        id: "s2".into(),
+        argv: vec!["claude".into(), "--dangerously-skip-permissions".into()],
+        title: String::new(),
+        alive: true,
+    };
+    // Reattaching a plain "open a terminal" to somebody's running agent would
+    // drop them into a tool they did not ask for.
+    assert!(!agent.is_shell());
+}
