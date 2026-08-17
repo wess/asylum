@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-17
+
+### Added
+
+- **Getting started, in the app** (Help → Getting Started Video) — an 8 minute 41 second captioned tour that goes from the mental model to a first task, a review of what came back, and a safe merge. Player, video, poster, captions, chapters and transcript are compiled into the binary and extracted beside the database on first use, so a packaged build plays it with no network and no resource-lookup rules — the tutorial cannot rot separately from the app it teaches.
+- **Devpipe machines, not just the vault** — the Devpipe client could read an account's secrets and nothing else. It now lists the boxes on the account, wakes a sleeping one, resolves where its daemon is, and lists or starts the terminals running on it. Same client, same token, same transport: a box is not a different service, it is the same account seen from another angle.
+
+### Changed
+
+- The video curriculum leads with the finished overview rather than a shot list, and the site carries it with chapters and a transcript.
+
+### Security
+
+- **A Devpipe forward names a port and never a host.** The daemon's authenticated websocket is the only way into a box — Devpipe closes port 22 to everything but its own control plane — and a forward that could be pointed anywhere would turn every box into a relay for whoever holds its token, which is the abuse that gets a whole provider account locked rather than one customer's machine.
+- **A box's bearer token is held in memory and never written down.** It reaches one machine and is useless anywhere else, so it is treated as the short-lived thing it is rather than persisted beside the account's own credentials.
+
+### Fixed
+
+- Reattaching to a terminal on a box returns to the running shell instead of opening a new one. A session asked for with an empty argv is listed back as the shell the daemon resolved (`[]` in, `["/bin/zsh"]` out); comparing those literally is what made Devpipe's own client start a fresh shell on every connect, and the persistence the product is built on was invisible.
+
 ## [1.1.0] - 2026-08-13
 
 ### Added
