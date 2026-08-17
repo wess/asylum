@@ -420,7 +420,7 @@ fn main() {
             #[cfg(debug_assertions)]
             if std::env::var_os("ASYLUM_START_TUTORIAL").is_some() {
                 window
-                    .update(cx, |root, window, cx| tutorial::open(root, window, cx))
+                    .update(cx, tutorial::open)
                     .ok();
             }
 

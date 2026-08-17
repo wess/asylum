@@ -112,7 +112,7 @@ pub fn modal(
         .track_focus(&focus)
         .on_key_down(move |event: &KeyDownEvent, _window, cx| {
             if event.keystroke.key.as_str() == "escape" {
-                dismiss.update(cx, |root, cx| close(root, cx));
+                dismiss.update(cx, close);
                 cx.stop_propagation();
             }
         })
@@ -122,7 +122,7 @@ pub fn modal(
                 .width(width)
                 .padding(Size::Sm)
                 .on_close(move |_, _, cx| {
-                    handle.update(cx, |root, cx| close(root, cx));
+                    handle.update(cx, close);
                 })
                 .child(
                     div()

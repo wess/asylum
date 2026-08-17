@@ -138,11 +138,20 @@ fn a_field_we_do_not_read_does_not_break_the_client() {
 fn a_websocket_url_gives_up_its_http_form() {
     // Sessions are listed over HTTP and attached over a websocket, against one
     // server on one port. The control plane hands out the wss form.
-    let reach = Reach { url: "wss://b.devpipe.com".into(), token: "t".into() };
+    let reach = Reach {
+        url: "wss://b.devpipe.com".into(),
+        token: "t".into(),
+    };
     assert_eq!(reach.http(), "https://b.devpipe.com");
-    assert_eq!(reach.attach("s1"), "wss://b.devpipe.com/v1/sessions/s1/attach");
+    assert_eq!(
+        reach.attach("s1"),
+        "wss://b.devpipe.com/v1/sessions/s1/attach"
+    );
 
-    let local = Reach { url: "ws://127.0.0.1:7788".into(), token: "t".into() };
+    let local = Reach {
+        url: "ws://127.0.0.1:7788".into(),
+        token: "t".into(),
+    };
     assert_eq!(local.http(), "http://127.0.0.1:7788");
 }
 
@@ -152,7 +161,10 @@ fn a_forward_names_a_port_and_never_a_host() {
     // pointed anywhere turns every box into a relay for whoever holds its
     // token — which is the abuse that gets the whole provider account locked,
     // not just one customer's machine.
-    let reach = Reach { url: "wss://b.devpipe.com".into(), token: "t".into() };
+    let reach = Reach {
+        url: "wss://b.devpipe.com".into(),
+        token: "t".into(),
+    };
     let url = reach.forward(3000);
     assert_eq!(url, "wss://b.devpipe.com/v1/forward?port=3000");
     assert!(!url.contains("host"));
@@ -164,7 +176,12 @@ fn a_login_shell_is_recognised_however_the_daemon_reports_it() {
     // is what made Devpipe's own CLI start a new shell on every connect
     // instead of returning to the running one, so the persistence the product
     // is built on was invisible.
-    let asked = Terminal { id: "s1".into(), argv: vec![], title: String::new(), alive: true };
+    let asked = Terminal {
+        id: "s1".into(),
+        argv: vec![],
+        title: String::new(),
+        alive: true,
+    };
     let listed = Terminal {
         id: "s1".into(),
         argv: vec!["/bin/zsh".into()],
