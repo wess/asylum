@@ -419,9 +419,7 @@ fn main() {
             // relying on coordinates or accessibility permissions.
             #[cfg(debug_assertions)]
             if std::env::var_os("ASYLUM_START_TUTORIAL").is_some() {
-                window
-                    .update(cx, tutorial::open)
-                    .ok();
+                window.update(cx, tutorial::open).ok();
             }
 
             cx.activate(true);
