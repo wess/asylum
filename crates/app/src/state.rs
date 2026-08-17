@@ -78,6 +78,18 @@ pub struct Root {
     /// The command palette and quick-open overlays (built lazily).
     pub palette: Option<gpui::Entity<guise::overlay::Spotlight>>,
     pub quickopen: Option<gpui::Entity<guise::overlay::Spotlight>>,
+    /// The bundled getting-started player, shown as a modal when present.
+    pub tutorial: Option<gpui::Entity<guise::WebView>>,
+    /// A just-closed native player retained until its previous canvas has
+    /// finished painting and it can be hidden one last time.
+    pub tutorial_closing: Option<gpui::Entity<guise::WebView>>,
+    /// Keyboard focus target for the tutorial overlay while its native view is
+    /// not focused directly.
+    pub tutorial_focus: Option<gpui::FocusHandle>,
+    /// Focus that was active before the tutorial opened, restored on the first
+    /// frame after it closes.
+    pub tutorial_previous_focus: Option<gpui::FocusHandle>,
+    pub tutorial_restore_focus: Option<gpui::FocusHandle>,
     /// The review-comment input (built lazily), for diff annotations.
     pub review_note: Option<gpui::Entity<guise::TextInput>>,
     /// Expanded node ids in the workspace tree (`project-<id>`, `task-<id>`).
@@ -224,6 +236,11 @@ impl Root {
             review_target: None,
             palette: None,
             quickopen: None,
+            tutorial: None,
+            tutorial_closing: None,
+            tutorial_focus: None,
+            tutorial_previous_focus: None,
+            tutorial_restore_focus: None,
             review_note: None,
             expanded: std::collections::HashSet::new(),
             context_menu: None,

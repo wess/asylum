@@ -48,6 +48,9 @@ const TRAFFIC_LIGHT_INSET: f32 = 8.0;
 
 impl Render for Root {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if let Some(focus) = self.tutorial_restore_focus.take() {
+            window.focus(&focus, cx);
+        }
         if self.launch_needed {
             cx.defer_in(window, |root, window, cx| root.launch_queued(window, cx));
         }
@@ -62,26 +65,33 @@ impl Render for Root {
         // No projects yet → onboarding.
         if self.is_empty() {
             crate::settings::ensure_inputs(self, cx);
-            if self.onboarding_settings {
-                return onboarding_settings(
+            let content = if self.onboarding_settings {
+                onboarding_settings(
                     self.settings.clone(),
                     self.settings_diagnostics.clone(),
                     self.agent_rows(),
                     self.settings_inputs.clone().expect("settings inputs"),
                     self.settings_collapsed.clone(),
-                    handle,
+                    handle.clone(),
                     window,
                     cx,
-                );
+                )
+            } else {
+                onboarding(
+                    handle.clone(),
+                    self.pending_project.clone(),
+                    self.agent_reports(),
+                    self.notices.clone(),
+                    colors.primary,
+                )
+                .into_any_element()
+            };
+            let mut root = div().relative().size_full().child(content);
+            if let (Some(view), Some(focus)) = (self.tutorial.clone(), self.tutorial_focus.clone())
+            {
+                root = root.child(crate::tutorial::modal(view, focus, handle, window));
             }
-            return onboarding(
-                handle,
-                self.pending_project.clone(),
-                self.agent_reports(),
-                self.notices.clone(),
-                colors.primary,
-            )
-            .into_any_element();
+            return root.into_any_element();
         }
 
         let unread = self.unread();
@@ -174,10 +184,20 @@ impl Render for Root {
             })
             .collect();
 
+        // Native webviews reassert visibility whenever they paint. Keep them
+        // out of the render tree while the tutorial is open so they cannot
+        // rise above its GPUI scrim or accept input through it.
+        let tutorial_open = self.tutorial.is_some();
+
         // Build the pane row.
         let mut area = div().flex().flex_row().size_full().overflow_hidden();
         for snap in pane_snaps {
             let content = match &snap.kind {
+                Some(TabKind::Browser(_) | TabKind::Preview(_) | TabKind::Notes)
+                    if tutorial_open =>
+                {
+                    div().size_full().into_any_element()
+                }
                 Some(kind) => {
                     self.tab_content(kind, &compose, &review_note, handle.clone(), window, cx)
                 }
@@ -261,6 +281,9 @@ impl Render for Root {
         if let Some(menu) = self.context_menu.clone() {
             root = root.child(menu);
         }
+        if let (Some(view), Some(focus)) = (self.tutorial.clone(), self.tutorial_focus.clone()) {
+            root = root.child(crate::tutorial::modal(view, focus, handle, window));
+        }
         root.into_any_element()
     }
 }
@@ -312,10 +335,11 @@ fn view_for_key(key: crate::workspace::TabKey) -> View {
 
 impl Root {
     fn sync_webview_visibility(&self, window: &Window, cx: &mut App) {
+        let workspace_visible = self.tutorial.is_none();
         let mut notes_visible = false;
         for pane in &self.workspace.panes {
             for (index, tab) in pane.tabs.iter().enumerate() {
-                let visible = index == pane.active;
+                let visible = workspace_visible && index == pane.active;
                 match &tab.kind {
                     TabKind::Browser(webview) | TabKind::Preview(webview) => {
                         webview.update(cx, |webview, _cx| webview.set_visible(visible));

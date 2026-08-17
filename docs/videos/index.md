@@ -1,9 +1,15 @@
 # Asylum Video Tutorials — Series Curriculum
 
-Ready-to-record shot lists for a video series that teaches Asylum from first
-launch to expert orchestration. Each file is a **script / storyboard**: narration
-paired with on-screen actions and timecodes. They are not prose articles and not
-finished videos — hand one to whoever records and they have a shot-by-shot plan.
+The finished **Asylum: Start Here** overview is an 8 minute 41 second, captioned
+walkthrough from the basic mental model through a safe review and merge. It is
+available on the Videos site and inside the app from **Help → Getting Started
+Video**. Its [script and capture notes](overview.md) live beside the course.
+
+The remaining files are ready-to-record shot lists for a video series that
+teaches Asylum from first launch to expert orchestration. Each file is a
+**script / storyboard**: narration paired with on-screen actions and timecodes.
+They are not prose articles — hand one to whoever records and they have a
+shot-by-shot plan.
 
 These scripts track the [Asylum Book](../book/index.md) chapter for chapter, so
 the videos and the written docs stay consistent. Every episode links its matching

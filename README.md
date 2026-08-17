@@ -114,6 +114,10 @@ cargo test                # run the suite
 cargo clippy --all-targets
 ```
 
+New to Asylum? Open **Help → Getting Started Video** in the app for the captioned
+8 minute 41 second tour, including the explain-like-I-am-five mental model and a
+complete first workflow.
+
 [guise-ui](https://github.com/wess/guise) and
 [libsinclair](https://github.com/wess/sinclair) are git dependencies; the first
 build fetches them.

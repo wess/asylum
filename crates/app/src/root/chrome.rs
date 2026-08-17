@@ -117,6 +117,7 @@ pub(super) fn onboarding(
             );
     }
     let configure = handle.clone();
+    let tutorial = handle.clone();
     let readiness = if verified > 0 {
         format!("Ready to work · {verified} agent(s) verified")
     } else if installed > 0 {
@@ -177,6 +178,16 @@ pub(super) fn onboarding(
                                                 crate::settings::collapsed_except("agents");
                                             root.onboarding_settings = true;
                                             cx.notify();
+                                        });
+                                    }),
+                            )
+                            .child(
+                                Button::new("getting-started", "Watch the 9-minute tour")
+                                    .variant(Variant::Subtle)
+                                    .size(Size::Md)
+                                    .on_click(move |_, window, cx| {
+                                        tutorial.update(cx, |root, cx| {
+                                            crate::tutorial::open(root, window, cx)
                                         });
                                     }),
                             ),
@@ -426,13 +437,24 @@ pub(super) fn header(
         colors.hover,
         move |window, cx| quickopen.update(cx, |spotlight, cx| spotlight.open(window, cx)),
     );
+    let open = handle.clone();
     let open_btn = icon_button(
         "tb-open",
         "folder",
         "Open repository",
         colors.text,
         colors.hover,
-        move |_, cx| open_project(handle.clone(), cx),
+        move |_, cx| open_project(open.clone(), cx),
+    );
+    let tutorial_btn = icon_button(
+        "tb-tutorial",
+        "play",
+        "Watch getting started",
+        colors.text,
+        colors.hover,
+        move |window, cx| {
+            handle.update(cx, |root, cx| crate::tutorial::open(root, window, cx));
+        },
     );
     let theme_btn = icon_button(
         "tb-theme",
@@ -477,6 +499,7 @@ pub(super) fn header(
                 .child(palette_btn)
                 .child(search_btn)
                 .child(open_btn)
+                .child(tutorial_btn)
                 .child(theme_btn),
         )
 }

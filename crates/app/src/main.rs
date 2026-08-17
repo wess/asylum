@@ -35,6 +35,7 @@ mod sidebar;
 mod sitecapture;
 mod state;
 mod theme;
+mod tutorial;
 mod workspace;
 
 use gpui::AppContext as _;
@@ -412,6 +413,16 @@ fn main() {
 
             // Seed the root with the boot settings and live-reload on change.
             reload::init(window, loaded, cx);
+
+            // Visual-QA hook for the bundled player. Kept out of release builds;
+            // it lets the screenshot harness open the native webview without
+            // relying on coordinates or accessibility permissions.
+            #[cfg(debug_assertions)]
+            if std::env::var_os("ASYLUM_START_TUTORIAL").is_some() {
+                window
+                    .update(cx, |root, window, cx| tutorial::open(root, window, cx))
+                    .ok();
+            }
 
             cx.activate(true);
         });

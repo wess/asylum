@@ -56,6 +56,7 @@ actions!(
         // Task
         RunFanout,
         // Help
+        GettingStarted,
         Documentation,
         OpenLogFolder,
     ]
@@ -148,6 +149,8 @@ fn menus() -> Vec<Menu> {
             name: "Help".into(),
             disabled: false,
             items: vec![
+                MenuItem::action("Getting Started Video", GettingStarted),
+                MenuItem::separator(),
                 MenuItem::action("Asylum Documentation", Documentation),
                 MenuItem::action("Open Log Folder", OpenLogFolder),
             ],
@@ -230,6 +233,13 @@ fn register(root: Entity<Root>, window: WindowHandle<Root>, cx: &mut App) {
 
     cx.on_action::<Documentation>(|_, _| open_url("https://github.com/wess/asylum"));
     cx.on_action::<OpenLogFolder>(|_, cx| cx.reveal_path(&logs::default_dir()));
+    cx.on_action::<GettingStarted>(move |_, cx| {
+        window
+            .update(cx, |root, window, cx| {
+                crate::tutorial::open(root, window, cx)
+            })
+            .ok();
+    });
 
     // Settings remains available during onboarding so executable paths can be
     // corrected before the first repository is opened.
