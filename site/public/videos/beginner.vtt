@@ -1,0 +1,924 @@
+WEBVTT
+Kind: captions
+Language: en
+
+1
+00:00:00.300 --> 00:00:01.589
+Welcome to Asylum.
+
+2
+00:00:01.589 --> 00:00:03.093
+Take this one slowly.
+
+3
+00:00:03.093 --> 00:00:06.888
+By the end of the video you will have a
+clear picture
+
+4
+00:00:06.888 --> 00:00:10.325
+of what this app is for, and you will be
+able to
+
+5
+00:00:10.325 --> 00:00:13.046
+finish one real piece of work with it.
+
+6
+00:00:13.046 --> 00:00:15.337
+You do not need to be an expert.
+
+7
+00:00:15.337 --> 00:00:17.342
+You do not need to know Git.
+
+8
+00:00:17.342 --> 00:00:21.137
+Every term gets explained the first time
+it turns up.
+
+9
+00:00:22.637 --> 00:00:26.151
+Here is the whole idea in its simplest
+form.
+
+10
+00:00:26.151 --> 00:00:30.942
+Imagine you ask three people to build the
+same small bridge.
+
+11
+00:00:30.942 --> 00:00:36.052
+If all three reach into one pile of
+blocks, their hands collide,
+
+12
+00:00:36.052 --> 00:00:39.885
+and afterwards nobody can tell who changed
+what.
+
+13
+00:00:39.885 --> 00:00:44.517
+So you give each person their own table,
+their own copy of
+
+14
+00:00:44.517 --> 00:00:47.871
+the blocks, and the same instruction card.
+
+15
+00:00:47.871 --> 00:00:52.901
+When they finish, you compare the bridges
+and you keep the best
+
+16
+00:00:52.901 --> 00:00:53.859
+one.
+
+17
+00:00:53.859 --> 00:00:59.449
+Asylum does exactly that, with coding
+assistants and the files in your
+
+18
+00:00:59.449 --> 00:01:00.407
+project.
+
+19
+00:01:01.907 --> 00:01:04.779
+Three words carry the entire app.
+
+20
+00:01:04.779 --> 00:01:09.565
+A project is your box of blocks, which in
+practice is a
+
+21
+00:01:09.565 --> 00:01:12.350
+folder of code on your computer.
+
+22
+00:01:12.350 --> 00:01:18.267
+A task is the instruction card, written in
+ordinary language, like a
+
+23
+00:01:18.267 --> 00:01:21.487
+note you would leave for a colleague.
+
+24
+00:01:21.487 --> 00:01:26.447
+A run is one assistant's attempt at that
+task, at its own
+
+25
+00:01:26.447 --> 00:01:27.492
+table.
+
+26
+00:01:27.492 --> 00:01:32.452
+Give one task to three assistants and you
+get three runs.
+
+27
+00:01:32.452 --> 00:01:34.105
+Project, task, run.
+
+28
+00:01:34.105 --> 00:01:37.934
+Everything else hangs off those three
+words.
+
+29
+00:01:39.434 --> 00:01:42.185
+The product is one loop, repeated.
+
+30
+00:01:42.185 --> 00:01:43.722
+You open a project.
+
+31
+00:01:43.722 --> 00:01:48.172
+You describe what should be true once the
+work is done.
+
+32
+00:01:48.172 --> 00:01:52.299
+One or more assistants go away and work
+separately.
+
+33
+00:01:52.299 --> 00:01:54.483
+You compare what came back.
+
+34
+00:01:54.483 --> 00:01:58.609
+Then you keep the best one, or you send a
+note back
+
+35
+00:01:58.609 --> 00:02:01.684
+and let a promising attempt try again.
+
+36
+00:02:01.684 --> 00:02:06.457
+Every screen in this app exists either to
+help you see that
+
+37
+00:02:06.457 --> 00:02:09.127
+loop, or to make it safer to run.
+
+38
+00:02:10.627 --> 00:02:12.317
+This works at any level.
+
+39
+00:02:12.317 --> 00:02:16.752
+If you are new to programming, use one
+assistant for your first
+
+40
+00:02:16.752 --> 00:02:20.131
+task and read the plain summary of what
+changed.
+
+41
+00:02:20.131 --> 00:02:24.707
+If you have been writing code for twenty
+years, the exact branch,
+
+42
+00:02:24.707 --> 00:02:29.001
+the folder on disk, the terminal output,
+and the line by line
+
+43
+00:02:29.001 --> 00:02:32.310
+difference are all right there in front of
+you.
+
+44
+00:02:32.310 --> 00:02:34.774
+It is the same workflow either way.
+
+45
+00:02:34.774 --> 00:02:38.434
+You are only choosing how far down you
+want to look.
+
+46
+00:02:39.934 --> 00:02:44.478
+The first time you open Asylum it runs a
+short check before
+
+47
+00:02:44.478 --> 00:02:45.864
+letting you start.
+
+48
+00:02:45.864 --> 00:02:50.177
+It looks for Git, which is the tool that
+keeps a history
+
+49
+00:02:50.177 --> 00:02:51.640
+of changes to code.
+
+50
+00:02:51.640 --> 00:02:56.876
+It looks for at least one coding assistant
+installed on this machine
+
+51
+00:02:56.876 --> 00:02:59.572
+that you have already signed in to.
+
+52
+00:02:59.572 --> 00:03:04.038
+And it checks that your project's own
+tools actually work.
+
+53
+00:03:04.038 --> 00:03:06.964
+Installed means the command was found.
+
+54
+00:03:06.964 --> 00:03:09.968
+Verified means it completed a real run.
+
+55
+00:03:09.968 --> 00:03:14.126
+Green here saves you from confusing
+failures later on.
+
+56
+00:03:15.626 --> 00:03:19.988
+This is the Tasks board, and it is where
+you will spend
+
+57
+00:03:19.988 --> 00:03:21.891
+nearly all of your time.
+
+58
+00:03:21.891 --> 00:03:26.491
+Down the left are your projects and the
+tasks inside them.
+
+59
+00:03:26.491 --> 00:03:31.487
+Across the top is the composer, which is
+where you describe new
+
+60
+00:03:31.487 --> 00:03:32.438
+work.
+
+61
+00:03:32.438 --> 00:03:37.514
+Underneath, every attempt appears as its
+own card, showing which
+
+62
+00:03:37.514 --> 00:03:41.796
+assistant made it, how long it took, and
+how it ended.
+
+63
+00:03:41.796 --> 00:03:45.365
+Nothing important is hidden behind a
+summary.
+
+64
+00:03:46.865 --> 00:03:50.804
+Now the part most people get wrong at the
+start.
+
+65
+00:03:50.804 --> 00:03:53.923
+Do not describe the steps you imagine.
+
+66
+00:03:53.923 --> 00:03:58.108
+Describe the result you want to be true
+afterwards.
+
+67
+00:03:58.108 --> 00:04:03.196
+Say what should change, name any rule that
+must not break, and
+
+68
+00:04:03.196 --> 00:04:07.136
+include something you can check when it is
+done.
+
+69
+00:04:07.136 --> 00:04:13.045
+Here I am asking for clearer validation
+messages, tests for two specific
+
+70
+00:04:13.045 --> 00:04:17.148
+bad inputs, and no change to the public
+interface.
+
+71
+00:04:17.148 --> 00:04:22.072
+Small and checkable beats large and vague
+every single time.
+
+72
+00:04:23.572 --> 00:04:27.550
+Below the box you pick which assistants
+get the job.
+
+73
+00:04:27.550 --> 00:04:30.381
+For your very first task, choose one.
+
+74
+00:04:30.381 --> 00:04:35.354
+Watch it work, read what it changed, and
+get comfortable with the
+
+75
+00:04:35.354 --> 00:04:36.731
+shape of the loop.
+
+76
+00:04:36.731 --> 00:04:41.704
+Later, when a problem has more than one
+sensible answer, pick two
+
+77
+00:04:41.704 --> 00:04:42.622
+or three.
+
+78
+00:04:42.622 --> 00:04:47.135
+Each one works alone and cannot see the
+others, so what you
+
+79
+00:04:47.135 --> 00:04:52.491
+get back are genuinely independent
+attempts rather than three versions
+
+80
+00:04:52.491 --> 00:04:53.409
+of one idea.
+
+81
+00:04:54.909 --> 00:04:59.992
+Because that choice comes up constantly,
+Asylum lets you save it.
+
+82
+00:04:59.992 --> 00:05:01.947
+A duel is two assistants.
+
+83
+00:05:01.947 --> 00:05:03.277
+A triad is three.
+
+84
+00:05:03.277 --> 00:05:07.109
+A swarm is a larger group, with a cap on
+how many
+
+85
+00:05:07.109 --> 00:05:09.064
+start at the same moment.
+
+86
+00:05:09.064 --> 00:05:13.600
+They are just named selections, and you
+can make your own.
+
+87
+00:05:13.600 --> 00:05:17.354
+There is also a limit on how many runs may
+go at
+
+88
+00:05:17.354 --> 00:05:22.672
+once across the whole app, which protects
+both your machine and your
+
+89
+00:05:22.672 --> 00:05:23.923
+usage allowance.
+
+90
+00:05:25.423 --> 00:05:29.867
+When you start the task, Asylum does the
+setup for you.
+
+91
+00:05:29.867 --> 00:05:34.958
+Each assistant is given its own branch and
+its own private copy
+
+92
+00:05:34.958 --> 00:05:36.735
+of the project folder.
+
+93
+00:05:36.735 --> 00:05:40.694
+Then each one is launched with your
+instructions.
+
+94
+00:05:40.694 --> 00:05:45.461
+From this moment they are all working at
+the same time, and
+
+95
+00:05:45.461 --> 00:05:50.067
+not one of them can disturb the others, or
+the folder you
+
+96
+00:05:50.067 --> 00:05:51.441
+actually work in.
+
+97
+00:05:52.941 --> 00:05:58.455
+This is the part worth understanding
+properly, because it is what makes
+
+98
+00:05:58.455 --> 00:06:00.086
+everything else safe.
+
+99
+00:06:00.086 --> 00:06:02.882
+A branch is a named line of changes.
+
+100
+00:06:02.882 --> 00:06:07.697
+A worktree is a second, separate copy of
+your project on disk,
+
+101
+00:06:07.697 --> 00:06:10.415
+checked out from that same history.
+
+102
+00:06:10.415 --> 00:06:14.221
+That is the separate table from the bridge
+story.
+
+103
+00:06:14.221 --> 00:06:18.959
+Three assistants can edit the very same
+file at the very same
+
+104
+00:06:18.959 --> 00:06:23.308
+second, because each one is touching its
+own copy of it.
+
+105
+00:06:23.308 --> 00:06:26.259
+Your original folder is never in play.
+
+106
+00:06:27.759 --> 00:06:32.328
+Each card shows two things that sound
+similar and are not.
+
+107
+00:06:32.328 --> 00:06:34.533
+Status is about the process.
+
+108
+00:06:34.533 --> 00:06:38.392
+Queued, running, succeeded, failed, or
+cancelled.
+
+109
+00:06:38.392 --> 00:06:42.803
+Activity is about what the assistant is
+doing right now.
+
+110
+00:06:42.803 --> 00:06:45.323
+Working, blocked, done, or idle.
+
+111
+00:06:45.323 --> 00:06:49.970
+Succeeded only means the program finished
+without an error.
+
+112
+00:06:49.970 --> 00:06:53.042
+It does not mean the change is correct.
+
+113
+00:06:53.042 --> 00:06:58.003
+Hold on to that distinction, because it is
+the one that catches
+
+114
+00:06:58.003 --> 00:06:58.949
+people out.
+
+115
+00:07:00.449 --> 00:07:03.551
+Orange, blocked, is the one to watch for.
+
+116
+00:07:03.551 --> 00:07:08.695
+It means the assistant has stopped, asked
+a question, and is waiting
+
+117
+00:07:08.695 --> 00:07:10.360
+on an answer from you.
+
+118
+00:07:10.360 --> 00:07:15.126
+Open that run and you see the whole
+conversation, exactly as if
+
+119
+00:07:15.126 --> 00:07:17.623
+you were sitting at its terminal.
+
+120
+00:07:17.623 --> 00:07:19.741
+Answer it and it carries on.
+
+121
+00:07:19.741 --> 00:07:23.751
+If it has gone off in the wrong direction,
+cancel it.
+
+122
+00:07:23.751 --> 00:07:28.215
+Its files are kept either way, so nothing
+you might want is
+
+123
+00:07:28.215 --> 00:07:29.122
+thrown away.
+
+124
+00:07:30.622 --> 00:07:33.605
+Once an attempt finishes, open Review.
+
+125
+00:07:33.605 --> 00:07:37.764
+What you are looking at is a diff, which
+just means a
+
+126
+00:07:37.764 --> 00:07:38.706
+comparison.
+
+127
+00:07:38.706 --> 00:07:40.511
+Green lines were added.
+
+128
+00:07:40.511 --> 00:07:42.552
+Red lines were taken away.
+
+129
+00:07:42.552 --> 00:07:47.026
+Grey lines did not change and are only
+there for context.
+
+130
+00:07:47.026 --> 00:07:50.793
+You can read it as one column, or as two
+side by
+
+131
+00:07:50.793 --> 00:07:51.735
+side.
+
+132
+00:07:51.735 --> 00:07:53.304
+Ask three questions.
+
+133
+00:07:53.304 --> 00:07:55.423
+Did the right files change.
+
+134
+00:07:55.423 --> 00:07:56.993
+Is anything missing.
+
+135
+00:07:56.993 --> 00:07:59.819
+Did something unrelated get touched.
+
+136
+00:07:59.819 --> 00:08:02.330
+A confident summary is pleasant.
+
+137
+00:08:02.330 --> 00:08:04.763
+The difference is the evidence.
+
+138
+00:08:06.263 --> 00:08:09.905
+You do not have to read code to judge an
+attempt.
+
+139
+00:08:09.905 --> 00:08:14.884
+Press checks, and Asylum finds your
+project's own commands for type
+
+140
+00:08:14.884 --> 00:08:19.789
+checking, linting, and tests, then runs
+them inside that attempt's
+
+141
+00:08:19.789 --> 00:08:20.903
+private folder.
+
+142
+00:08:20.903 --> 00:08:25.660
+Passing is real evidence, because it is
+your project's own rules
+
+143
+00:08:25.660 --> 00:08:27.518
+agreeing with the change.
+
+144
+00:08:27.518 --> 00:08:29.375
+Failing blocks the merge.
+
+145
+00:08:29.375 --> 00:08:33.686
+If you are still learning to read code,
+treat this as your
+
+146
+00:08:33.686 --> 00:08:37.550
+health signal first, and read the
+difference second.
+
+147
+00:08:39.050 --> 00:08:42.745
+If an attempt is close but not right, you
+do not have
+
+148
+00:08:42.745 --> 00:08:43.861
+to throw it out.
+
+149
+00:08:43.861 --> 00:08:48.531
+Click the exact line and write what should
+be different in ordinary
+
+150
+00:08:48.531 --> 00:08:49.368
+language.
+
+151
+00:08:49.368 --> 00:08:52.784
+Your note is attached to that file and
+that line.
+
+152
+00:08:52.784 --> 00:08:57.036
+Send your notes back and the same
+assistant carries on in the
+
+153
+00:08:57.036 --> 00:09:00.731
+same folder, keeping everything it already
+got right.
+
+154
+00:09:00.731 --> 00:09:04.774
+Review becomes a short conversation rather
+than a verdict.
+
+155
+00:09:06.274 --> 00:09:11.119
+When one attempt is clearly the strongest,
+you merge it, which means
+
+156
+00:09:11.119 --> 00:09:14.539
+folding its changes back into your real
+project.
+
+157
+00:09:14.539 --> 00:09:19.027
+Asylum shows you what is about to happen
+before it happens, and
+
+158
+00:09:19.027 --> 00:09:21.165
+then waits for you to confirm.
+
+159
+00:09:21.165 --> 00:09:23.017
+Nothing merges on its own.
+
+160
+00:09:23.017 --> 00:09:27.506
+The attempts you did not keep stay exactly
+where they are until
+
+161
+00:09:27.506 --> 00:09:32.493
+you clear them out, so changing your mind
+afterwards costs you nothing
+
+162
+00:09:32.493 --> 00:09:33.348
+at all.
+
+163
+00:09:34.848 --> 00:09:39.815
+Now Devpipe, which answers a problem you
+meet the moment the work
+
+164
+00:09:39.815 --> 00:09:40.732
+gets real.
+
+165
+00:09:40.732 --> 00:09:42.795
+Your project needs secrets.
+
+166
+00:09:42.795 --> 00:09:46.922
+Keys for services, addresses for
+databases, and so on.
+
+167
+00:09:46.922 --> 00:09:52.041
+The unsafe habit is pasting them into
+files and prompts, where they
+
+168
+00:09:52.041 --> 00:09:55.174
+end up in places you cannot fully recall.
+
+169
+00:09:55.174 --> 00:09:57.773
+Devpipe is an account level vault.
+
+170
+00:09:57.773 --> 00:10:03.198
+Asylum reads it through, and never copies
+it onto this machine, because
+
+171
+00:10:03.198 --> 00:10:08.165
+two copies of one secret eventually
+disagree about whether it was
+
+172
+00:10:08.165 --> 00:10:09.082
+deleted.
+
+173
+00:10:10.582 --> 00:10:12.705
+Entries come in two kinds.
+
+174
+00:10:12.705 --> 00:10:18.419
+Values, which are ordinary settings, and
+secrets, which are protected.
+
+175
+00:10:18.419 --> 00:10:20.460
+Each one sits at a level.
+
+176
+00:10:20.460 --> 00:10:24.951
+Your whole account, a single workspace, or
+one machine.
+
+177
+00:10:24.951 --> 00:10:29.767
+When the same name appears twice, the
+narrowest level wins.
+
+178
+00:10:29.767 --> 00:10:35.319
+And a machine cannot read a secret merely
+because the secret exists.
+
+179
+00:10:35.319 --> 00:10:38.911
+You grant that machine that secret, by
+name.
+
+180
+00:10:38.911 --> 00:10:42.993
+So an assistant can use a key to make a
+real call,
+
+181
+00:10:42.993 --> 00:10:48.626
+without ever being shown the key, and
+without getting to choose where
+
+182
+00:10:48.626 --> 00:10:49.605
+it is sent.
+
+183
+00:10:51.105 --> 00:10:55.982
+Worth gathering the safety rails in one
+place, because they are the
+
+184
+00:10:55.982 --> 00:10:58.675
+reason you can relax while this runs.
+
+185
+00:10:58.675 --> 00:11:02.095
+Every attempt is isolated, so nothing
+collides.
+
+186
+00:11:02.095 --> 00:11:04.716
+Nothing is merged unless you say so.
+
+187
+00:11:04.716 --> 00:11:09.738
+A project cannot run its own setup
+commands until you have explicitly
+
+188
+00:11:09.738 --> 00:11:10.611
+trusted it.
+
+189
+00:11:10.611 --> 00:11:13.741
+Secrets are resolved outside the
+assistant.
+
+190
+00:11:13.741 --> 00:11:17.889
+And every action leaves a record you can
+go back and read
+
+191
+00:11:17.889 --> 00:11:18.762
+afterwards.
+
+192
+00:11:20.262 --> 00:11:22.196
+That is the entire loop.
+
+193
+00:11:22.196 --> 00:11:23.404
+Open a project.
+
+194
+00:11:23.404 --> 00:11:28.318
+Write one small task with something you
+can check at the end.
+
+195
+00:11:28.318 --> 00:11:30.734
+Give it to a single assistant.
+
+196
+00:11:30.734 --> 00:11:32.345
+Read the difference.
+
+197
+00:11:32.345 --> 00:11:33.553
+Run the checks.
+
+198
+00:11:33.553 --> 00:11:37.500
+Then merge it, or send a note back and let
+it try
+
+199
+00:11:37.500 --> 00:11:38.467
+once more.
+
+200
+00:11:38.467 --> 00:11:43.300
+Do that one time today, on something small
+and low risk, and
+
+201
+00:11:43.300 --> 00:11:47.328
+every other part of this app will fall
+into place.
+
+202
+00:11:47.328 --> 00:11:48.939
+Thanks for watching.

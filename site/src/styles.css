@@ -1948,6 +1948,16 @@ svg {
   padding-block: 80px 140px;
 }
 
+/* A single-video section sitting between the hero and the course, so the two
+   do not stack their full section padding against each other. */
+.curriculum.compact {
+  padding-block: 0 30px;
+}
+
+.curriculum.compact .videotheater {
+  margin-top: 26px;
+}
+
 .curriculum > header a {
   display: inline-flex;
   align-items: center;
