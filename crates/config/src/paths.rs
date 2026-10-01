@@ -32,6 +32,10 @@ pub fn settings_path() -> PathBuf {
 /// `~/Library/Application Support/asylum` on macOS, `$XDG_DATA_HOME/asylum`
 /// (or `~/.local/share/asylum`) elsewhere.
 pub fn data_dir() -> PathBuf {
+  // A separate data folder, for demos and screenshots that mustn't touch real data.
+  if let Some(dir) = std::env::var_os("ASYLUM_DATA").filter(|v| !v.is_empty()) {
+    return PathBuf::from(dir);
+  }
   if cfg!(target_os = "macos") {
     return home().join("Library/Application Support").join(APP);
   }

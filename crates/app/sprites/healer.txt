@@ -1,0 +1,18 @@
+# Healer
+# primary=#f2efe8 accent=#b83b3b hair=#e6a23c skin=#f6d2b5
+................
+....oooooooo....
+...oPppppppPo...
+..oPppppppppPo..
+..oPpaaaaaapPoo.
+..opahhhhhhaogo.
+..opsssssssspb..
+..opsessssespb..
+...ossssssssob..
+..oppppppppppb..
+.opPppppppppPbo.
+.osPppppppppPbo.
+..oppppppppppb..
+..oapapaapapab..
+..oApApAApApAb..
+...obbo..obbob..

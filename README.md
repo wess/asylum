@@ -11,8 +11,9 @@ anything consequential.
 
 ## Features
 
-- **Agents** — name, label, standing instructions, avatars (built, generated, or
-  uploaded), per-Agent model, notifications, pin/hide/sections/duplicate.
+- **Agents** — name, label, standing instructions, pixel-sprite avatars (eight
+  classes in your colors) or generated or uploaded images, per-Agent model,
+  notifications, pin/hide/sections/duplicate.
 - **Chat** — streaming replies with tool activity; threads, reactions, find,
   attachments (drag, paste, pick), `@` mentions and `/` skills, and optional
   dictation and live voice chat; group chats of 2–6 Agents with mention routing.

@@ -7,6 +7,7 @@ mod avatar;
 mod cards;
 mod chat;
 mod cli;
+mod demo;
 mod composer;
 mod computer;
 mod details;

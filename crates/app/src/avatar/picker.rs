@@ -1,7 +1,7 @@
-//! The avatar picker: build a character (shapes, eyes, accessories,
-//! colors), generate one from a prompt, or upload an image (under 25 MB).
+//! The avatar picker: pick a sprite class and its colors, generate one from
+//! a prompt, or upload an image (under 25 MB).
 
-use super::character::{self, Spec};
+use super::sprite::{self, Spec};
 use crate::i18n::t;
 use crate::root::Root;
 use crate::theme::ink;
@@ -33,12 +33,12 @@ pub fn open(root: &mut Root, bot: &str, window: &mut Window, cx: &mut Context<Ro
   let rt = root.rt.clone();
   let weak = cx.entity().downgrade();
   let view = cx.new(|cx| {
-    let tabs = cx.new(|cx| SegmentedControl::new(cx).data([t("Agent"), t("Generate"), t("Upload")]).selected(0).size(Size::Sm));
+    let tabs = cx.new(|cx| SegmentedControl::new(cx).data([t("Character"), t("Generate"), t("Upload")]).selected(0).size(Size::Sm));
     let sub = cx.subscribe(&tabs, |this: &mut Picker, _, ev: &SegmentedControlEvent, cx| {
       this.tab = ev.0;
       cx.notify();
     });
-    let spec = b.avatar.strip_prefix("bot:").map(character::parse).unwrap_or_default();
+    let spec = b.avatar.strip_prefix("sprite:").map(sprite::parse).unwrap_or_else(|| sprite::of_class(sprite::CLASSES[0].id));
     let prompt = cx.new(|cx| TextInput::new(cx).placeholder(t("A friendly robot with round glasses, flat illustration")));
     let _ = window;
     Picker { rt, root: weak, bot: b, tabs, tab: 0, spec, prompt, preview: None, busy: false, error: None, _sub: sub }
@@ -112,14 +112,50 @@ impl Picker {
   }
 }
 
-fn options(label: &'static str, values: &'static [&'static str], current: &str, cx: &mut Context<Picker>, set: fn(&mut Spec, &str)) -> impl IntoElement {
+/// One class: its sprite in its own colors, with its name under it.
+fn class(c: &'static sprite::Class, on: bool, cx: &mut Context<Picker>) -> impl IntoElement {
   let ink = ink(cx);
-  let mut row = div().flex().flex_wrap().gap(px(4.0)).items_center().child(div().w(px(84.0)).text_size(px(12.0)).text_color(ink.dimmed).child(t(label)));
+  let face = sprite::format(&sprite::of_class(c.id));
+  div()
+    .id(SharedString::from(format!("class-{}", c.id)))
+    .w(px(96.0))
+    .flex()
+    .flex_col()
+    .items_center()
+    .gap(px(4.0))
+    .py(px(8.0))
+    .rounded(px(8.0))
+    .border_1()
+    .cursor_pointer()
+    .border_color(if on { ink.primary } else { ink.border })
+    .when(on, |d| d.bg(ink.primary.opacity(0.12)))
+    .hover(|d| d.bg(ink.surface))
+    .child(sprite::render(face.trim_start_matches("sprite:"), 48.0))
+    .child(div().text_size(px(12.0)).when(on, |d| d.font_weight(gpui::FontWeight::SEMIBOLD)).child(t(c.label)))
+    .on_click(cx.listener(move |this, _, _, cx| {
+      // A new class starts in its own colors but keeps the chosen skin.
+      let skin = this.spec.skin.clone();
+      this.spec = sprite::of_class(c.id);
+      this.spec.skin = skin;
+      cx.notify();
+    }))
+}
+
+/// A row of color swatches for one part of the sprite.
+fn swatches(label: &'static str, values: &'static [&'static str], current: &str, cx: &mut Context<Picker>, set: fn(&mut Spec, &str)) -> impl IntoElement {
+  let ink = ink(cx);
+  let mut row = div().flex().flex_wrap().gap(px(6.0)).items_center().child(div().w(px(64.0)).text_size(px(12.0)).text_color(ink.dimmed).child(t(label)));
   for v in values {
-    let on = *v == current;
+    let on = v.eq_ignore_ascii_case(current);
     row = row.child(
-      crate::details::profile::chip(SharedString::from(format!("{label}-{v}")), if label == "Color" { "●".into() } else { t(v).into() }, on, &ink)
-        .when(label == "Color", |d| d.text_color(guise::Color::hex(v).hsla()))
+      div()
+        .id(SharedString::from(format!("{label}-{v}")))
+        .size(px(22.0))
+        .rounded_full()
+        .cursor_pointer()
+        .bg(guise::Color::hex(v).hsla())
+        .border_2()
+        .border_color(if on { ink.text } else { ink.border })
         .on_click(cx.listener(move |this, _, _, cx| {
           set(&mut this.spec, v);
           cx.notify();
@@ -137,16 +173,21 @@ impl Render for Picker {
     let mut body = div().flex().flex_col().gap(px(10.0)).child(self.tabs.clone());
     match self.tab {
       0 => {
-        preview_bot.avatar = character::format(&self.spec);
+        preview_bot.avatar = sprite::format(&self.spec);
         let spec = self.spec.clone();
+        let mut classes = div().flex().flex_wrap().gap(px(8.0)).justify_center();
+        for c in &sprite::CLASSES {
+          classes = classes.child(class(c, c.id == spec.class, cx));
+        }
         body = body
-          .child(div().flex().justify_center().py(px(8.0)).child(super::face(&preview_bot, 96.0, cx)))
-          .child(options("Shape", &character::SHAPES, &spec.shape, cx, |s, v| s.shape = v.into()))
-          .child(options("Eyes", &character::EYES, &spec.eyes, cx, |s, v| s.eyes = v.into()))
-          .child(options("Accessory", &character::ACCESSORIES, &spec.accessory, cx, |s, v| s.accessory = v.into()))
-          .child(options("Color", &character::TONES, &spec.tone, cx, |s, v| s.tone = v.into()))
+          .child(div().flex().justify_center().py(px(6.0)).child(super::face(&preview_bot, 112.0, cx)))
+          .child(classes)
+          .child(swatches("Clothes", &sprite::CLOTH, &spec.primary, cx, |s, v| s.primary = v.into()))
+          .child(swatches("Trim", &sprite::CLOTH, &spec.accent, cx, |s, v| s.accent = v.into()))
+          .child(swatches("Hair", &sprite::HAIR, &spec.hair, cx, |s, v| s.hair = v.into()))
+          .child(swatches("Skin", &sprite::SKIN, &spec.skin, cx, |s, v| s.skin = v.into()))
           .child(Button::new("set-char", t("Set avatar")).on_click(cx.listener(|this, _, w, cx| {
-            let a = character::format(&this.spec);
+            let a = sprite::format(&this.spec);
             this.set(a, w, cx);
           })));
       }
@@ -215,7 +256,7 @@ impl Render for Picker {
     div().absolute().top_0().left_0().size_full().child(
       Modal::new()
         .title(t("Avatar"))
-        .width(460.0)
+        .width(480.0)
         .on_close(move |_, w, cx| {
           let _ = root.update(cx, |r, cx| r.close_modal(w, cx));
         })

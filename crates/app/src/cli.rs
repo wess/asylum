@@ -106,6 +106,16 @@ pub fn dispatch(args: &[String], rt: &agent::Runtime) -> Option<i32> {
         }
       }
     })),
+    Some("demo") => Some(match tk::runtime().block_on(crate::demo::seed(rt)) {
+      Ok(()) => {
+        println!("demo data written to {}", config::data_dir().display());
+        0
+      }
+      Err(e) => {
+        eprintln!("{e}");
+        1
+      }
+    }),
     _ => None,
   }
 }

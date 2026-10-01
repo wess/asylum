@@ -114,7 +114,7 @@ pub async fn expire_stale(pool: &Pool, at: i64) -> Result<Vec<Approval>> {
 /// Anything still pending when the app last quit can no longer resume.
 pub async fn cancel_all(pool: &Pool) -> Result<u64> {
   Ok(
-    sqlx::query("UPDATE approvals SET status = 'canceled', decided = ? WHERE status = 'pending'")
+    sqlx::query("UPDATE approvals SET status = 'canceled', decided = ? WHERE status = 'pending' AND run_id IS NOT NULL")
       .bind(now())
       .execute(pool)
       .await?

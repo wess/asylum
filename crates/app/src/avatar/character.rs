@@ -1,12 +1,10 @@
-//! Constructed Bot characters: simple shapes and expressive eyes. A spec is
-//! `shape=round;eyes=dots;accessory=antenna;tone=#hex`.
+//! The original constructed characters ("bot:" specs): simple shapes and
+//! expressive eyes. New avatars are sprites; these still render for Agents
+//! that have one. A spec is `shape=round;eyes=dots;accessory=antenna;tone=#hex`.
 
 use gpui::prelude::*;
 use gpui::{div, px, Hsla, IntoElement};
 
-pub const SHAPES: [&str; 4] = ["round", "square", "tall", "wide"];
-pub const EYES: [&str; 5] = ["dots", "ovals", "happy", "wink", "visor"];
-pub const ACCESSORIES: [&str; 5] = ["none", "antenna", "bow", "halo", "headset"];
 pub const TONES: [&str; 8] = ["#7c5cff", "#ff6b6b", "#1fb6ff", "#13ce66", "#ffb020", "#ff49db", "#00c2a8", "#8e44ad"];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -37,10 +35,6 @@ pub fn parse(spec: &str) -> Spec {
     }
   }
   s
-}
-
-pub fn format(s: &Spec) -> String {
-  format!("bot:shape={};eyes={};accessory={};tone={}", s.shape, s.eyes, s.accessory, s.tone)
 }
 
 pub fn render(spec: &str, size: f32, _bg: Hsla) -> impl IntoElement {

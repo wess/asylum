@@ -1,9 +1,12 @@
-//! A Bot's face: an uploaded or generated image, an emoji, a constructed
-//! character ("bot:" spec), or its initial on its color — with a ring that
-//! animates by state: working pulses, waiting glows amber, done shows a dot.
+//! An Agent's face: an uploaded or generated image, a pixel sprite
+//! ("sprite:" spec; Agents without an avatar get one picked from their id),
+//! an older constructed character ("bot:"), an emoji, or its initial — with
+//! a ring that animates by state: working pulses, waiting glows amber, done
+//! shows a dot.
 
 pub mod character;
 pub mod picker;
+pub mod sprite;
 
 use crate::theme::ink;
 use gpui::prelude::*;
@@ -51,6 +54,9 @@ pub fn face(bot: &Bot, size: f32, cx: &App) -> gpui::AnyElement {
       .child(gpui::img(std::path::PathBuf::from(&bot.avatar)).size(px(size)).object_fit(ObjectFit::Cover))
       .into_any_element();
   }
+  if let Some(spec) = bot.avatar.strip_prefix("sprite:") {
+    return base.bg(bg.opacity(0.42)).child(sprite::render(spec, size * 0.95)).into_any_element();
+  }
   if let Some(spec) = bot.avatar.strip_prefix("bot:") {
     return base.bg(bg).child(character::render(spec, size, bg)).into_any_element();
   }
@@ -60,6 +66,10 @@ pub fn face(bot: &Bot, size: f32, cx: &App) -> gpui::AnyElement {
       .text_size(px(size * 0.55))
       .child(SharedString::from(bot.avatar.clone()))
       .into_any_element();
+  }
+  if bot.avatar.trim().is_empty() && !bot.id.is_empty() {
+    let spec = sprite::format(&sprite::auto(&bot.id));
+    return base.bg(bg.opacity(0.42)).child(sprite::render(spec.trim_start_matches("sprite:"), size * 0.95)).into_any_element();
   }
   base
     .bg(bg)

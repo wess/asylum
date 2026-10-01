@@ -235,3 +235,9 @@ mod tests;
 pub async fn activity(pool: &Pool, since: i64) -> Result<(i64, i64)> {
   Ok(sqlx::query_as("SELECT COUNT(*), COUNT(DISTINCT chat_id) FROM messages WHERE created >= ?").bind(since).fetch_one(pool).await?)
 }
+
+/// Backdate a message (demo data).
+pub async fn set_created(pool: &Pool, id: &str, at: i64) -> Result<()> {
+  sqlx::query("UPDATE messages SET created = ? WHERE id = ?").bind(at).bind(id).execute(pool).await?;
+  Ok(())
+}

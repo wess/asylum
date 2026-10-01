@@ -36,7 +36,7 @@ Legend: **✓** built · **≈** built as a local design (how, below) · **—**
 
 | Feature | | Notes |
 |---|---|---|
-| Name, label, description, avatar (built, generated, or uploaded) | ✓ | |
+| Name, label, description, avatar | ✓ | A pixel sprite (eight classes, your colors), a generated image, or an upload |
 | Per-Agent provider and model | ✓ | One Agent on GPT, another on Opus, in the same group chat |
 | Pin, hide, sections, duplicate, rename, delete | ✓ | |
 | Templates by link, public or team-only | ✓ | `asylum://template/…`, previewed with warnings and terms before adding |

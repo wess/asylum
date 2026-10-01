@@ -40,6 +40,7 @@ scripts/dmg.sh                    # dist/Asylum.dmg (needs bundle first); with
                                   # CODESIGN_IDENTITY + NOTARY_PROFILE it signs,
                                   # notarizes, and staples
 scripts/icon.sh                   # regenerate assets/icon.{png,icns}
+scripts/sprites.py                # export Agent sprites to site/assets/sprites
 ```
 
 Each crate keeps tests in a sibling `tests/` directory mirroring `src/`. Every

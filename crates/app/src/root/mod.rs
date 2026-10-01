@@ -324,6 +324,11 @@ impl Render for Root {
         self.open_item(&item, window, cx);
         match self.startup.take().as_deref() {
           Some("details") => self.show_details(window, cx),
+          Some("avatar") => {
+            if let crate::state::Item::Bot(id) = &item {
+              crate::avatar::picker::open(self, id, window, cx);
+            }
+          }
           Some("computer") => {
             self.show_computer(window, cx);
             if let (Ok(url), Some(p)) = (std::env::var("ASYLUM_URL"), self.panel.clone()) {
@@ -428,7 +433,7 @@ pub fn open(rt: Runtime, cx: &mut App) -> anyhow::Result<gpui::WindowHandle<Root
 
 /// Dev hook for screenshots without driving input: `ASYLUM_SHOW` names a
 /// screen to open at launch — `settings:<page>`, `market`, `new`, `palette`,
-/// `about`, `web[:<url>]`, or `bot:<name>[:details|:computer]`.
+/// `about`, `web[:<url>]`, or `bot:<name>[:details|:computer|:avatar]`.
 fn show(root: &mut Root, window: &mut Window, cx: &mut Context<Root>) {
   let Ok(spec) = std::env::var("ASYLUM_SHOW") else { return };
   // `web:<url or workspace/path>` opens the built-in browser.

@@ -1,0 +1,18 @@
+# Sage
+# primary=#6b3fa0 accent=#3b3f8f hair=#d8d8d8 skin=#f2c7a0
+................
+....oooooooo....
+...oaaaaaaaao...
+..oaaaaaaaaaao..
+..oahhhhhhhhao..
+..oassssssssao..
+..oasessssesao..
+..oassssssssao..
+...owwwwwwwwo...
+..opwwwwwwwwpo..
+.opppwwwwwwpppo.
+.osPpppwwpppPso.
+..oaaaaaaaaaao..
+..oPppppppppPo..
+..oPppppppppPo..
+...obbo..obbo...

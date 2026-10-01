@@ -48,6 +48,8 @@ def extract():
             found.add(m.group(1))
         for m in re.finditer(r'\((?:Tab::\w+|"\w+"), ' + LIT + r'(?:, IconName::\w+)?\)', text):
             found.add(m.group(1))
+        for m in re.finditer(r"swatches\(" + LIT, text):
+            found.add(m.group(1))
         for m in re.finditer(r'label: ' + LIT, text):
             found.add(m.group(1))
     catalog = open(os.path.join(root, "crates/agent/src/catalog.rs")).read()
