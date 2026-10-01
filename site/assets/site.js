@@ -4,10 +4,10 @@ document.querySelectorAll('[data-copy]').forEach((button) => {
     if (!code) return;
     try {
       await navigator.clipboard.writeText(code.textContent);
-      button.textContent = 'copied';
+      button.textContent = 'Copied';
     } catch {
-      button.textContent = 'select and copy';
+      button.textContent = 'Select and copy';
     }
-    window.setTimeout(() => { button.textContent = 'copy'; }, 1200);
+    window.setTimeout(() => { button.textContent = 'Copy'; }, 1200);
   });
 });

@@ -1,8 +1,6 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="A hands-on Asylum tutorial: install, connect a model, hire your first Agent, approve its work, give it a routine, and build a team."><title>Asylum tutorial</title><link rel="canonical" href="https://wess.io/asylum/tutorial/"><link rel="stylesheet" href="../assets/site.css"><link rel="icon" type="image/svg+xml" sizes="any" href="../assets/favicon.svg"></head>
-<body><a class="skip" href="#main">skip to content</a><div class="shell">
-<div class="topline"><strong>ASYLUM :: TUTORIAL</strong><nav aria-label="Main navigation"><a href="../">Home</a><a aria-current="page" href="./">Tutorial</a><a href="../docs/">Docs</a><a href="../admin/">Admin</a><a href="https://github.com/wess/asylum/releases">Download</a><a href="https://github.com/wess/asylum">Source</a></nav></div>
-<main id="main" class="content">
-<header><p class="eyebrow">First run · about 30 minutes</p><h1>Hire your first Agent.</h1><p class="lede">From a fresh install to a small team of Agents that research, run on a schedule, hand work to each other, and ask before they act. Every step works with a free local model.</p></header>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="A hands-on Asylum tutorial: install, connect a model, hire your first Agent, approve its work, give it a routine, and build a team."><title>Asylum tutorial</title><link rel="canonical" href="https://wess.io/asylum/tutorial/"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"><link rel="stylesheet" href="../assets/site.css"><link rel="icon" type="image/svg+xml" sizes="any" href="../assets/favicon.svg"></head>
+<body><a class="skip" href="#main">skip to content</a><header class="site-header"><div class="wrap"><a class="brand" href="../"><span class="mark"><img src="../assets/sprites/warrior.png" width="16" height="16" alt=""></span>Asylum</a><nav class="site-nav" aria-label="Main"><a href="../tutorial/" aria-current="page" class="hide-sm">Tutorial</a><a href="../docs/">Docs</a><a href="../admin/" class="hide-sm">Admin</a><a href="https://github.com/wess/asylum" class="hide-sm">GitHub</a><a class="button small" href="https://github.com/wess/asylum/releases/latest">Download</a></nav></div></header>
+<main id="main"><section class="page-head"><div class="wrap"><p class="eyebrow">First run · about 30 minutes</p><h1>Hire your first Agent.</h1><p class="lede">From a fresh install to a small team of Agents that research, run on a schedule, hand work to each other, and ask before they act. Every step works with a free local model.</p></div></section><div class="wrap content steps">
 
 <div class="callout tip">You'll need a Mac running macOS 11 or later and Chrome, Edge, Chromium, or Brave installed — the Agents' computer drives that browser. For a free local model, install <a href="https://ollama.com">Ollama</a> and run <code>ollama pull qwen3:8b</code> first.</div>
 
@@ -38,6 +36,7 @@ scripts/bundle.sh && scripts/dmg.sh    # or dist/Asylum.app and dist/Asylum.dmg<
 ergonomics, and ecosystem. Cite your sources.</code></pre>
 <p>Watch the reply stream in. Each tool the Agent uses — <code>web_search</code>, <code>fetch_url</code>, <code>browser_open</code> — shows up inline; click one to see what went in and what came back. Link cards preview the page when you hover.</p>
 <p>The Agent's <strong>description</strong> holds lasting rules. Open <strong>Agent settings</strong> (<kbd>⌘⇧,</kbd>) and add one: <em>"Always end with a one-line recommendation."</em> Put task-specific instructions in messages instead.</p>
+<p>While you're there, click its avatar to pick a <strong>class</strong> — Warrior, Knight, Wizard, Healer, Thief, Monk, Ranger, or Sage — and choose its clothes, trim, hair, and skin colors.</p>
 </div></section>
 
 <section class="step"><div class="stepnum">05</div><div><h2>Watch its computer, then take over</h2>
@@ -97,7 +96,5 @@ two-paragraph summary.</code></pre>
 </div></section>
 
 <div class="callout">Next: the <a href="../docs/">manual</a> covers every setting, tool, and limit, and the <a href="../admin/">admin guide</a> covers managing Asylum across an organization.</div>
-</main>
-<div class="statusline"><span>tutorial</span><span>13 steps</span><span>complete</span></div>
-<footer><span>Asylum 0.1.0 · Apache-2.0</span><span><a href="../docs/">manual</a> · <a href="https://github.com/wess/asylum/issues">report an issue</a></span></footer>
-</div><script src="../assets/site.js"></script></body></html>
+</div></main>
+<footer class="site-footer"><div class="wrap"><span>Asylum 0.1.0 · Apache-2.0</span><span><a href="../tutorial/">Tutorial</a> · <a href="../docs/">Docs</a> · <a href="../admin/">Admin</a> · <a href="https://github.com/wess/asylum">GitHub</a></span></div></footer><script src="../assets/site.js"></script></body></html>
