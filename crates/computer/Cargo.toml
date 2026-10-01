@@ -1,0 +1,22 @@
+[package]
+autotests = false
+name = "computer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "A Bot's persistent computer: confined filesystem, shell, web, and a real browser over CDP."
+
+[dependencies]
+anyhow.workspace = true
+base64 = "0.22"
+chromiumoxide = "0.9"
+futures.workspace = true
+html2text = "0.17"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip"] }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+urlencoding = "2"
+
+[dev-dependencies]
+tempfile = "3"

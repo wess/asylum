@@ -1,0 +1,13 @@
+[package]
+autotests = false
+name = "schedule"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Routine timing: cron evaluation in a timezone, intervals, and plain-English descriptions."
+
+[dependencies]
+anyhow.workspace = true
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10"
+iana-time-zone = "0.1"

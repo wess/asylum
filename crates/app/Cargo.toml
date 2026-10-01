@@ -1,0 +1,42 @@
+[package]
+autotests = false
+name = "app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Always-on AI teammates with their own computer"
+
+# The bin target is `asylumdev`: a dev build never collides with an installed
+# `asylum`. scripts/bundle.sh installs this same binary as `asylum`.
+[[bin]]
+name = "asylumdev"
+path = "src/main.rs"
+
+[dependencies]
+agent = { path = "../agent" }
+anyhow.workspace = true
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10"
+computer = { path = "../computer" }
+config = { path = "../config" }
+futures.workspace = true
+gpui.workspace = true
+gpui_platform.workspace = true
+guise-ui.workspace = true
+libsinclair.workspace = true
+grok = { path = "../grok" }
+mcp = { path = "../mcp" }
+provider = { path = "../provider" }
+schedule = { path = "../schedule" }
+serde.workspace = true
+serde_json.workspace = true
+store = { path = "../store" }
+tokio.workspace = true
+voice = { path = "../voice" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
+objc2 = { version = "0.6", features = ["exception"] }
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSDockTile", "NSResponder"] }
+objc2-foundation = { version = "0.3", features = ["NSGeometry", "NSBundle", "NSString", "NSError"] }
+objc2-user-notifications = { version = "0.3", features = ["block2", "UNUserNotificationCenter", "UNNotificationRequest", "UNNotificationContent", "UNNotificationTrigger"] }

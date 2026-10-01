@@ -1,0 +1,17 @@
+[package]
+autotests = false
+name = "config"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Settings: JSONC settings.json with defaults, diagnostics, live reload, and keychain secrets."
+
+[dependencies]
+anyhow.workspace = true
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+notify = "6"
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

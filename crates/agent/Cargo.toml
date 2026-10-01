@@ -1,0 +1,42 @@
+[package]
+autotests = false
+name = "agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The Bot runtime: turns, tools, approvals, Auto-review, handoffs, routines, memory."
+
+[dependencies]
+anyhow.workspace = true
+axum = { version = "0.8", features = ["ws"] }
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10"
+computer = { path = "../computer" }
+config = { path = "../config" }
+futures.workspace = true
+grok = { path = "../grok" }
+mcp = { path = "../mcp" }
+provider = { path = "../provider" }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+schedule = { path = "../schedule" }
+slack = { path = "../slack" }
+serde.workspace = true
+serde_json.workspace = true
+store = { path = "../store" }
+tokio.workspace = true
+tokio-util = "0.7"
+uuid.workspace = true
+voice = { path = "../voice" }
+
+[dev-dependencies]
+tempfile = "3"
+provider = { path = "../provider" }
+
+[[test]]
+name = "e2e"
+path = "tests/e2e.rs"
+
+[[test]]
+name = "live"
+path = "tests/live.rs"

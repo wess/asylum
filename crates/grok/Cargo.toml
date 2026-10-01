@@ -1,0 +1,18 @@
+[package]
+autotests = false
+name = "grok"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "xAI Grok API client: chat completions, streaming, tool calls, models."
+
+[dependencies]
+anyhow.workspace = true
+futures.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
