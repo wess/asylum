@@ -135,12 +135,12 @@ dependencies = [
  "anyhow",
  "axum",
  "base64 0.22.1",
+ "chat",
  "chrono",
  "chrono-tz",
  "computer",
  "config",
  "futures",
- "grok",
  "mcp",
  "provider",
  "reqwest 0.12.28",
@@ -246,6 +246,7 @@ dependencies = [
  "agent",
  "anyhow",
  "block2 0.6.2",
+ "chat",
  "chrono",
  "chrono-tz",
  "computer",
@@ -253,7 +254,6 @@ dependencies = [
  "futures",
  "gpui",
  "gpui_platform",
- "grok",
  "guise-ui",
  "libsinclair",
  "mcp",
@@ -267,6 +267,7 @@ dependencies = [
  "serde_json",
  "store",
  "tokio",
+ "urlencoding",
  "voice",
 ]
 
@@ -1206,6 +1207,18 @@ dependencies = [
  "cfg-if",
  "cpufeatures 0.3.1",
  "rand_core 0.10.1",
+]
+
+[[package]]
+name = "chat"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -3390,18 +3403,6 @@ name = "grid"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b40ca9252762c466af32d0b1002e91e4e1bc5398f77455e55474deb466355ff5"
-
-[[package]]
-name = "grok"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "futures",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tokio",
-]
 
 [[package]]
 name = "gtk"
@@ -6121,9 +6122,11 @@ name = "provider"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
+ "chat",
  "config",
  "futures",
- "grok",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tempfile",

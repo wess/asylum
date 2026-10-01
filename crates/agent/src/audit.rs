@@ -10,7 +10,7 @@ pub const COALESCE_MS: i64 = 30_000;
 /// A Bot ran (or was stopped from running) a tool.
 pub async fn action(rt: &Runtime, bot: &str, chat: &str, tool: &str, target: &str, outcome: &str, ms: u64) {
   let _ = events::add(&rt.pool, New { kind: events::ACTION, actor: bot, bot: Some(bot), chat: Some(chat), name: tool, target, outcome, detail: &format!("{ms}ms") }).await;
-  crate::otel::span(rt, "tool", &[("bot", bot), ("chat", chat), ("tool", tool), ("outcome", outcome)], ms);
+  crate::otel::span(rt, "tool", &[("agent", bot), ("chat", chat), ("tool", tool), ("outcome", outcome)], ms);
 }
 
 /// A control-plane change by the user (or the admin's policy).

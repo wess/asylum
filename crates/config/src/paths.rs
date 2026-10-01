@@ -15,10 +15,17 @@ pub fn config_dir() -> PathBuf {
   }
 }
 
-/// `bots.json`, not `settings.json`: another tool already keeps a
+/// `agents.json`, not `settings.json`: another tool already keeps a
 /// `settings.json` in `~/.config/asylum`, and this app must never touch it.
+/// Older builds called it `bots.json`; it's moved over on first use.
 pub fn settings_path() -> PathBuf {
-  config_dir().join("bots.json")
+  let dir = config_dir();
+  let path = dir.join("agents.json");
+  let old = dir.join("bots.json");
+  if !path.exists() && old.exists() {
+    let _ = std::fs::rename(&old, &path);
+  }
+  path
 }
 
 /// Where the database and each Bot's computer live:

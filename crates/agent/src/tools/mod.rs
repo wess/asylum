@@ -20,7 +20,7 @@ use crate::plugins::Offered;
 use crate::queue::Origin;
 use crate::runtime::Runtime;
 use anyhow::{anyhow, Result};
-use grok::ToolDef;
+use chat::ToolDef;
 use serde_json::Value;
 pub use sheet::Sheet;
 use store::{Bot, Chat};
@@ -106,7 +106,7 @@ pub fn class(name: &str, offered: &[Offered]) -> Class {
   match name {
     "shell" | "write_file" | "edit_file" | "move_file" | "browser_open" | "browser_click" | "browser_type"
     | "browser_press" => Class::Review,
-    "delete_file" | "create_routine" | "update_routine" | "delete_routine" | "set_routine_active" | "create_bot"
+    "delete_file" | "create_routine" | "update_routine" | "delete_routine" | "set_routine_active" | "create_agent"
     | "test_routine" => Class::Consequential,
     "local_shell" | "local_read_file" | "copy_to_local" | "copy_from_local" => Class::Local,
     _ => Class::Free,
@@ -124,7 +124,7 @@ pub fn target(name: &str, args: &Value) -> String {
     "copy_to_local" | "copy_from_local" => format!("{} → {}", arg(args, "from"), arg(args, "to")),
     "browser_open" => pick("url"),
     "create_routine" | "update_routine" | "delete_routine" | "set_routine_active" | "test_routine" => pick("name"),
-    "create_bot" => pick("name"),
+    "create_agent" => pick("name"),
     _ => String::new(),
   }
 }

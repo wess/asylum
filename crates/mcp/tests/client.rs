@@ -44,3 +44,22 @@ async fn deepwiki_live() {
   let tools = c.tools().await.unwrap();
   assert!(tools.iter().any(|t| t.name.contains("wiki") || t.name.contains("question")), "{tools:?}");
 }
+
+/// The token-based Atlassian connector's server starts through our stdio
+/// client and lists its Jira tools. Needs uv and the network the first time.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn mcp_atlassian_lists_jira_tools() {
+  let env: std::collections::HashMap<String, String> = [("JIRA_URL", "https://example.atlassian.net"), ("JIRA_USERNAME", "probe@example.com"), ("JIRA_API_TOKEN", "dummy")]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .collect();
+  let s = crate::stdio::Stdio::spawn("uvx", &["mcp-atlassian".to_string()], &env, None).unwrap();
+  let c = Client::stdio(s);
+  tokio::time::timeout(std::time::Duration::from_secs(180), c.initialize()).await.unwrap().unwrap();
+  let tools = c.tools().await.unwrap();
+  let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+  for want in ["jira_search", "jira_get_issue", "jira_create_issue", "jira_transition_issue", "jira_add_comment"] {
+    assert!(names.contains(&want), "missing {want}");
+  }
+}

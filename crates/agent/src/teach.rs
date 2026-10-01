@@ -7,7 +7,7 @@ use crate::part::Part;
 use crate::runtime::Runtime;
 use anyhow::{bail, Result};
 use computer::browser::Step;
-use grok::Message;
+use chat::Message;
 use store::messages;
 
 pub const MAX_MS: i64 = 10 * 60 * 1000;

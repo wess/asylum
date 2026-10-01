@@ -13,18 +13,18 @@ pub fn render(d: &mut Dialog, _window: &mut Window, cx: &mut Context<Dialog>) ->
     .flex()
     .flex_col()
     .child(heading(t("Account"), cx))
-    .child(row(t("Your name"), Some(t("Bots use it when they write for you.")), div().w(px(240.0)).child(d.name.clone()), cx))
+    .child(row(t("Your name"), Some(t("Agents use it when they write for you.")), div().w(px(240.0)).child(d.name.clone()), cx))
     .child(heading(t("Appearance"), cx))
     .child(row(t("Theme"), None, div().w(px(200.0)).child(d.theme.clone()), cx))
-    .child(row(t("Language"), Some(t("New Bots write in this language unless you write in another.")), div().w(px(240.0)).child(d.language.clone()), cx))
-    .child(heading(t("Bot"), cx))
+    .child(row(t("Language"), Some(t("New Agents write in this language unless you write in another.")), div().w(px(240.0)).child(d.language.clone()), cx))
+    .child(heading(t("Agent"), cx))
     .child(row(t("Timezone"), Some(t("Routine schedules use this.")), div().w(px(240.0)).child(d.zone.clone()), cx))
     .child(row(
       t("Execution on Local Computer"),
       Some(if policy.local_exec.is_some_and(|max| policy.cap_local(s.local_exec) != s.local_exec || max == config::LocalExec::Never) {
         t("Limited by your admin: stricter settings win.")
       } else {
-        t("Whether Bots may run commands and read files on this Mac, outside their computer.")
+        t("Whether Agents may run commands and read files on this Mac, outside their computer.")
       }),
       div().w(px(200.0)).child(d.local.clone()),
       cx,
@@ -39,9 +39,9 @@ pub fn render(d: &mut Dialog, _window: &mut Window, cx: &mut Context<Dialog>) ->
       this.page = "rules";
       cx.notify();
     })), cx))
-    .child(row(t("Memory"), Some(t("Bots keep stable preferences, important facts, and summaries of past work.")), switch("memory", s.memory, rt, |s, v| s.memory = v), cx))
+    .child(row(t("Memory"), Some(t("Agents keep stable preferences, important facts, and summaries of past work.")), switch("memory", s.memory, rt, |s, v| s.memory = v), cx))
     .child(row(t("Background work"), Some(t("Routines keep running while the window is closed.")), switch("background", s.background_work, rt, |s, v| s.background_work = v), cx))
-    .child(row(t("Isolate the computer"), Some(t("Bots' shell commands can only write inside the workspace.")), switch("isolate", s.isolate_computer, rt, |s, v| s.isolate_computer = v), cx))
+    .child(row(t("Isolate the computer"), Some(t("Agents' shell commands can only write inside the workspace.")), switch("isolate", s.isolate_computer, rt, |s, v| s.isolate_computer = v), cx))
     .child(row(t("Show reasoning"), Some(t("Show the model's thinking, collapsed, above replies.")), switch("reasoning", s.show_reasoning, rt, |s, v| s.show_reasoning = v), cx))
     .child(row(
       t("Sync sections across your Macs"),
@@ -58,7 +58,7 @@ pub fn render(d: &mut Dialog, _window: &mut Window, cx: &mut Context<Dialog>) ->
       cx,
     ))
     .child(heading(t("Notifications"), cx))
-    .child(row(t("Desktop notifications"), Some(t("When a Bot finishes or needs input. Quiet while Asylum is focused.")), switch("notifs", s.notifications, rt, |s, v| s.notifications = v), cx))
+    .child(row(t("Desktop notifications"), Some(t("When an Agent finishes or needs input. Quiet while Asylum is focused.")), switch("notifs", s.notifications, rt, |s, v| s.notifications = v), cx))
     .child(row(t("Sound"), None, switch("sound", s.notification_sound, rt, |s, v| s.notification_sound = v), cx))
     .child(heading(t("Composer"), cx))
     .child(row(t("Enter sends"), Some(t("Off: Enter adds a line and ⌘Enter sends.")), switch("enter", s.send_on_enter, rt, |s, v| s.send_on_enter = v), cx))
@@ -68,7 +68,7 @@ pub fn render(d: &mut Dialog, _window: &mut Window, cx: &mut Context<Dialog>) ->
     .child(row(t("Voice features"), Some(t("Dictation, voice chat, and voice memos. Uses xAI's speech APIs and needs an xAI key.")), switch("voice-on", s.voice_enabled, rt, |s, v| s.voice_enabled = v), cx))
     .when(s.voice_enabled, |c| {
       c.child(row(t("Microphone"), None, div().w(px(240.0)).child(d.mic.clone()), cx))
-        .child(row(t("Voice"), Some(t("The voice Bots speak with in voice chats and memos.")), div().w(px(200.0)).child(d.voice.clone()), cx))
+        .child(row(t("Voice"), Some(t("The voice Agents speak with in voice chats and memos.")), div().w(px(200.0)).child(d.voice.clone()), cx))
     })
     .into_any_element()
 }
@@ -79,9 +79,9 @@ pub fn team(d: &mut Dialog, cx: &mut Context<Dialog>) -> AnyElement {
   div()
     .flex()
     .flex_col()
-    .child(heading(t("Team Bots"), cx))
-    .child(div().text_size(px(13.0)).text_color(ink.dimmed).child(t("Team Bots are Bots you set up once and share with your team through a link. Each teammate chats with it privately; it keeps team memory and private notes per person.")))
-    .child(row(t("Clear connector preferences"), Some(t("Forget every “Always allow” you gave Team Bots for your personal connectors.")), Button::new("clear-prefs", t("Clear")).size(Size::Xs).variant(Variant::Light).on_click(cx.listener(|this, _, _, cx| {
+    .child(heading(t("Team Agents"), cx))
+    .child(div().text_size(px(13.0)).text_color(ink.dimmed).child(t("Team Agents are Agents you set up once and share with your team through a link. Each teammate chats with it privately; it keeps team memory and private notes per person.")))
+    .child(row(t("Clear connector preferences"), Some(t("Forget every “Always allow” you gave Team Agents for your personal connectors.")), Button::new("clear-prefs", t("Clear")).size(Size::Xs).variant(Variant::Light).on_click(cx.listener(|this, _, _, cx| {
       let rt = this.rt.clone();
       cx.spawn(async move |this, cx| {
         let _ = crate::tk::run(async move {
@@ -101,7 +101,7 @@ pub fn team(d: &mut Dialog, cx: &mut Context<Dialog>) -> AnyElement {
       .detach();
     })), cx))
     .child(heading(t("Linked Slack accounts"), cx))
-    .child(div().text_size(px(12.5)).text_color(ink.dimmed).pb(px(6.0)).child(t("Team Bots in Slack answer linked teammates. Anyone else is asked, privately, to link. With no links, everyone in the workspace can talk to them.")))
+    .child(div().text_size(px(12.5)).text_color(ink.dimmed).pb(px(6.0)).child(t("Team Agents in Slack answer linked teammates. Anyone else is asked, privately, to link. With no links, everyone in the workspace can talk to them.")))
     .children(d.links.clone().into_iter().map(|l| {
       let u = l.slack_user.clone();
       div()
@@ -144,7 +144,7 @@ pub fn team(d: &mut Dialog, cx: &mut Context<Dialog>) -> AnyElement {
         }))),
     )
     .child(heading(t("Setup"), cx))
-    .child(div().text_size(px(13.0)).text_color(ink.dimmed).child(t("Create a Team Bot from New → Create new Team Bot, or publish a personal Bot from its Share menu.")))
+    .child(div().text_size(px(13.0)).text_color(ink.dimmed).child(t("Create a Team Agent from New → Create new Team Agent, or publish a personal Agent from its Share menu.")))
     .children(d.status.clone().map(|s| div().pt(px(8.0)).text_size(px(12.0)).text_color(ink.primary).child(s)))
     .into_any_element()
 }

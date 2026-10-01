@@ -68,7 +68,7 @@ pub fn link(t: &Template) -> Result<String> {
 }
 
 pub fn parse(link: &str) -> Result<Template> {
-  let data = link.trim().strip_prefix(SCHEME).ok_or_else(|| anyhow!("not a Bot template link"))?;
+  let data = link.trim().strip_prefix(SCHEME).ok_or_else(|| anyhow!("not an Agent template link"))?;
   let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(data.trim_end_matches('='))?;
   let t: Template = serde_json::from_slice(&bytes)?;
   if t.name.trim().is_empty() {

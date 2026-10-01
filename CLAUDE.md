@@ -4,20 +4,25 @@ Repository guidance for agent sessions.
 
 ## What this is
 
-Asylum is a desktop app for always-on AI teammates ("Bots"), a feature clone
-of xAI's Grok Bot, written in Rust as a Cargo workspace. The GUI is built on
+Asylum is a free, open-source desktop app for always-on AI teammates
+("Agents"), written in Rust as a Cargo workspace. The GUI is built on
 [gpui](https://github.com/zed-industries/zed) (pinned zed git rev) with the
 [guise](https://github.com/wess/guise) component library, and embeds terminals
 through `libsinclair` from [Sinclair](https://github.com/wess/sinclair). The
-Bot engine runs on tokio; persistence is SQLite through sqlx. Models come from
+Agent engine runs on tokio; persistence is SQLite through sqlx. Models come from
 the xAI API.
 
 The GUI is the `app` crate, whose bin target is `asylumdev` so a dev build
 never collides with an installed `asylum`; `scripts/bundle.sh` ships the same
 binary as `asylum`.
 
-`docs/spec.md` is the functional spec (with a numbered checklist) the app is
-built against. `docs/parity.md` tracks coverage against it.
+`site/` is the static website (GitHub Pages via `.github/workflows/pages.yml`):
+home, `tutorial/`, `docs/` (the user manual), and `admin/` (policy and
+activity). Keep it in step with behavior: settings keys, shortcuts, limits,
+and policy keys there are checked against the code by hand.
+
+`docs/features.md` lists what the app does, how each part is built, and
+what's deliberately left out. Keep it current when features change.
 
 ## Commands
 
@@ -73,25 +78,26 @@ MetalToolchain` installs it; then the feature can go).
 
 Layered bottom-up; each crate depends only on those below it.
 
-- **`config`** — `bots.json` (JSONC) under `~/.config/asylum/` (not
+- **`config`** — `agents.json` (JSONC) under `~/.config/asylum/` (not
   `settings.json`: another tool owns that file there and must not be touched): typed
   `Settings` with per-key defaults, diagnostics that never abort the load, a
   minimal-diff writer, and live file watching. `policy` reads the admin
   policy (`/Library/Application Support/asylum/policy.json`, or
   `ASYLUM_POLICY`): disabled/required plugins, locked rules, local-exec
-  ceiling, forced Auto-review, template limits, required Team Bots, Network
+  ceiling, forced Auto-review, template limits, required Team Agents, Network
   Controls, local egress, Cloud Agents, setup/check scripts, idle
   termination, and an OTel endpoint. `secret` keeps secrets (the xAI
-  key, plugin tokens, Bot secrets) in the OS keychain — never in the file.
+  key, plugin tokens, Agent secrets) in the OS keychain — never in the file.
 - **`store`** — SQLite via sqlx (WAL, foreign keys), hand-written migrations in
   `migrations/` applied with `sqlx::migrate!`. One module of free functions
-  per entity: bots, sections, chats (direct and group, unread/attention,
-  drafts), messages (FTS5 search, threads, reactions), memories (bot / team /
-  person scope), skills (one library, per-Bot enablement), routines, runs
+  per entity: agents, sections, chats (direct and group, unread/attention,
+  drafts), messages (FTS5 search, threads, reactions), memories (agent / team /
+  person scope), skills (one library, per-Agent enablement), routines, runs
   (history capped per routine), approvals, Auto-review rules, secrets
   (metadata only), plugins + accounts, templates, notifications, usage, state.
-- **`grok`** — the OpenAI-compatible chat-completions wire client (named for
-  its first backend; it serves every HTTP provider): wire types, SSE
+- **`chat`** — the OpenAI-compatible chat-completions wire client (it serves
+  every HTTP provider; app code reaches it as `::chat` because the app has its
+  own `chat` module): wire types, SSE
   decoding, streamed tool-call accumulation, and retries with jittered
   backoff before any text arrives. Pure decoding is unit-tested.
 - **`provider`** — model providers, mirroring ainz: `config::Profile`
@@ -99,22 +105,24 @@ Layered bottom-up; each crate depends only on those below it.
   (xai, openai, anthropic, lite-llm, ollama, ollama-cloud, claude-code,
   codex, custom), credential resolution (env / Synapse / Keychain), the
   process runner (transcript on stdin; text, JSON result, or Claude
-  stream-json out), and `/models` discovery. `Runtime::provider(bot)` picks
-  a Bot's pinned profile/model or the default; CLI providers get no Asylum
+  stream-json out), `/models` discovery, `litellm` (key check, teams,
+  team-scoped models, key reach), and `Provider::Fallback` (the next
+  provider answers only when one fails before its first event). `Runtime::provider(agent)` picks
+  an Agent's pinned profile/model or the default; CLI providers get no Asylum
   tools (they bring their own).
 - **`mcp`** — Model Context Protocol client: stdio (Command plugins) and
   Streamable HTTP (remote plugins) transports, tools/list + tools/call, and
   the MCP OAuth flow (discovery, dynamic registration, PKCE, loopback
   redirect, refresh).
-- **`slack`** — Team Bots in Slack: app manifest, Socket Mode client,
+- **`slack`** — Team Agents in Slack: app manifest, Socket Mode client,
   Web API calls, and the routing rules (DMs, mentions, followed threads).
-- **`computer`** — the one computer every Bot shares: `workspace/` (the
+- **`computer`** — the one computer every Agent shares: `workspace/` (the
   durable shared filesystem, confined path resolution), a shell that runs
   under a macOS `sandbox-exec` profile allowing writes only to the workspace
   and caches (the local stand-in for the cloud VM), secret injection with
   output redaction, web fetch/search, and a real Chromium over CDP
   (`chromiumoxide`) with a shared profile (shared sign-ins) and one page per
-  Bot (its "screen"): numbered-element snapshots, click/type/keys, screenshots,
+  Agent (its "screen"): numbered-element snapshots, click/type/keys, screenshots,
   takeover input, secret fill, and Teach-a-task recording. `proxy` is the
   egress gate for Network Controls: the browser launches through it and
   sandboxed commands can reach the network only through it.
@@ -122,8 +130,8 @@ Layered bottom-up; each crate depends only on those below it.
   safe), intervals, and the "When to run" English rendering.
 - **`voice`** — cpal microphone/speaker threads, PCM math, xAI speech-to-text
   (dictation), text-to-speech (voice memos), and realtime voice chat.
-- **`agent`** — the Bot runtime. `Runtime` owns the pool, computer, browser,
-  plugin hub, and per-Bot job queues (a user message preempts work in that
+- **`agent`** — the Agent runtime. `Runtime` owns the pool, computer, browser,
+  plugin hub, and per-Agent job queues (a user message preempts work in that
   chat; routine runs and handoffs queue). A `turn` streams the model into a
   message (`tools::Sheet`), runs tool calls through `approve` (Free / Review /
   Consequential / Local classes; Auto-review on the fast model with Ask-first
@@ -135,14 +143,17 @@ Layered bottom-up; each crate depends only on those below it.
   serves routine triggers on `127.0.0.1`. `api/` is everything the UI calls.
 - **`app`** — the gpui application: windows, sidebar, conversation, cards,
   details pane, computer panel (live screen, takeover, files, terminal via
-  `libsinclair::termview::TermView`), palette, Marketplace, settings,
+  `libsinclair::termview::TermView`), the built-in browser (`web`, a guise
+  `WebView` in the right pane for links and workspace previews), palette,
+  Marketplace, settings (`settings/gateway.rs`: LiteLLM keys, teams,
+  reasoning, fallbacks, provider check),
   onboarding, voice chat. `tk` owns the tokio runtime; engine calls run there
   and are awaited from gpui tasks; engine `Event`s are forwarded into gpui.
 
 ### Process modes (`app/src/cli.rs`)
 
-`asylumdev ask <bot> <message>`, `asylumdev providers`, `asylumdev plugin
-add <id>`, and `asylumdev pin <bot> <provider> [model]` run the engine
+`asylumdev ask <agent> <message>`, `asylumdev providers`, `asylumdev plugin
+add <id>`, and `asylumdev pin <agent> <provider> [model]` run the engine
 without a window. `ASYLUM_SHOW=<screen>` (with optional `ASYLUM_URL`) opens a
 given screen at launch for screenshots; `ASYLUM_TRACE=<file>` logs each model
 exchange.
@@ -161,7 +172,7 @@ gaps). Regenerate after adding strings.
   functions over data; structs for state and data, not behavior bags.
 - rustfmt: 2-space indent, width 100 (`rustfmt.toml`).
 - Keep gpui out of every crate but `app`; keep I/O out of the pure modules
-  (`grok::sse`, `schedule`, `agent::{prompt,history,route,review}`) so they
+  (`chat::sse`, `schedule`, `agent::{prompt,history,route,review}`) so they
   stay unit-testable.
 - The user handles git. Commit messages and PRs carry no assistant
   attribution.

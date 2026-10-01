@@ -5,7 +5,7 @@
 
 use crate::approve::Action;
 use crate::runtime::Runtime;
-use grok::Message;
+use chat::Message;
 use serde::Deserialize;
 use store::Rule;
 

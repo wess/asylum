@@ -31,7 +31,7 @@ pub enum Tab {
 }
 
 pub const TABS: [(Tab, &str); 6] = [
-  (Tab::Settings, "Bot settings"),
+  (Tab::Settings, "Agent settings"),
   (Tab::Tasks, "Tasks"),
   (Tab::Secrets, "Secrets"),
   (Tab::Memory, "Memory"),

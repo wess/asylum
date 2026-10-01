@@ -7,7 +7,7 @@ use crate::streamjson::Lines;
 use anyhow::{anyhow, bail, Context, Result};
 use config::Output;
 use futures::stream::{BoxStream, StreamExt};
-use grok::{Content, Message, Role, StreamEvent};
+use chat::{Content, Message, Role, StreamEvent};
 use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};

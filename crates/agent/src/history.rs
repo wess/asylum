@@ -4,7 +4,7 @@
 //! speaker's name. Older tool output is trimmed to keep context affordable.
 
 use crate::part::{self, Part};
-use grok::{Message as Msg, Part as MsgPart, ToolCall};
+use chat::{Message as Msg, Part as MsgPart, ToolCall};
 use store::{Bot, Message};
 
 pub const RECENT_TOOLS: usize = 6;
@@ -15,7 +15,7 @@ pub fn build(me: &Bot, history: &[Message], roster: &[Bot], images: &dyn Fn(&str
     id.as_ref()
       .and_then(|i| roster.iter().find(|b| &b.id == i))
       .map(|b| b.name.clone())
-      .unwrap_or_else(|| "Another Bot".into())
+      .unwrap_or_else(|| "Another Agent".into())
   };
   // Messages whose tool results stay whole: the last few with tools.
   let keep: Vec<usize> = history
@@ -105,9 +105,9 @@ fn trim(s: &str) -> String {
 fn merge_users(msgs: Vec<Msg>) -> Vec<Msg> {
   let mut out: Vec<Msg> = Vec::new();
   for m in msgs {
-    if let (Some(last), grok::Role::User) = (out.last_mut(), m.role) {
-      if last.role == grok::Role::User {
-        if let (Some(grok::Content::Text(a)), Some(grok::Content::Text(b))) = (&mut last.content, &m.content) {
+    if let (Some(last), chat::Role::User) = (out.last_mut(), m.role) {
+      if last.role == chat::Role::User {
+        if let (Some(chat::Content::Text(a)), Some(chat::Content::Text(b))) = (&mut last.content, &m.content) {
           a.push_str("\n\n");
           a.push_str(b);
           continue;

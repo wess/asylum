@@ -4,7 +4,7 @@ use crate::queue::{Job, Origin};
 use crate::route::{self, Target};
 use crate::runtime::Runtime;
 use anyhow::{bail, Result};
-use grok::Message as Msg;
+use chat::Message as Msg;
 use std::path::PathBuf;
 use store::{bots, chats, messages, Message};
 

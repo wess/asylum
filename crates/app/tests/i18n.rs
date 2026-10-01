@@ -10,21 +10,18 @@ fn matches_locales() {
   assert_eq!(matched("xx"), "en");
 }
 
-#[test]
-fn placeholders() {
-  set("en");
-  assert_eq!(tf("Create \"{}\" Bot", &["Scout"]), "Create \"Scout\" Bot");
-}
-
+/// One test: the language is global, so tests that set it can't run in parallel.
 #[test]
 fn tables_resolve() {
+  set("en");
+  assert_eq!(tf("Create \"{}\" Agent", &["Scout"]), "Create \"Scout\" Agent");
   set("fr");
   assert_ne!(t("Settings"), "Settings");
   set("zh-hans");
   assert_ne!(t("Settings"), "Settings");
   set("ja");
-  assert!(tf("Create \"{}\" Bot", &["Scout"]).contains("Scout"));
-  assert_ne!(t("Create new Bot"), "Create new Bot");
+  assert!(tf("Create \"{}\" Agent", &["Scout"]).contains("Scout"));
+  assert_ne!(t("Create new Agent"), "Create new Agent");
   set("en");
   assert_eq!(t("Settings"), "Settings");
 }

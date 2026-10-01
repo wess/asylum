@@ -42,6 +42,8 @@ actions!(
     Cancel,
     CloseWindow,
     OpenComputer,
+    OpenBrowser,
+    OpenTerminal,
     StopBot,
   ]
 );
@@ -91,6 +93,8 @@ pub fn bind(cx: &mut App) {
     KeyBinding::new("escape", Cancel, Some(CONTEXT)),
     KeyBinding::new("secondary-w", CloseWindow, None),
     KeyBinding::new("secondary-shift-o", OpenComputer, None),
+    KeyBinding::new("secondary-shift-b", OpenBrowser, None),
+    KeyBinding::new("secondary-shift-t", OpenTerminal, None),
     KeyBinding::new("secondary-.", StopBot, None),
   ]);
 }

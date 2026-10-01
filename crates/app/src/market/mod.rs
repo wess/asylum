@@ -188,12 +188,21 @@ impl Render for Market {
                   Button::new(SharedString::from(format!("adds-{}", s.name)), t("Add")).size(Size::Xs).variant(Variant::Light).on_click(cx.listener(move |this, _, _, cx| {
                     let rt = this.rt.clone();
                     this.run(cx, async move { agent::api::bots::add_packaged_skill(&rt, name).await }, |this, s, cx| {
-                      this.status = Some(crate::i18n::tf("Added /{}. Switch it on for a Bot in its Skills tab.", &[&s.name]));
+                      this.status = Some(crate::i18n::tf("Added /{}. Switch it on for an Agent in its Skills tab.", &[&s.name]));
                       this.load(cx);
                     });
                   })).into_any_element()
                 }))
-                .child(div().text_size(px(12.0)).text_color(ink.dimmed).child(t(s.description))),
+                .child(div().text_size(px(12.0)).text_color(ink.dimmed).child(t(s.description)))
+                .children((!s.needs.is_empty()).then(|| {
+                  // Which connector the skill works with, and whether it's connected.
+                  let ready = s.needs.iter().any(|id| self.status_of(id).is_some_and(|(_, st)| st == "connected"));
+                  let names: Vec<&str> = s.needs.iter().filter_map(|id| agent::catalog::plugin(id).map(|p| p.name)).collect();
+                  div()
+                    .text_size(px(11.0))
+                    .text_color(if ready { ink.success } else { ink.warning })
+                    .child(crate::i18n::tf(if ready { "Works with {} (connected)" } else { "Needs {}: add it from Plugins" }, &[names.first().copied().unwrap_or_default()]))
+                })),
             );
           }
         }

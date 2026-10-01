@@ -83,7 +83,7 @@ async fn message_to_tool_to_reply() {
     }
   })
   .await;
-  assert!(done.is_ok(), "the Bot never finished");
+  assert!(done.is_ok(), "the Agent never finished");
 
   let written = rt.computer.workspace().join("notes/plan.md");
   assert_eq!(std::fs::read_to_string(written).unwrap(), "# Plan\n");
@@ -127,7 +127,7 @@ async fn process_provider_turn() {
     }
   })
   .await;
-  assert!(done.is_ok(), "the Bot never finished");
+  assert!(done.is_ok(), "the Agent never finished");
   let msgs = store::messages::list(&rt.pool, &chat.id).await.unwrap();
   let reply = msgs.iter().find(|m| m.role == "bot").unwrap();
   assert_eq!(reply.body, "Handled by the CLI.");
@@ -276,7 +276,7 @@ async fn bots_use_their_own_providers() {
     }
   })
   .await
-  .expect("both Bots should answer");
+  .expect("both Agents should answer");
   let by = |id: &str| done.iter().find(|m| m.bot_id.as_deref() == Some(id)).unwrap().body.clone();
   assert_eq!(by(&a.id), "GPT here.");
   assert_eq!(by(&b.id), "Opus here as opus.");
@@ -430,4 +430,54 @@ async fn recreate_pauses_at_safe_point() {
   api::computer::wake_check(&rt).await;
   assert!(!api::computer::asleep());
   rt.browser.shutdown().await;
+}
+
+/// The API-token Jira connector, end to end: add it, connect (credentials
+/// checked against a fake Jira), and call a real mcp-atlassian tool that
+/// reads from that fake Jira. Needs uv; run with --ignored.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn jira_token_connector_end_to_end() {
+  use axum::extract::Path;
+  use std::sync::Mutex;
+  let seen: Arc<Mutex<Vec<String>>> = Arc::default();
+  let seen2 = seen.clone();
+  let issue = |key: String| json!({
+    "id": "10001", "key": key, "self": "x",
+    "fields": { "summary": "Checkout fails on Safari", "description": "Steps: open cart", "status": { "name": "To Do", "statusCategory": { "name": "To Do" } },
+      "issuetype": { "name": "Bug" }, "priority": { "name": "High" }, "created": "2026-09-30T10:00:00.000+0000", "updated": "2026-09-30T10:00:00.000+0000", "labels": [], "comment": { "comments": [] } }
+  });
+  let app = Router::new()
+    .route("/rest/api/2/myself", get(|| async { Json(json!({ "displayName": "Pat Probe", "accountId": "abc" })) }))
+    .route("/rest/api/3/myself", get(|| async { Json(json!({ "displayName": "Pat Probe", "accountId": "abc" })) }))
+    .route("/rest/api/2/issue/{key}", get(move |Path(key): Path<String>| async move { Json(issue(key)) }))
+    .route("/rest/api/3/issue/{key}", get(move |Path(key): Path<String>| async move { Json(issue(key)) }))
+    .fallback(move |uri: axum::http::Uri| {
+      let seen = seen2.clone();
+      async move {
+        seen.lock().unwrap().push(uri.to_string());
+        Json(json!({}))
+      }
+    });
+  let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+  let addr = l.local_addr().unwrap();
+  tokio::spawn(async move { axum::serve(l, app).await.unwrap() });
+
+  let dir = tempfile::tempdir().unwrap();
+  let rt = agent::Runtime::start(dir.path().to_path_buf(), config::Settings { memory: false, ..Default::default() }).await.unwrap();
+  let p = api::connect::add(&rt, "jiratoken").await.unwrap();
+  let mut values = std::collections::HashMap::new();
+  values.insert("JIRA_URL".to_string(), format!("http://{addr}"));
+  values.insert("JIRA_USERNAME".to_string(), "probe@acme.com".to_string());
+  values.insert("JIRA_API_TOKEN".to_string(), "good-token".to_string());
+  values.insert("CONFLUENCE_URL".to_string(), String::new());
+  if let Err(e) = api::connect::connect_fields(&rt, &p.id, "work", values).await {
+    panic!("connect failed: {e}");
+  }
+  let offered = rt.plugins.offered(&rt).await;
+  let get_issue = offered.iter().find(|o| o.tool.name == "jira_get_issue").expect("jira_get_issue offered");
+  let (text, error) = rt.plugins.call(&rt, get_issue, json!({ "issue_key": "SHOP-42" })).await.unwrap();
+  assert!(!error, "{text}\nunmatched: {:?}", seen.lock().unwrap());
+  assert!(text.contains("Checkout fails on Safari"), "{text}");
+  api::connect::remove(&rt, &p.id).await.unwrap();
 }

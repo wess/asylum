@@ -66,7 +66,7 @@ impl Render for Preview {
           .flex()
           .flex_col()
           .gap(px(10.0))
-          .child(div().flex().items_center().gap(px(12.0)).child(crate::avatar::face(&bot, 48.0, cx)).child(div().flex().flex_col().child(div().text_size(px(17.0)).font_weight(gpui::FontWeight::SEMIBOLD).child(tpl.name.clone())).child(div().text_size(px(12.5)).text_color(ink.dimmed).child(if team { t("Team Bot") } else { t("Bot template") }))))
+          .child(div().flex().items_center().gap(px(12.0)).child(crate::avatar::face(&bot, 48.0, cx)).child(div().flex().flex_col().child(div().text_size(px(17.0)).font_weight(gpui::FontWeight::SEMIBOLD).child(tpl.name.clone())).child(div().text_size(px(12.5)).text_color(ink.dimmed).child(if team { t("Team Agent") } else { t("Agent template") }))))
           .when(!tpl.label.is_empty(), |c| c.child(div().text_size(px(13.0)).child(tpl.label.clone())))
           .when(!tpl.description.is_empty(), |c| c.child(div().text_size(px(13.0)).text_color(ink.dimmed).child(tpl.description.clone())))
           .child(div().text_size(px(12.5)).child(tf("Includes {} skills and {} routines.", &[&tpl.skills.len().to_string(), &tpl.routines.len().to_string()])));
@@ -94,7 +94,7 @@ impl Render for Preview {
                 cx.notify();
               }))
               .child(Checkbox::new("terms-ck").checked(agreed))
-              .child(div().text_size(px(12.5)).child(t("I accept the third-party Bot terms: this Bot was made by someone else, and I'm responsible for what I let it do."))),
+              .child(div().text_size(px(12.5)).child(t("I accept the third-party Agent terms: this Agent was made by someone else, and I'm responsible for what I let it do."))),
           )
           .child(Group::new().gap(Size::Sm).child(Button::new("add-bot", t("Add to Asylum")).disabled(!agreed).on_click(cx.listener(|p, _, w, cx| p.add(w, cx)))).child(Button::new("cancel-bot", t("Cancel")).variant(Variant::Default).on_click(move |_, w, cx| {
             let _ = root.update(cx, |r, cx| r.close_modal(w, cx));

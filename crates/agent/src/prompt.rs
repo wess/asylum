@@ -36,7 +36,7 @@ pub fn system(c: &Context) -> String {
     if !c.chat.description.trim().is_empty() {
       s.push_str(&format!("Group description (applies to every member): {}\n", c.chat.description.trim()));
     }
-    s.push_str("Other Bots here: ");
+    s.push_str("Other Agents here: ");
     s.push_str(&c.members.iter().map(label).collect::<Vec<_>>().join("; "));
     s.push_str(
       "\nReply in the group only when the message is for you or your role clearly fits. Keep it short. \
@@ -88,7 +88,7 @@ keep notes about one person with scope \"person\".\n",
     .map(label)
     .collect();
   if !others.is_empty() {
-    s.push_str("\n## Your teammates (other Bots; reach them with message_bot)\n");
+    s.push_str("\n## Your teammates (other Agents; reach them with message_agent)\n");
     for o in others {
       s.push_str(&format!("- {o}\n"));
     }
@@ -137,7 +137,7 @@ const WAYS: &str = "## How you work
 - If you need the user to decide something, call ask_user and stop.
 - Remember durable preferences and facts with remember. Save a repeatable process with save_skill when asked.
 - Create routines when asked for recurring or triggered work. A new routine waits for its first scheduled time.
-- Hand work to the teammate whose job fits with message_bot; pass ownership when they should own it.
+- Hand work to the teammate whose job fits with message_agent; pass ownership when they should own it.
 ";
 
 #[cfg(test)]

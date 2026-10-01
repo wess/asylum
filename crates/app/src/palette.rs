@@ -12,7 +12,7 @@ use guise::{IconName, SegmentedControl, SegmentedControlEvent, Size, TextInput, 
 pub const SCOPES: [(&str, Scope); 6] = [
   ("All", Scope::All),
   ("Messages", Scope::Messages),
-  ("Bots", Scope::Bots),
+  ("Agents", Scope::Bots),
   ("Group Chats", Scope::Groups),
   ("Files", Scope::Files),
   ("Routines", Scope::Routines),
@@ -32,7 +32,7 @@ pub fn open(root: &mut Root, scope: Option<Scope>, window: &mut Window, cx: &mut
   let weak = cx.entity().downgrade();
   let rt = root.rt.clone();
   let view = cx.new(|cx| {
-    let input = cx.new(|cx| TextInput::new(cx).placeholder(t("Search Bots, messages, files, routines…")));
+    let input = cx.new(|cx| TextInput::new(cx).placeholder(t("Search Agents, messages, files, routines…")));
     let start = scope.unwrap_or(Scope::All);
     let idx = SCOPES.iter().position(|(_, s)| *s == start).unwrap_or(0);
     let scopes = cx.new(|cx| SegmentedControl::new(cx).data(SCOPES.iter().map(|(l, _)| t(l))).selected(idx).size(Size::Xs));
@@ -71,7 +71,7 @@ impl Palette {
 
   fn actions() -> Vec<(&'static str, Box<dyn gpui::Action>)> {
     vec![
-      ("New Bot", Box::new(crate::actions::NewChat)),
+      ("New Agent", Box::new(crate::actions::NewChat)),
       ("Open Settings", Box::new(crate::actions::OpenSettings)),
       ("Marketplace", Box::new(crate::actions::Marketplace)),
       ("Open Computer", Box::new(crate::actions::OpenComputer)),

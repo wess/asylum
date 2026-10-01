@@ -1,7 +1,7 @@
 use super::{arg, def, need, Ctx, Outcome};
 use crate::part::Part;
 use anyhow::Result;
-use grok::ToolDef;
+use chat::ToolDef;
 use serde_json::{json, Value};
 
 pub fn defs(voice: bool) -> Vec<ToolDef> {

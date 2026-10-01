@@ -15,7 +15,7 @@ pub fn resolve(home: &Path, input: &str) -> Result<PathBuf> {
   let joined = if candidate.is_absolute() {
     match candidate.strip_prefix(home) {
       Ok(inner) => home.join(inner),
-      Err(_) => bail!("{input} is outside this Bot's computer"),
+      Err(_) => bail!("{input} is outside this Agent's computer"),
     }
   } else {
     home.join(candidate)
@@ -31,7 +31,7 @@ pub fn resolve(home: &Path, input: &str) -> Result<PathBuf> {
     }
   }
   if !out.starts_with(home) {
-    bail!("{input} is outside this Bot's computer");
+    bail!("{input} is outside this Agent's computer");
   }
   Ok(out)
 }

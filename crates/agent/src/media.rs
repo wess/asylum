@@ -10,7 +10,7 @@ pub const IMAGE_MODELS: [&str; 3] = ["grok-2-image", "grok-2-image-1212", "grok-
 
 pub async fn image(rt: &Runtime, prompt: &str) -> Result<Vec<u8>> {
   let key = config::secret::xai_key().ok_or_else(|| anyhow!("Image generation uses xAI. Add your xAI API key in Settings → Providers."))?;
-  let base = grok::DEFAULT_BASE.to_string();
+  let base = chat::DEFAULT_BASE.to_string();
   let models = rt.models.read().map(|m| m.clone()).unwrap_or_default();
   let model = IMAGE_MODELS
     .iter()

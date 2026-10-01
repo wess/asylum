@@ -6,12 +6,12 @@ use anyhow::{bail, Result};
 use store::bots::{self, Profile};
 use store::{chats, routines, skills, Bot, Chat};
 
-pub const DEFAULT_NAME: &str = "New Bot";
+pub const DEFAULT_NAME: &str = "New Agent";
 
 pub async fn create(rt: &Runtime, name: Option<&str>) -> Result<(Bot, Chat)> {
   let pool = &rt.pool;
   if bots::count(pool).await? + chats::groups(pool).await?.len() as i64 >= crate::turn::ROSTER_LIMIT {
-    bail!("You have {} Bots and group chats. Delete one to make room.", crate::turn::ROSTER_LIMIT);
+    bail!("You have {} Agents and group chats. Delete one to make room.", crate::turn::ROSTER_LIMIT);
   }
   let base = name.map(str::trim).filter(|n| !n.is_empty()).unwrap_or(DEFAULT_NAME);
   let name = bots::unique_name(pool, base).await?;
@@ -31,7 +31,7 @@ pub fn palette(i: usize) -> String {
 
 pub async fn update(rt: &Runtime, id: &str, p: &Profile) -> Result<Bot> {
   if p.name.trim().is_empty() {
-    bail!("A Bot needs a name.");
+    bail!("An Agent needs a name.");
   }
   let b = bots::update(&rt.pool, id, p).await?;
   rt.emit(Event::BotsChanged);
@@ -101,7 +101,7 @@ pub async fn delete(rt: &Runtime, id: &str) -> Result<()> {
 
 pub async fn create_group(rt: &Runtime, ids: &[String]) -> Result<Chat> {
   if !(2..=6).contains(&ids.len()) {
-    bail!("Pick 2 to 6 Bots for a group chat.");
+    bail!("Pick 2 to 6 Agents for a group chat.");
   }
   let title = crate::turn::group_name(rt, ids).await;
   let c = chats::create_group(&rt.pool, &title, ids).await?;
@@ -111,7 +111,7 @@ pub async fn create_group(rt: &Runtime, ids: &[String]) -> Result<Chat> {
 
 pub async fn set_members(rt: &Runtime, chat: &str, ids: &[String]) -> Result<()> {
   if !(2..=6).contains(&ids.len()) {
-    bail!("A group chat has 2 to 6 Bots.");
+    bail!("A group chat has 2 to 6 Agents.");
   }
   let current = chats::members(&rt.pool, chat).await?;
   for id in &current {

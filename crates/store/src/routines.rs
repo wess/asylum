@@ -59,7 +59,7 @@ pub async fn create(pool: &Pool, r: New) -> Result<Routine> {
     .fetch_one(pool)
     .await?;
   if count >= LIMIT_PER_BOT {
-    bail!("this Bot already has {LIMIT_PER_BOT} routines");
+    bail!("this Agent already has {LIMIT_PER_BOT} routines");
   }
   if !TRIGGERS.contains(&r.trigger.as_str()) {
     bail!("unknown trigger {}", r.trigger);

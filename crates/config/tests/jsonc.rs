@@ -10,9 +10,9 @@ fn strips_comments_and_trailing_commas() {
 
 #[test]
 fn keeps_slashes_inside_strings() {
-  let text = r#"{"url": "https://x.ai//a", "q": "say \"//\""}"#;
+  let text = r#"{"url": "https://example.com//a", "q": "say \"//\""}"#;
   let v: serde_json::Value = serde_json::from_str(&strip(text)).unwrap();
-  assert_eq!(v["url"], "https://x.ai//a");
+  assert_eq!(v["url"], "https://example.com//a");
   assert_eq!(v["q"], "say \"//\"");
 }
 

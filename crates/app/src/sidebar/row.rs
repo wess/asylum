@@ -120,7 +120,7 @@ pub fn render(root: &mut Root, item: &Item, index: usize, _window: &mut Window, 
   row.into_any_element()
 }
 
-/// "You built a Bot. Now your whole team gets a teammate." — shown for a
+/// "You built an Agent. Now your whole team gets a teammate." — shown for a
 /// Team Bot that is ready but not yet published.
 pub fn team_card(root: &mut Root, compact: bool, cx: &mut Context<Root>) -> Option<AnyElement> {
   if compact {
@@ -139,7 +139,7 @@ pub fn team_card(root: &mut Root, compact: bool, cx: &mut Context<Root>) -> Opti
       .flex()
       .flex_col()
       .gap(px(6.0))
-      .child(div().text_size(px(12.5)).child(t("You built a Bot. Now your whole team gets a teammate.")))
+      .child(div().text_size(px(12.5)).child(t("You built an Agent. Now your whole team gets a teammate.")))
       .child(
         guise::Button::new("publish-team", t("Publish to team")).size(Size::Xs).on_click(cx.listener(move |this, _, _, cx| {
           let rt = this.rt.clone();

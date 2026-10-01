@@ -106,7 +106,7 @@ pub fn render(p: &mut Panel, window: &mut Window, cx: &mut Context<Panel>) -> An
           .gap(px(6.0))
           .text_color(gpui::white())
           .child(guise::Icon::new(IconName::Monitor).size(Size::Lg))
-          .child(div().text_size(px(12.5)).child(t("The Bot's screen appears when it opens a website."))),
+          .child(div().text_size(px(12.5)).child(t("The Agent's screen appears when it opens a website."))),
       )
     }
   }
@@ -160,7 +160,7 @@ pub fn render(p: &mut Panel, window: &mut Window, cx: &mut Context<Panel>) -> An
       .flex()
       .items_center()
       .gap(px(8.0))
-      .child(div().flex_1().text_size(px(12.5)).child(t("You're in control. Click, scroll, and type on the screen. Your Bot never sees what you type.")))
+      .child(div().flex_1().text_size(px(12.5)).child(t("You're in control. Click, scroll, and type on the screen. Your Agent never sees what you type.")))
       .child(Button::new("window", if p.rt.browser.is_headful() { t("Back to preview") } else { t("Open in a window") }).size(Size::Xs).variant(Variant::Default).on_click(cx.listener(|this, _, _, cx| {
         let on = !this.rt.browser.is_headful();
         let rt = this.rt.clone();
@@ -180,7 +180,7 @@ pub fn render(p: &mut Panel, window: &mut Window, cx: &mut Context<Panel>) -> An
       .flex()
       .items_center()
       .gap(px(8.0))
-      .child(div().flex_1().text_size(px(12.0)).text_color(ink.dimmed).child(t("Live preview of the Bot's screen.")))
+      .child(div().flex_1().text_size(px(12.0)).text_color(ink.dimmed).child(t("Live preview of the Agent's screen.")))
       .child(Button::new("take-over", t("Take over")).size(Size::Xs).variant(Variant::Light).on_click(cx.listener(|this, _, w, cx| {
         this.taking = true;
         w.focus(&this.focus, cx);

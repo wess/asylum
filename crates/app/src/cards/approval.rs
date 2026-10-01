@@ -62,7 +62,7 @@ pub fn render(pane: &mut ChatPane, id: &str, cx: &mut Context<ChatPane>) -> AnyE
     // The admin's ceiling keeps "Always allow" off.
     let capped = capped_by_policy(&pane.rt);
     card = card
-      .child(div().text_size(px(12.5)).child(t("Allow Asylum and all Bots to run commands on your local computer?")))
+      .child(div().text_size(px(12.5)).child(t("Allow Asylum and all Agents to run commands on your local computer?")))
       .child(
         Group::new()
           .gap(Size::Sm)

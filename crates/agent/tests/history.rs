@@ -20,9 +20,9 @@ fn replays_tools_and_names_other_bots() {
     msg("user", None, "thanks", "[]"),
   ];
   let out = build(&me, &hist, &roster, &|_| None);
-  assert_eq!(out[0].role, grok::Role::User);
+  assert_eq!(out[0].role, chat::Role::User);
   assert_eq!(out[1].tool_calls.as_ref().unwrap()[0].function.name, "shell");
-  assert_eq!(out[2].role, grok::Role::Tool);
+  assert_eq!(out[2].role, chat::Role::Tool);
   assert_eq!(out[3].content.as_ref().unwrap().as_text(), "Found x.txt");
   // The other Bot's line and the user's follow-up merge into one user turn.
   let last = out.last().unwrap().content.as_ref().unwrap().as_text();
@@ -36,7 +36,7 @@ fn images_attach_as_parts() {
   let att = r#"[{"type":"attachment","name":"p.png","path":"/w/p.png","mime":"image/png","size":3}]"#;
   let out = build(&me, &[msg("user", None, "see", att)], std::slice::from_ref(&me), &|_| Some("data:image/png;base64,AA".into()));
   match out[0].content.as_ref().unwrap() {
-    grok::Content::Parts(p) => assert_eq!(p.len(), 2),
+    chat::Content::Parts(p) => assert_eq!(p.len(), 2),
     _ => panic!("expected parts"),
   }
 }

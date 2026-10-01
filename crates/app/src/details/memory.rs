@@ -11,7 +11,7 @@ pub fn render(d: &mut Details, cx: &mut Context<Details>) -> AnyElement {
   let ink = ink(cx);
   let mut col = div().flex().flex_col().gap(px(6.0)).child(section(t("Memory"), cx));
   if d.data.memory.is_empty() {
-    col = col.child(div().text_size(px(13.0)).text_color(ink.dimmed).child(t("Nothing remembered yet. Bots keep stable preferences, important facts, and summaries of finished work.")));
+    col = col.child(div().text_size(px(13.0)).text_color(ink.dimmed).child(t("Nothing remembered yet. Agents keep stable preferences, important facts, and summaries of finished work.")));
   }
   for m in d.data.memory.clone() {
     let id = m.id.clone();

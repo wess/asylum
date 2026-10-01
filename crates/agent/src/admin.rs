@@ -2,7 +2,7 @@
 //! and dashboards. Every request needs `Authorization: Bearer <token>`; the
 //! token is generated when the API is turned on and kept in the keychain.
 //!
-//! GET  /v1/bots                     Bots and their status
+//! GET  /v1/agents                     Agents and their status
 //! GET  /v1/actions?since=<ms>       Action Recording
 //! GET  /v1/audit?since=<ms>         Audit log
 //! GET  /v1/insights?since=<ms>      Conversation Insights
@@ -39,7 +39,7 @@ pub fn token() -> anyhow::Result<String> {
 
 pub fn router(rt: Runtime, token: String) -> Router {
   Router::new()
-    .route("/v1/bots", get(bots))
+    .route("/v1/agents", get(agents))
     .route("/v1/actions", get(actions))
     .route("/v1/audit", get(audit))
     .route("/v1/insights", get(insights))
@@ -84,7 +84,7 @@ fn fail(e: anyhow::Error) -> Reply {
   (StatusCode::BAD_REQUEST, Json(json!({ "error": e.to_string() })))
 }
 
-async fn bots(State(rt): State<Runtime>) -> Reply {
+async fn agents(State(rt): State<Runtime>) -> Reply {
   match store::bots::list(&rt.pool).await {
     Ok(b) => ok(b.into_iter().map(|b| json!({ "id": b.id, "name": b.name, "status": b.status, "kind": b.kind, "model": b.model })).collect::<Vec<_>>()),
     Err(e) => fail(e),

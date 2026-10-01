@@ -7,7 +7,7 @@
 use crate::runtime::Runtime;
 use serde_json::{json, Value};
 
-pub const SURFACE: &str = "asylum.bot";
+pub const SURFACE: &str = "asylum.agent";
 
 /// The configured endpoint; the admin's wins.
 pub fn endpoint(rt: &Runtime) -> Option<String> {

@@ -186,6 +186,9 @@ pub struct Request {
   pub max_tokens: Option<u32>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub stream_options: Option<Value>,
+  /// "low", "medium", or "high" for reasoning models (OpenAI and LiteLLM).
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub reasoning_effort: Option<String>,
 }
 
 impl Request {
@@ -198,6 +201,7 @@ impl Request {
       temperature: None,
       max_tokens: None,
       stream_options: Some(serde_json::json!({ "include_usage": true })),
+      reasoning_effort: None,
     }
   }
 }

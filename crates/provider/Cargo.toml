@@ -10,11 +10,13 @@ description = "Model providers: HTTP chat-completions (xAI, OpenAI, Ollama, Lite
 anyhow.workspace = true
 config = { path = "../config" }
 futures.workspace = true
-grok = { path = "../grok" }
+chat = { path = "../chat" }
 serde.workspace = true
 serde_json.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tokio.workspace = true
 toml = "0.8"
 
 [dev-dependencies]
 tempfile = "3"
+axum = "0.8"

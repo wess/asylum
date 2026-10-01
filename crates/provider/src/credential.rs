@@ -13,6 +13,16 @@ pub async fn resolve(c: &Credential) -> Result<Option<String>> {
   })
 }
 
+/// A profile's key. For an environment credential, an exported variable
+/// wins; otherwise a key typed into Settings and kept in the keychain under
+/// this profile is used, so a shell or CI job can override what setup saved.
+pub async fn resolve_for(p: &config::Profile) -> Result<Option<String>> {
+  if let Credential::Env { var } = &p.credential {
+    return Ok(env(var).or_else(|| config::secret::get(&account(&p.name))));
+  }
+  resolve(&p.credential).await
+}
+
 fn env(var: &str) -> Option<String> {
   std::env::var(var).ok().filter(|v| !v.trim().is_empty())
 }

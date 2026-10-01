@@ -17,13 +17,13 @@ pub struct Problem {
 /// The screen for an engine error, if it has one.
 pub fn known(err: &str) -> Option<(&'static str, &'static str, Option<&'static str>)> {
   if err.contains(agent::api::team::NOT_AVAILABLE) {
-    return Some((agent::api::team::NOT_AVAILABLE, "Your admin has turned off Team Bots for your organization. Ask them to turn it on.", None));
+    return Some((agent::api::team::NOT_AVAILABLE, "Your admin has turned off Team Agents for your organization. Ask them to turn it on.", None));
   }
   if err.contains(agent::api::team::NOT_FOUND) {
-    return Some((agent::api::team::NOT_FOUND, "This link doesn't point to a Bot you can add. It may have been unpublished or the link is incomplete. Ask its owner for a new link.", None));
+    return Some((agent::api::team::NOT_FOUND, "This link doesn't point to an Agent you can add. It may have been unpublished or the link is incomplete. Ask its owner for a new link.", None));
   }
   if err.contains("reached your usage limit") {
-    return Some(("Usage limit reached", "Your Bots will pick up again when the week resets. To keep going now, raise your weekly limit or turn on Keep going in Settings → Usage.", Some("usage")));
+    return Some(("Usage limit reached", "Your Agents will pick up again when the week resets. To keep going now, raise your weekly limit or turn on Keep going in Settings → Usage.", Some("usage")));
   }
   None
 }

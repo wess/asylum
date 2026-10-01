@@ -26,7 +26,7 @@ pub async fn add(rt: &Runtime, id: &str) -> Result<Plugin> {
     "command": e.command,
     "args": e.args,
     "header": e.header,
-    "fields": e.fields.iter().map(|f| json!({"name": f.name, "label": f.label, "secret": f.secret})).collect::<Vec<_>>(),
+    "fields": e.fields.iter().map(|f| json!({"name": f.name, "label": f.label, "secret": f.secret, "optional": f.optional})).collect::<Vec<_>>(),
     "multi_account": e.multi_account,
     "description": e.description,
   });
@@ -113,14 +113,22 @@ fn enc(s: &str) -> String {
 }
 
 /// Connect with a token (token plugins) or environment values (commands).
-pub async fn connect_fields(rt: &Runtime, plugin: &str, label: &str, values: HashMap<String, String>) -> Result<()> {
+pub async fn connect_fields(rt: &Runtime, plugin: &str, label: &str, mut values: HashMap<String, String>) -> Result<()> {
   let p = plugins::get(&rt.pool, plugin).await?;
   let fields: Vec<Value> = p.config()["fields"].as_array().cloned().unwrap_or_default();
   for f in &fields {
     let name = f["name"].as_str().unwrap_or("");
     if values.get(name).is_none_or(|v| v.trim().is_empty()) {
+      if f["optional"].as_bool().unwrap_or(false) {
+        values.remove(name);
+        continue;
+      }
       bail!("{} is required", f["label"].as_str().unwrap_or(name));
     }
+  }
+  // Some servers start with any credentials; check them where we can.
+  if p.catalog == "jiratoken" {
+    crate::api::atlassian::verify(&values).await?;
   }
   let acct = plugins::add_account(&rt.pool, plugin, label, "").await?;
   let secret = if p.kind == plugins::TOKEN {

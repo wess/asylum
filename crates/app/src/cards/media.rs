@@ -170,7 +170,15 @@ pub fn link(pane: &mut ChatPane, url: &str, title: &str, cx: &mut Context<ChatPa
       })
       .detach();
     }))
-    .on_click(move |_, _, cx| cx.open_url(&u))
+    .on_click(cx.listener(move |this, ev: &gpui::ClickEvent, w, cx| {
+      // Links open in the built-in browser; ⌘-click opens the default browser.
+      if ev.modifiers().platform {
+        cx.open_url(&u);
+      } else {
+        let u = u.clone();
+        let _ = this.root.update(cx, |r, cx| r.show_web(Some(&u), w, cx));
+      }
+    }))
     .child(div().text_color(ink.dimmed).child(guise::Icon::new(IconName::Globe).size(Size::Sm)))
     .child(
       div()

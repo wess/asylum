@@ -5,7 +5,7 @@ members = [
     "crates/app",
     "crates/computer",
     "crates/config",
-    "crates/grok",
+    "crates/chat",
     "crates/mcp",
     "crates/provider",
     "crates/schedule",

@@ -1,4 +1,4 @@
-//! Provider profiles: where Bots' models come from. An HTTP profile is any
+//! Provider profiles: where Agents' models come from. An HTTP profile is any
 //! chat-completions endpoint (xAI, OpenAI/ChatGPT, Ollama local or cloud, a
 //! LiteLLM proxy, a custom gateway); a process profile wraps a coding-agent
 //! CLI (Claude Code, Codex) fed the transcript on stdin. Profiles store
@@ -54,6 +54,13 @@ pub struct Profile {
   pub output: Output,
   /// Models known for this profile (discovered from /models, or listed).
   pub models: Vec<String>,
+  /// This profile's own default model, used when it serves as a fallback.
+  pub model: String,
+  /// The LiteLLM team this profile is scoped to (id and display name).
+  pub team: Option<String>,
+  pub team_name: String,
+  /// Reasoning effort sent with requests: "", "low", "medium", or "high".
+  pub reasoning: String,
 }
 
 impl Profile {

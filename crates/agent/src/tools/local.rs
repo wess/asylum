@@ -4,7 +4,7 @@
 use super::{def, need, Ctx, Outcome};
 use anyhow::{bail, Result};
 use computer::shell::{self, Place, Spec};
-use grok::ToolDef;
+use chat::ToolDef;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::time::Duration;

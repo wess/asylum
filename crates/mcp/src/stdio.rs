@@ -17,7 +17,9 @@ pub struct Stdio {
 impl Stdio {
   pub fn spawn(command: &str, args: &[String], env: &HashMap<String, String>, cwd: Option<&std::path::Path>) -> Result<Self> {
     let mut cmd = Command::new(command);
+    // Server env wins, but a PATH it doesn't set comes from the login shell.
     cmd
+      .env("PATH", crate::path::login())
       .args(args)
       .envs(env)
       .stdin(Pipe::piped())

@@ -14,7 +14,9 @@ use gpui::{div, px, AnyElement, Context, Entity, SharedString, Window};
 use guise::{Badge, Button, Group, IconName, Select, Size, TextInput, Variant};
 use std::collections::HashMap;
 
-pub const CREDS: [&str; 4] = ["Environment variable", "Keychain", "Synapse secret", "No key"];
+/// Where the key comes from. Pasting it is first: most people won't set an
+/// environment variable or run Synapse.
+pub const CREDS: [&str; 4] = ["Paste a key", "Environment variable", "Synapse secret", "No key"];
 
 pub struct Form {
   pub preset: Entity<Select>,
@@ -22,6 +24,8 @@ pub struct Form {
   pub endpoint: Entity<TextInput>,
   pub cred: Entity<Select>,
   pub value: Entity<TextInput>,
+  /// The pasted key (masked).
+  pub key: Entity<TextInput>,
   pub var: Entity<TextInput>,
   pub model: Entity<TextInput>,
   pub fast_model: Entity<TextInput>,
@@ -37,7 +41,8 @@ impl Form {
       name: cx.new(|cx| TextInput::new(cx).placeholder(t("Name, e.g. litellm")).size(Size::Sm)),
       endpoint: cx.new(|cx| TextInput::new(cx).placeholder("http://127.0.0.1:4000/v1").size(Size::Sm)),
       cred: cx.new(|cx| Select::new(cx).data(CREDS.iter().map(|c| t(c))).selected(0).size(Size::Sm)),
-      value: cx.new(|cx| TextInput::new(cx).placeholder(t("LITELLM_API_KEY")).size(Size::Sm)),
+      value: cx.new(|cx| TextInput::new(cx).placeholder(t("Variable name, e.g. LITELLM_API_KEY")).size(Size::Sm)),
+      key: cx.new(|cx| TextInput::new(cx).password(true).placeholder(t("Paste your API key")).size(Size::Sm)),
       var: cx.new(|cx| TextInput::new(cx).placeholder(t("Variable it exports, e.g. OPENROUTER_API_KEY")).size(Size::Sm)),
       model: cx.new(|cx| TextInput::new(cx).value(&s.model).placeholder(t("Model")).size(Size::Sm)),
       fast_model: cx.new(|cx| TextInput::new(cx).value(&s.fast_model).placeholder(t("Fast model (optional)")).size(Size::Sm)),
@@ -53,7 +58,7 @@ fn set_profiles(rt: &Runtime, f: impl FnOnce(&mut Vec<Profile>)) {
   save(rt, |s| s.providers = list);
 }
 
-fn discover(d: &mut Dialog, p: Profile, cx: &mut Context<Dialog>) {
+pub fn discover(d: &mut Dialog, p: Profile, cx: &mut Context<Dialog>) {
   let name = p.name.clone();
   d.providers.found.insert(name.clone(), Ok(Vec::new()));
   let rt = d.rt.clone();
@@ -94,23 +99,42 @@ fn add(d: &mut Dialog, cx: &mut Context<Dialog>) {
     cx.notify();
     return;
   }
-  let mut p = provider::preset::build(preset, &name);
   let endpoint = f.endpoint.read(cx).text();
+  let cred = f.cred.read(cx).selected_index().unwrap_or(0);
+  if cred == 0 && !matches!(preset, "claude-code" | "codex" | "ollama") {
+    let key = f.key.read(cx).text();
+    let rt = d.rt.clone();
+    let (pr, nm, ep, lb) = (preset.to_string(), name.clone(), endpoint.clone(), label);
+    d.status = Some(t("Checking…").into());
+    cx.notify();
+    cx.spawn(async move |this, cx| {
+      let r = crate::tk::run(async move { agent::api::providers::connect(&rt, &pr, &nm, &ep, &key).await }).await;
+      let _ = this.update(cx, |this, cx| {
+        match r {
+          Ok(_) => {
+            this.status = Some(crate::i18n::tf("Added {}.", &[lb]));
+            this.providers.adding = false;
+            for e in [&this.providers.name, &this.providers.endpoint, &this.providers.key] {
+              e.update(cx, |i, cx| i.set_text("", cx));
+            }
+          }
+          Err(e) => this.status = Some(e.to_string()),
+        }
+        cx.notify();
+      });
+    })
+    .detach();
+    return;
+  }
+  let mut p = provider::preset::build(preset, &name);
   if !endpoint.trim().is_empty() && !p.is_process() {
     p.endpoint = endpoint.trim().trim_end_matches('/').to_string();
   }
   if !p.is_process() && preset != "xai" {
     let value = f.value.read(cx).text().trim().to_string();
-    p.credential = match f.cred.read(cx).selected_index().unwrap_or(0) {
-      0 if !value.is_empty() => Credential::Env { var: value },
-      0 => p.credential.clone(),
-      1 => {
-        let account = provider::credential::account(&name);
-        if !value.is_empty() {
-          let _ = config::secret::set(&account, &value);
-        }
-        Credential::Keychain { account }
-      }
+    p.credential = match cred {
+      1 if !value.is_empty() => Credential::Env { var: value },
+      1 => p.credential.clone(),
       2 => Credential::Synapse { secret: value, var: f.var.read(cx).text().trim().to_string() },
       _ => Credential::None,
     };
@@ -150,7 +174,7 @@ pub fn render(d: &mut Dialog, _window: &mut Window, cx: &mut Context<Dialog>) ->
   let mut col = div().flex().flex_col().gap(px(8.0));
   col = col.child(heading(t("Providers"), cx)).child(
     div().text_size(px(12.5)).text_color(ink.dimmed).child(t(
-      "Bots talk to models through these. HTTP providers (xAI, OpenAI, LiteLLM, Ollama) get Asylum's tools; CLI agents (Claude Code, Codex) run with their own tools in the computer's workspace.",
+      "Agents talk to models through these. HTTP providers (xAI, OpenAI, LiteLLM, Ollama) get Asylum's tools; CLI agents (Claude Code, Codex) run with their own tools in the computer's workspace.",
     )),
   );
   for p in profiles.clone() {
@@ -202,7 +226,8 @@ pub fn render(d: &mut Dialog, _window: &mut Window, cx: &mut Context<Dialog>) ->
             }))))),
       )
       .child(div().text_size(px(12.0)).text_color(ink.dimmed).font_family("Menlo").truncate().child(where_))
-      .child(div().text_size(px(12.0)).text_color(ink.dimmed).child(crate::i18n::tf("Key: {}", &[&provider::credential::describe(&p.credential)])));
+      .child(div().text_size(px(12.0)).text_color(ink.dimmed).child(crate::i18n::tf("Key: {}", &[&provider::credential::describe(&p.credential)])))
+      .when(!p.team_name.is_empty(), |c| c.child(div().text_size(px(12.0)).text_color(ink.dimmed).child(crate::i18n::tf("Team: {}", &[&p.team_name]))));
     match d.providers.found.get(&p.name) {
       Some(Err(e)) => card = card.child(div().text_size(px(12.0)).text_color(ink.danger).child(SharedString::from(e.clone()))),
       Some(Ok(v)) if v.is_empty() => card = card.child(div().text_size(px(12.0)).text_color(ink.dimmed).child(t("Asking for models…"))),
@@ -239,6 +264,9 @@ pub fn render(d: &mut Dialog, _window: &mut Window, cx: &mut Context<Dialog>) ->
       }
       card = card.child(chips);
     }
+    if !p.is_process() {
+      card = card.child(super::gateway::render(d, &p, cx));
+    }
     col = col.child(card);
   }
 
@@ -255,7 +283,7 @@ pub fn render(d: &mut Dialog, _window: &mut Window, cx: &mut Context<Dialog>) ->
         cx.notify();
       }))),
   );
-  col = col.child(div().text_size(px(12.0)).text_color(ink.dimmed).child(t("Leave empty on xAI to use the best Grok model your key can use. Any Bot can pin its own provider and model in Bot settings.")));
+  col = col.child(div().text_size(px(12.0)).text_color(ink.dimmed).child(t("Leave empty on xAI to use the best Grok model your key can use. Any Agent can pin its own provider and model in Agent settings.")));
   col = col.child(
     div()
       .flex()
@@ -296,17 +324,20 @@ pub fn render(d: &mut Dialog, _window: &mut Window, cx: &mut Context<Dialog>) ->
       .child(f.preset.clone())
       .child(div().text_size(px(12.0)).text_color(ink.dimmed).child(hint))
       .child(f.name.clone());
-    if !process && preset != "xai" {
-      form = form.child(f.endpoint.clone()).child(f.cred.clone());
-      if cred < 3 {
-        form = form.child(f.value.clone());
+    if !process && preset != "ollama" {
+      if preset != "xai" {
+        form = form.child(f.endpoint.clone());
       }
-      if cred == 2 {
-        form = form.child(f.var.clone());
+      form = form.child(f.cred.clone());
+      match cred {
+        0 => form = form.child(f.key.clone()),
+        1 => form = form.child(f.value.clone()),
+        2 => form = form.child(f.value.clone()).child(f.var.clone()),
+        _ => {}
       }
       let explain = match cred {
-        0 => t("Asylum stores the variable's name, never its value."),
-        1 => t("Paste the key; it goes to the macOS Keychain."),
+        0 => t("Paste the key. Asylum checks it, then keeps it in your Mac's Keychain."),
+        1 => t("For keys you already export in your shell. Asylum stores the variable's name, never its value."),
         2 => t("A secret in Synapse's vault, like apis.OpenRouter, and the variable it exports."),
         _ => t("No key is sent."),
       };

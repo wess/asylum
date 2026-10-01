@@ -13,7 +13,7 @@ use crate::runtime::Runtime;
 use crate::tools::{self, Ctx, Sheet};
 use anyhow::Result;
 use futures::StreamExt;
-use grok::{Message as Msg, StreamEvent, ToolCall};
+use chat::{Message as Msg, StreamEvent, ToolCall};
 use serde_json::Value;
 use std::time::{Duration, Instant};
 use store::{bots, chats, messages, runs};
@@ -37,7 +37,7 @@ async fn worker(rt: Runtime, bot: String) {
     let started = std::time::Instant::now();
     let result = run(&rt, &job, &cancel).await;
     let outcome = if result.is_ok() { "done" } else { "error" };
-    crate::otel::span(&rt, "turn", &[("bot", &job.bot), ("chat", &job.chat), ("origin", job.origin.as_str()), ("outcome", outcome)], started.elapsed().as_millis() as u64);
+    crate::otel::span(&rt, "turn", &[("agent", &job.bot), ("chat", &job.chat), ("origin", job.origin.as_str()), ("outcome", outcome)], started.elapsed().as_millis() as u64);
     if let Err(e) = result {
       let _ = fail(&rt, &job, &e.to_string()).await;
     }
@@ -90,11 +90,11 @@ pub fn friendly(err: &str) -> String {
   } else if e.contains("401") || e.contains("api key") || e.contains("unauthorized") {
     "Your xAI API key was rejected. Check it in Settings → Account.".into()
   } else if e.contains("429") || e.contains("rate") {
-    "Rate limited by the model provider. The Bot will be able to respond shortly.".into()
+    "Rate limited by the model provider. The Agent will be able to respond shortly.".into()
   } else if e.contains("usage limit") {
     err.to_string()
   } else {
-    format!("Bot failed to respond: {err}")
+    format!("Agent failed to respond: {err}")
   }
 }
 
@@ -163,7 +163,7 @@ pub async fn run(rt: &Runtime, job: &Job, cancel: &CancellationToken) -> Result<
   let offered = if provider.tools() { rt.plugins.offered(rt).await } else { Vec::new() };
   let mut defs = if provider.tools() { tools::builtin(&ctx.chat, rt.settings().voice_enabled) } else { Vec::new() };
   for o in &offered {
-    defs.push(grok::ToolDef::new(&o.name, &o.tool.description, crate::plugins::schema(o)));
+    defs.push(chat::ToolDef::new(&o.name, &o.tool.description, crate::plugins::schema(o)));
   }
 
   let mut convo = vec![Msg::system(crate::prompt::system(&ctx))];

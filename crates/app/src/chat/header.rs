@@ -123,7 +123,7 @@ fn overflow(pane: &mut ChatPane, at: gpui::Point<gpui::Pixels>, window: &mut Win
   let bot = pane.bot().cloned().filter(|_| !pane.is_group());
   let mut m = crate::menu::Menu::default();
   let r1 = root.clone();
-  m = m.item(t("Bot settings"), move |w, cx| {
+  m = m.item(t("Agent settings"), move |w, cx| {
     let _ = r1.update(cx, |r, cx| r.show_details(w, cx));
   });
   let (r2, c2) = (root.clone(), chat.clone());
@@ -178,7 +178,7 @@ fn overflow(pane: &mut ChatPane, at: gpui::Point<gpui::Pixels>, window: &mut Win
     m = m.danger(t("Delete"), move |w, cx| {
       let (id, name) = (id7.clone(), name.clone());
       let _ = r7.update(cx, |r, cx| {
-        crate::root::dialogs::confirm(r, crate::i18n::tf("Delete {}?", &[&name]), t("This removes the Bot, its conversation, and its routines. Files on the computer and browser sign-ins stay."), t("Delete"), w, cx, move |r, _, cx| {
+        crate::root::dialogs::confirm(r, crate::i18n::tf("Delete {}?", &[&name]), t("This removes the Agent, its conversation, and its routines. Files on the computer and browser sign-ins stay."), t("Delete"), w, cx, move |r, _, cx| {
           let rt = r.rt.clone();
           let id = id.clone();
           r.active = None;

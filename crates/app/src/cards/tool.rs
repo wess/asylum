@@ -35,8 +35,8 @@ pub fn label(name: &str, args: &serde_json::Value) -> String {
     "forget" => t("Updated memory").into(),
     "use_skill" => tf("Used skill /{}", &[&pick("name")]),
     "save_skill" => tf("Saved skill \"{}\"", &[&pick("name")]),
-    "message_bot" => tf("Messaged {}", &[&pick("bot")]),
-    "create_bot" => tf("Created {}", &[&pick("name")]),
+    "message_agent" => tf("Messaged {}", &[&pick("agent")]),
+    "create_agent" => tf("Created {}", &[&pick("name")]),
     "create_routine" => tf("Created routine \"{}\"", &[&pick("name")]),
     "generate_image" => t("Generated an image").into(),
     n if n.contains("__") => {

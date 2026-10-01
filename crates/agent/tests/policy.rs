@@ -70,7 +70,7 @@ async fn policy_adds_required_team_bots_and_can_disable_team_bots() {
   let link = crate::api::team::link(&rt, &owner.id).await.unwrap();
 
   let file = dir.path().join("policy.json");
-  std::fs::write(&file, serde_json::json!({ "team-bots": [link] }).to_string()).unwrap();
+  std::fs::write(&file, serde_json::json!({ "team-agents": [link] }).to_string()).unwrap();
   apply(&rt, &file).await.unwrap();
   apply(&rt, &file).await.unwrap(); // idempotent: added once
   let added: Vec<_> = store::bots::list(&rt.pool).await.unwrap().into_iter().filter(|b| b.required).collect();

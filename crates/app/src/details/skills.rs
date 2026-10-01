@@ -11,10 +11,10 @@ pub fn render(d: &mut Details, cx: &mut Context<Details>) -> AnyElement {
   let ink = ink(cx);
   let Some(bid) = d.bot_id() else { return div().into_any_element() };
   let mut col = div().flex().flex_col().gap(px(6.0)).child(section(t("Skills"), cx)).child(
-    div().text_size(px(12.0)).text_color(ink.dimmed).pb(px(4.0)).child(t("One library shared by every Bot. Switch on the ones this Bot may use, or reference any with / in the composer.")),
+    div().text_size(px(12.0)).text_color(ink.dimmed).pb(px(4.0)).child(t("One library shared by every Agent. Switch on the ones this Agent may use, or reference any with / in the composer.")),
   );
   if d.data.skills.is_empty() {
-    col = col.child(div().text_size(px(13.0)).text_color(ink.dimmed).child(t("No skills yet. Ask a Bot to save a process as a skill, teach one by demonstration, or add one from the Marketplace.")));
+    col = col.child(div().text_size(px(13.0)).text_color(ink.dimmed).child(t("No skills yet. Ask an Agent to save a process as a skill, teach one by demonstration, or add one from the Marketplace.")));
   }
   for s in d.data.skills.clone() {
     let on = d.data.enabled.contains(&s.id);

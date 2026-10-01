@@ -36,3 +36,14 @@ fn expiry() {
   assert!(t.expired(50_000));
   assert!(!t.expired(10_000));
 }
+
+/// Atlassian's hosted MCP server publishes no protected-resource metadata,
+/// so discovery has to fall back to the origin's authorization server.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn discovers_atlassian_sign_in() {
+  let s = discover("https://mcp.atlassian.com/v1/mcp", None).await.unwrap();
+  assert_eq!(s.authorization_endpoint, "https://mcp.atlassian.com/v1/authorize");
+  assert_eq!(s.token_endpoint, "https://mcp.atlassian.com/v1/token");
+  assert_eq!(s.registration_endpoint.as_deref(), Some("https://mcp.atlassian.com/v1/register"));
+}

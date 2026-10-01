@@ -1,0 +1,150 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Managing Asylum across an organization: the admin policy, network controls, connector and rule policy, Action Recording, audit logs, OpenTelemetry, and the Admin API."><title>Asylum admin guide</title><link rel="canonical" href="https://wess.io/asylum/admin/"><link rel="stylesheet" href="../assets/site.css"><link rel="icon" type="image/svg+xml" sizes="any" href="../assets/favicon.svg"></head>
+<body><a class="skip" href="#main">skip to content</a><div class="shell">
+<div class="topline"><strong>ASYLUM :: ADMIN</strong><nav aria-label="Main navigation"><a href="../">Home</a><a href="../tutorial/">Tutorial</a><a href="../docs/">Docs</a><a aria-current="page" href="./">Admin</a><a href="https://github.com/wess/asylum/releases">Download</a><a href="https://github.com/wess/asylum">Source</a></nav></div>
+<main id="main" class="content"><header><p class="eyebrow">Sysop's handbook · 0.1.0</p><h1>Run it for a team.</h1><p class="lede">One policy file, installed the way you install any managed setting, controls what Asylum may do on every Mac you manage. Activity data stays on each Mac, and you can pull it with an API or stream it to your collector.</p></header>
+<div class="split"><nav class="toc" aria-label="Page sections">
+<p class="group">Policy</p><a href="#policy">The policy file</a><a href="#deploy">Deploying it</a><a href="#reference">Reference</a><a href="#network">Network Controls</a><a href="#connectors">Connectors</a><a href="#rules">Rules and review</a><a href="#execution">Execution</a><a href="#teambots">Team Agents</a><a href="#scripts">Setup scripts</a><a href="#computers">Computers</a>
+<p class="group">Visibility</p><a href="#activity">Activity</a><a href="#recording">Action Recording</a><a href="#audit">Audit log</a><a href="#export">Export</a><a href="#otel">OpenTelemetry</a><a href="#api">Admin API</a>
+<p class="group">Limits</p><a href="#scope">What isn't covered</a>
+</nav>
+<article class="doc">
+
+<h2 id="policy">The policy file</h2>
+<p>Asylum reads <code>/Library/Application Support/asylum/policy.json</code> at launch and again every minute. Only administrators can write there, so users can see the policy but can't change it. When a policy is installed, Settings shows <strong>Managed by &lt;organization&gt;</strong>; if the file can't be parsed, Settings says so and the last good policy stays in force.</p>
+<pre><code>{
+  // Comments are allowed.
+  "organization": "Acme",
+  "network": { "mode": "allowlist", "allowed": ["acme.com", "github.com", "*.atlassian.net"] },
+  "local-egress": false,
+  "local-exec": "ask",
+  "auto-review": true,
+  "rules": [
+    { "kind": "ask", "text": "Before emailing anyone outside acme.com." },
+    { "kind": "allow", "text": "Reading public documentation sites." }
+  ],
+  "disabled-plugins": ["stripe"],
+  "required-plugins": ["github", "linear"],
+  "templates": "team",
+  "team-agents": ["asylum://template/…"],
+  "cloud-agents": false,
+  "setup-script": "brew bundle --file=/opt/acme/Brewfile",
+  "check-script": "test -f ~/.acme/enrolled",
+  "terminate-inactive-days": 30,
+  "otel-endpoint": "https://otel.acme.internal:4318"
+}</code></pre>
+<p>Every key is optional; an empty object — or no file — means unmanaged. Set <code>ASYLUM_POLICY</code> to try a policy from another path before rolling it out.</p>
+
+<h2 id="deploy">Deploying it</h2>
+<p>Any tool that can put a root-owned file on a Mac works: an MDM's custom file payload, a package, or a script.</p>
+<pre><code>sudo mkdir -p "/Library/Application Support/asylum"
+sudo cp policy.json "/Library/Application Support/asylum/policy.json"
+sudo chown root:wheel "/Library/Application Support/asylum/policy.json"
+sudo chmod 644 "/Library/Application Support/asylum/policy.json"</code></pre>
+<p>Changes apply within a minute, without restarting Asylum. Each change is written to the audit log as <code>policy.applied</code> with the admin as its actor.</p>
+
+<h2 id="reference">Reference</h2>
+<table><thead><tr><th>Key</th><th>Type</th><th>Effect</th></tr></thead><tbody>
+<tr><td><code>organization</code></td><td>string</td><td>Shown as "Managed by …"</td></tr>
+<tr><td><code>network</code></td><td>object</td><td><a href="#network">Network Controls</a>: <code>mode</code>, <code>allowed</code>, <code>blocked</code></td></tr>
+<tr><td><code>local-egress</code></td><td>bool</td><td><code>false</code> cuts network access for commands run on the user's own Mac</td></tr>
+<tr><td><code>local-exec</code></td><td><code>never</code> · <code>ask</code> · <code>always</code></td><td>Ceiling for Execution on Local Computer; stricter wins</td></tr>
+<tr><td><code>auto-review</code></td><td>bool</td><td>Force Auto-review on or off</td></tr>
+<tr><td><code>rules</code></td><td>array</td><td>Locked Auto-review rules: <code>{"kind": "ask"|"allow", "text": "…"}</code></td></tr>
+<tr><td><code>disabled-plugins</code></td><td>array</td><td>Marketplace ids or names Agents may not use</td></tr>
+<tr><td><code>required-plugins</code></td><td>array</td><td>Marketplace ids added for everyone, which users can't remove</td></tr>
+<tr><td><code>templates</code></td><td><code>public</code> · <code>team</code> · <code>off</code></td><td>The widest template sharing allowed</td></tr>
+<tr><td><code>team-agents</code></td><td>array</td><td>Team Agent links added for everyone; they can't be hidden or deleted</td></tr>
+<tr><td><code>team-agents-enabled</code></td><td>bool</td><td><code>false</code> turns Team Agents off</td></tr>
+<tr><td><code>cloud-agents</code></td><td>bool</td><td><code>false</code> turns off the Claude Code and Codex CLI providers</td></tr>
+<tr><td><code>setup-script</code> / <code>check-script</code></td><td>string</td><td>Shell run on the computer; see <a href="#scripts">setup scripts</a></td></tr>
+<tr><td><code>terminate-inactive-days</code></td><td>number</td><td>Delete a computer's data after this many idle days (0: never)</td></tr>
+<tr><td><code>otel-endpoint</code></td><td>string</td><td>OTLP/HTTP collector for every user; overrides theirs</td></tr>
+</tbody></table>
+<p>Marketplace ids: <code>github</code> <code>linear</code> <code>notion</code> <code>jira</code> <code>jiratoken</code> <code>sentry</code> <code>stripe</code> <code>supabase</code> <code>vercel</code> <code>huggingface</code> <code>deepwiki</code> <code>context7</code> <code>google</code> <code>slack</code> <code>pagerduty</code> <code>brave</code> <code>postgres</code> <code>playwright</code> <code>datadog</code> <code>salesforce</code> <code>figma</code>.</p>
+
+<h2 id="network">Network Controls</h2>
+<table><thead><tr><th><code>mode</code></th><th>Agents can reach</th></tr></thead><tbody>
+<tr><td><code>open</code> (or unset)</td><td>Anywhere</td></tr>
+<tr><td><code>default</code></td><td>Anywhere except the hosts in <code>blocked</code></td></tr>
+<tr><td><code>allowlist</code></td><td>Only the hosts in <code>allowed</code></td></tr>
+<tr><td><code>offline</code></td><td>Nothing outside the Mac</td></tr>
+</tbody></table>
+<p>An entry matches the host and its subdomains: <code>acme.com</code> covers <code>docs.acme.com</code> but not <code>acme.com.evil.io</code>; a leading <code>*.</code> is accepted and means the same.</p>
+<p>Enforcement doesn't rely on the model behaving. Asylum runs a small filtering proxy on <code>127.0.0.1</code>:</p>
+<ul>
+<li>the Agents' browser launches through it, so every page, redirect, and script request is checked;</li>
+<li>commands on the computer get it as <code>HTTP(S)_PROXY</code>, and the sandbox denies them any other outbound connection — a tool that ignores the proxy simply can't connect;</li>
+<li>the web search, page fetch, and link preview tools go through it too.</li>
+</ul>
+<p>Blocked requests get <code>403 Blocked by your admin's network policy.</code> Changing the mode relaunches the browser on its next use. Model providers and connectors are Asylum's own connections, not Agent browsing, and aren't filtered — control those with <code>disabled-plugins</code> and your network.</p>
+
+<h2 id="connectors">Connectors</h2>
+<p>A disabled connector shows <strong>Disabled by your admin</strong> in the Marketplace, can't be added, and is never offered to Agents even if it was added earlier. A required connector is added automatically for everyone and can't be removed; each user still signs in with their own account.</p>
+
+<h2 id="rules">Rules and review</h2>
+<p>Policy rules appear at the top of Auto-review Rules with a lock ("Required by your admin") and can't be edited or deleted. Users can add their own rules beside them; "Ask first" still wins a conflict. With <code>auto-review</code> set, the switch is locked to your value.</p>
+
+<h2 id="execution">Execution</h2>
+<p><code>local-exec</code> sets a ceiling on running commands and reading files on the user's own Mac: a user can be stricter, never looser. Below <code>always</code>, the approval card's <strong>Always allow</strong> is disabled. <code>local-egress: false</code> runs those local commands in a sandbox with outbound network denied.</p>
+
+<h2 id="teambots">Team Agents</h2>
+<p>List Team Agent links in <code>team-agents</code> and every user gets them, marked <strong>Required by your admin</strong> — they can't be hidden or deleted. Remove a link and the Agent stays but becomes optional. <code>team-agents-enabled: false</code> turns Team Agents off; users opening a Team Agent link see <strong>Team Agents Not Available</strong>. <code>templates</code> limits sharing: <code>team</code> allows only team-only links, <code>off</code> none.</p>
+
+<h2 id="scripts">Setup scripts</h2>
+<p><code>setup-script</code> runs once on each Mac's computer, in its workspace and sandbox, and again only when you change the script. <code>check-script</code> runs every time the computer starts. A non-zero exit sends the user a notification with the output and writes <code>computer.script_failed</code> to the audit log; Agents keep working either way. Scripts are subject to Network Controls like anything else on the computer.</p>
+
+<h2 id="computers">Computers</h2>
+<p><code>terminate-inactive-days</code> erases a computer that hasn't been used for that long — workspace files, browser sign-ins, and backups — and logs <code>computer.terminated_inactive</code>. Agents and conversations stay; the computer starts fresh next time. Users can also <strong>Recreate</strong>, <strong>Stop</strong>, or <strong>Delete computer and data</strong> themselves in Settings → Computer.</p>
+
+<h2 id="activity">Activity</h2>
+<p>Each Mac keeps its own records in its database; nothing is sent anywhere unless you set an OpenTelemetry endpoint or call the Admin API. Users see the same data in <strong>Settings → Activity</strong>: a week of Insights, the two logs, and export.</p>
+
+<h2 id="recording">Action Recording</h2>
+<p>One entry per tool call: time, Agent, conversation, tool, target (a URL, path, or recipient — at most 500 characters), outcome, and duration. Outcomes are <code>done</code>, <code>error</code>, <code>denied</code> (by a rule or Auto-review), <code>user-denied</code>, and <code>expired</code>. Arguments and results are never recorded. Entries are kept for 90 days.</p>
+
+<h2 id="audit">Audit log</h2>
+<p>Control-plane changes, kept indefinitely: <code>settings.changed</code> (which keys, not values), <code>rule.added</code>, <code>rule.deleted</code>, <code>plugin.added</code>, <code>plugin.removed</code>, <code>policy.applied</code>, <code>computer.updating</code>, <code>computer.recovering</code>, <code>computer.recreating</code>, <code>computer.resetting</code>, <code>computer.update_scheduled</code>, <code>computer.setup</code>, <code>computer.script_failed</code>, <code>computer.terminated_inactive</code>, <code>conversation.exported</code>, and <code>conversations.exported</code>. Repeats of the same change within 30 seconds are one entry. The actor is <code>user</code> or <code>admin</code>.</p>
+
+<h2 id="export">Export</h2>
+<p>Conversation content export writes each conversation as JSON and Markdown: every message's author, time, and text, plus each tool call's input, output, and status. Users export one conversation from its sidebar menu or all of them from Settings → Activity; the API exports one by id.</p>
+<pre><code>{
+  "id": "…", "title": "Bug Reproducer", "kind": "direct",
+  "messages": [
+    { "at": 1759312440000, "role": "user", "author": "user", "text": "Reproduce #482", "tools": [] },
+    { "at": 1759312468000, "role": "agent", "author": "Bug Reproducer", "text": "Bisected to 9f3c2e1.",
+      "tools": [ { "tool": "shell", "input": { "command": "git bisect run ./repro.sh" }, "output": "…", "status": "done" } ] }
+  ]
+}</code></pre>
+
+<h2 id="otel">OpenTelemetry</h2>
+<p>Set <code>otel-endpoint</code> in the policy (or a user sets <strong>Collector endpoint</strong> in Activity) and Asylum sends a span for every Agent turn and tool call to <code>&lt;endpoint&gt;/v1/traces</code> as OTLP/HTTP JSON. Spans carry ids and names only — never message text, arguments, or results:</p>
+<table><thead><tr><th>Span</th><th>Attributes</th></tr></thead><tbody>
+<tr><td><code>turn</code></td><td><code>asylum.agent</code> <code>asylum.chat</code> <code>asylum.origin</code> (chat, routine, handoff…) <code>asylum.outcome</code></td></tr>
+<tr><td><code>tool</code></td><td><code>asylum.agent</code> <code>asylum.chat</code> <code>asylum.tool</code> <code>asylum.outcome</code></td></tr>
+</tbody></table>
+<p>Every span has <code>service.name = asylum</code> and <code>asylum.surface = asylum.agent</code>. Delivery is best-effort; a collector that's down doesn't slow Agents down.</p>
+
+<h2 id="api">Admin API</h2>
+<p>Turn on <strong>Local Admin API</strong> in Settings → Activity. It listens on <code>http://127.0.0.1:7438/v1</code> and needs <code>Authorization: Bearer &lt;token&gt;</code>; <strong>Copy token</strong> copies it from the Keychain, where it's created the first time.</p>
+<table><thead><tr><th>Request</th><th>Returns</th></tr></thead><tbody>
+<tr><td><code>GET /v1/agents</code></td><td>Agents: id, name, status, kind, model</td></tr>
+<tr><td><code>GET /v1/actions?since=&lt;ms&gt;</code></td><td>Action Recording, newest first</td></tr>
+<tr><td><code>GET /v1/audit?since=&lt;ms&gt;</code></td><td>Audit log, newest first</td></tr>
+<tr><td><code>GET /v1/insights?since=&lt;ms&gt;</code></td><td>Counts, outcomes, top tools and Agents</td></tr>
+<tr><td><code>GET /v1/chats/{id}/export</code></td><td>One conversation's content</td></tr>
+<tr><td><code>POST /v1/chats/{id}/messages</code></td><td>Send <code>{"text": "…"}</code> as the user; returns the message id</td></tr>
+</tbody></table>
+<pre><code>TOKEN=$(pbpaste)
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:7438/v1/insights | jq
+curl -s -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" -d '{"text": "Run the weekly report now."}' \
+  http://127.0.0.1:7438/v1/chats/&lt;chat-id&gt;/messages</code></pre>
+<p>A missing or wrong token gets <code>401</code>; a bad request <code>400</code> with <code>{"error": "…"}</code>. Turning the API off takes effect after a restart.</p>
+
+<h2 id="scope">What isn't covered</h2>
+<p>Asylum runs entirely on each person's Mac; there is no shared server. That means no SCIM, central group management, invitations, per-group policy overrides, or billing — distribute the policy file and Team Agent links instead.</p>
+<div class="callout">Questions or a control you need? <a href="https://github.com/wess/asylum/issues">Open an issue</a>.</div>
+</article></div></main>
+<div class="statusline"><span>admin</span><span>policy.json</span><span>managed</span></div>
+<footer><span>Asylum 0.1.0 · Apache-2.0</span><span><a href="../docs/">manual</a> · <a href="https://github.com/wess/asylum/security">security</a></span></footer>
+</div><script src="../assets/site.js"></script></body></html>

@@ -1,4 +1,4 @@
-//! Admin policy: the local stand-in for Grok Bot's admin console. An admin
+//! Admin policy: what an organization controls on every Mac. An admin
 //! (or MDM) installs `/Library/Application Support/asylum/policy.json`,
 //! which only administrators can write; users can read but not change it.
 //! `ASYLUM_POLICY` overrides the path (for tests and staging).
@@ -24,9 +24,11 @@ pub struct Policy {
   pub auto_review: Option<bool>,
   /// The widest template sharing allowed: "public", "team", or "off".
   pub templates: Option<String>,
-  /// Team Bot links every teammate gets added automatically.
+  /// Team Agent links every teammate gets added automatically.
+  #[serde(rename = "team-agents", alias = "team-bots")]
   pub team_bots: Vec<String>,
-  /// Set false to turn Team Bots off for everyone.
+  /// Set false to turn Team Agents off for everyone.
+  #[serde(rename = "team-agents-enabled", alias = "team-bots-enabled")]
   pub team_bots_enabled: Option<bool>,
   /// Where the computer's browser and web tools may go.
   pub network: Network,

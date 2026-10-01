@@ -64,10 +64,14 @@ pub fn render(p: &mut Panel, cx: &mut Context<Panel>) -> AnyElement {
         .rounded(px(6.0))
         .cursor_pointer()
         .hover(|s| s.bg(ink.hover))
-        .on_click(cx.listener(move |this, _, _, cx| {
+        .on_click(cx.listener(move |this, ev: &gpui::ClickEvent, w, cx| {
           if full.is_dir() {
             this.dir = path.clone();
             this.list(cx);
+          } else if crate::web::previewable(&path) && !ev.modifiers().platform {
+            // Pages, images, and PDFs open in the built-in browser; ⌘-click opens the default app.
+            let rel = path.clone();
+            let _ = this.root.update(cx, |r, cx| r.preview_file(&rel, w, cx));
           } else {
             cx.open_url(&format!("file://{}", full.display()));
           }

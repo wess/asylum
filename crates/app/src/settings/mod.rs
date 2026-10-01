@@ -1,10 +1,11 @@
 //! The settings dialog (⌘,): General, Computer, Usage, Team
-//! Setup, and Updates. Changes save immediately to bots.json; secrets go to
+//! Setup, and Updates. Changes save immediately to agents.json; secrets go to
 //! the keychain.
 
 pub mod about;
 pub mod activity;
 pub mod computer;
+pub mod gateway;
 pub mod general;
 pub mod providers;
 pub mod required;
@@ -59,6 +60,7 @@ pub struct Dialog {
   pub links: Vec<store::slack::Link>,
   pub activity: Option<activity::Data>,
   pub update_at: Option<i64>,
+  pub gateway: gateway::State,
   pub otel: Entity<TextInput>,
   pub link_user: Entity<TextInput>,
   pub link_name: Entity<TextInput>,
@@ -80,7 +82,7 @@ pub fn open(root: &mut Root, page: Option<&'static str>, window: &mut Window, cx
   root.set_modal(view, cx);
 }
 
-/// Change settings and write them to bots.json.
+/// Change settings and write them to agents.json.
 pub fn save(rt: &Runtime, f: impl FnOnce(&mut config::Settings)) {
   let before = rt.settings();
   let mut s = before.clone();
@@ -235,6 +237,7 @@ impl Dialog {
       links: Vec::new(),
       activity: None,
       update_at: None,
+      gateway: gateway::State::default(),
       otel: cx.new(|cx| TextInput::new(cx).value(&s.otel_endpoint).placeholder("http://127.0.0.1:4318").size(Size::Sm)),
       link_user: cx.new(|cx| TextInput::new(cx).placeholder(t("Slack member ID, e.g. U012AB3CD")).size(Size::Sm)),
       link_name: cx.new(|cx| TextInput::new(cx).placeholder(t("Name")).size(Size::Sm)),
@@ -290,7 +293,7 @@ impl Dialog {
     let rt = self.rt.clone();
     cx.spawn(async move |this, cx| {
       let r = crate::tk::run(async move {
-        grok::Client::new(key.clone(), None).models().await?;
+        ::chat::Client::new(key.clone(), None).models().await?;
         config::secret::set(config::secret::XAI_KEY, &key)?;
         let _ = rt.refresh_models().await;
         Ok(())

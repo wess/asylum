@@ -215,9 +215,9 @@ fn state_banner(p: &Panel, cx: &mut Context<Panel>) -> Option<gpui::AnyElement> 
     "starting" => ("Starting your computer", None),
     "updating" => ("Updating your computer", None),
     "recovering" | "resetting" => ("Reconnecting", None),
-    "recreating" => ("Recreating your computer. Bots resume when it's ready.", None),
+    "recreating" => ("Recreating your computer. Agents resume when it's ready.", None),
     "hibernating" => (
-      "Your computer is hibernating to save memory. It wakes when a Bot needs it.",
+      "Your computer is hibernating to save memory. It wakes when an Agent needs it.",
       Some(("Wake", |p, cx| {
         let rt = p.rt.clone();
         tk::spawn(async move { agent::api::computer::wake(&rt).await });
@@ -248,6 +248,15 @@ fn state_banner(p: &Panel, cx: &mut Context<Panel>) -> Option<gpui::AnyElement> 
       })));
   }
   Some(row.into_any_element())
+}
+
+impl Panel {
+  /// Switch to the Terminal tab (⌘⇧T).
+  pub fn show_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    self.tab = Tab::Terminal;
+    terminal::ensure(self, window, cx);
+    cx.notify();
+  }
 }
 
 impl Render for Panel {

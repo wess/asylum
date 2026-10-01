@@ -22,6 +22,7 @@ pub enum Right {
   None,
   Details,
   Computer,
+  Web,
 }
 
 pub struct Root {
@@ -42,6 +43,8 @@ pub struct Root {
   pub rename: Option<(Item, Entity<guise::TextInput>)>,
   pub details: Option<Entity<crate::details::Details>>,
   pub panel: Option<Entity<crate::computer::Panel>>,
+  /// The built-in browser; kept across chats so its page survives.
+  pub web: Option<Entity<crate::web::Browser>>,
   pub voice: Option<Entity<crate::voicechat::Call>>,
   pub market: Option<Entity<crate::market::Market>>,
   pub show_hidden: bool,
@@ -85,6 +88,7 @@ impl Root {
       active: None,
       pane: None,
       right: Right::None,
+      web: None,
       compact: settings.compact_sidebar,
       modal: None,
       spotlight: None,
@@ -124,7 +128,7 @@ impl Root {
         Ok(s) => s,
         Err(e) => {
           eprintln!("could not load the sidebar: {e:#}");
-          let _ = this.update(cx, |this, cx| this.toast(format!("{} {e}", crate::i18n::t("Couldn't load your Bots.")), cx));
+          let _ = this.update(cx, |this, cx| this.toast(format!("{} {e}", crate::i18n::t("Couldn't load your Agents.")), cx));
           return;
         }
       };
@@ -229,12 +233,13 @@ impl Root {
     let root = cx.entity().downgrade();
     self.details = Some(cx.new(|cx| crate::details::Details::new(rt, chat, root, window, cx)));
     self.panel = None;
+    self.hide_web(cx);
     cx.notify();
   }
 
   pub fn show_computer(&mut self, window: &mut Window, cx: &mut Context<Self>) {
     let Some(bot) = self.active_bot() else {
-      self.toast(crate::i18n::t("Open a Bot's chat to see its computer."), cx);
+      self.toast(crate::i18n::t("Open an Agent's chat to see its computer."), cx);
       return;
     };
     self.right = Right::Computer;
@@ -243,15 +248,51 @@ impl Root {
     let state = self.computer.clone();
     self.panel = Some(cx.new(|cx| crate::computer::Panel::new(rt, bot.id.clone(), root, state, window, cx)));
     self.details = None;
+    self.hide_web(cx);
     cx.notify();
   }
 
+  /// Open the built-in browser at a URL (or keep its page when `None`).
+  pub fn show_web(&mut self, url: Option<&str>, window: &mut Window, cx: &mut Context<Self>) {
+    match (&self.web, url) {
+      (Some(w), Some(u)) => w.update(cx, |w, cx| w.go(u, cx)),
+      (Some(_), None) => {}
+      (None, start) => {
+        let root = cx.entity().downgrade();
+        let ws = self.rt.computer.workspace();
+        let start = start.unwrap_or("about:blank").to_string();
+        self.web = Some(cx.new(|cx| crate::web::Browser::new(root, ws, &start, window, cx)));
+      }
+    }
+    self.right = Right::Web;
+    self.details = None;
+    self.panel = None;
+    cx.notify();
+  }
+
+  /// Open a workspace file (HTML, images, PDFs) in the built-in browser.
+  pub fn preview_file(&mut self, relative: &str, window: &mut Window, cx: &mut Context<Self>) {
+    let url = crate::web::address::workspace(relative.trim_start_matches("~/"));
+    self.show_web(Some(&url), window, cx);
+  }
+
   pub fn close_right(&mut self, cx: &mut Context<Self>) {
+    if self.right == Right::Web {
+      if let Some(w) = &self.web {
+        w.update(cx, |w, cx| w.set_visible(false, cx));
+      }
+    }
     self.right = Right::None;
     self.wide = false;
     self.details = None;
     self.panel = None;
     cx.notify();
+  }
+
+  fn hide_web(&mut self, cx: &mut Context<Self>) {
+    if let Some(w) = &self.web {
+      w.update(cx, |w, cx| w.set_visible(false, cx));
+    }
   }
 
   pub fn set_modal(&mut self, view: impl Into<AnyView>, cx: &mut Context<Self>) {
@@ -301,9 +342,16 @@ impl Render for Root {
     let right = match self.right {
       Right::Details => self.details.clone().map(|d| d.into_any_element()),
       Right::Computer => self.panel.clone().map(|p| p.into_any_element()),
+      Right::Web => self.web.clone().map(|w| w.into_any_element()),
       Right::None => None,
     };
-    let wide = self.wide && self.right == Right::Computer;
+    // The web view is a native surface drawn over gpui: keep it out of the
+    // way of dialogs, and let it show again when they close.
+    if let Some(w) = self.web.clone() {
+      let show = self.right == Right::Web && self.modal.is_none();
+      w.update(cx, |w, cx| w.set_visible(show, cx));
+    }
+    let wide = self.wide && matches!(self.right, Right::Computer | Right::Web);
     let mut body = div().flex().flex_1().min_h_0().child(crate::sidebar::render(self, window, cx));
     if !wide {
       body = body.child(main);
@@ -312,7 +360,9 @@ impl Render for Root {
       body = body.child(
         div()
           .when(wide, |d| d.flex_1())
-          .when(!wide, |d| d.w(px(if self.right == Right::Computer { 520.0 } else { 360.0 })).flex_none())
+          // The browser shares the width with the chat; the others are fixed.
+          .when(!wide && self.right == Right::Web, |d| d.flex_1().min_w_0())
+          .when(!wide && self.right != Right::Web, |d| d.w(px(if self.right == Right::Computer { 520.0 } else { 360.0 })).flex_none())
           .h_full()
           .border_l_1()
           .border_color(ink.border)
@@ -378,9 +428,15 @@ pub fn open(rt: Runtime, cx: &mut App) -> anyhow::Result<gpui::WindowHandle<Root
 
 /// Dev hook for screenshots without driving input: `ASYLUM_SHOW` names a
 /// screen to open at launch — `settings:<page>`, `market`, `new`, `palette`,
-/// `about`, or `bot:<name>[:details|:computer]`.
+/// `about`, `web[:<url>]`, or `bot:<name>[:details|:computer]`.
 fn show(root: &mut Root, window: &mut Window, cx: &mut Context<Root>) {
   let Ok(spec) = std::env::var("ASYLUM_SHOW") else { return };
+  // `web:<url or workspace/path>` opens the built-in browser.
+  if let Some(rest) = spec.strip_prefix("web") {
+    let url = rest.strip_prefix(':').filter(|u| !u.is_empty());
+    root.show_web(url, window, cx);
+    return;
+  }
   let mut parts = spec.splitn(3, ':');
   match (parts.next(), parts.next(), parts.next()) {
     (Some("settings"), page, _) => {

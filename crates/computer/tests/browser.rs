@@ -10,13 +10,13 @@ fn key_names() {
 #[test]
 fn snapshot_render_lists_elements() {
   let s = Snapshot {
-    url: "https://x.ai".into(),
+    url: "https://example.com".into(),
     title: "xAI".into(),
     text: "Hello".into(),
     elements: vec!["[1] a \"News\"".into()],
   };
   let r = s.render();
-  assert!(r.contains("URL: https://x.ai"));
+  assert!(r.contains("URL: https://example.com"));
   assert!(r.contains("[1] a \"News\""));
 }
 

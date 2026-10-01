@@ -117,7 +117,7 @@ pub async fn daily(rt: &Runtime) {
 
 fn preflight(rt: &Runtime) -> Result<()> {
   if rt.queues.busy_any() {
-    bail!("Agent busy: a Bot is working and can't pause yet. Try again when it finishes.");
+    bail!("Agent busy: an Agent is working and can't pause yet. Try again when it finishes.");
   }
   if snapshots(rt).is_empty() {
     bail!("Backup not ready: the first backup hasn't finished yet.");
@@ -161,7 +161,7 @@ pub async fn recover(rt: &Runtime) -> Result<()> {
 pub async fn reset(rt: &Runtime) -> Result<()> {
   let _g = Guard::take()?;
   if rt.queues.busy_any() {
-    bail!("Agent busy: a Bot is working and can't pause yet.");
+    bail!("Agent busy: an Agent is working and can't pause yet.");
   }
   let Some(last) = snapshots(rt).pop() else { bail!("Backup not ready: there is no backup to reset from.") };
   emit(rt, RESETTING);
@@ -243,7 +243,7 @@ pub async fn wake(rt: &Runtime) -> Result<()> {
 pub async fn recreate(rt: &Runtime) -> Result<()> {
   let _g = Guard::take()?;
   let Ok(_pause) = tokio::time::timeout(SAFE_POINT, rt.gate.write()).await else {
-    bail!("Agent busy: a Bot is working and can't pause yet.");
+    bail!("Agent busy: an Agent is working and can't pause yet.");
   };
   emit(rt, RECREATING);
   backup(rt).await?;
@@ -265,7 +265,7 @@ pub async fn recreate(rt: &Runtime) -> Result<()> {
 /// Stop the computer now (it starts again when a Bot needs it).
 pub async fn stop(rt: &Runtime) -> Result<()> {
   if rt.queues.busy_any() {
-    bail!("Agent busy: a Bot is working and can't pause yet.");
+    bail!("Agent busy: an Agent is working and can't pause yet.");
   }
   rt.browser.shutdown().await;
   ASLEEP.store(true, Ordering::SeqCst);
@@ -278,7 +278,7 @@ pub async fn stop(rt: &Runtime) -> Result<()> {
 pub async fn delete_all(rt: &Runtime) -> Result<()> {
   let _g = Guard::take()?;
   let Ok(_pause) = tokio::time::timeout(SAFE_POINT, rt.gate.write()).await else {
-    bail!("Agent busy: a Bot is working and can't pause yet.");
+    bail!("Agent busy: an Agent is working and can't pause yet.");
   };
   emit(rt, RESETTING);
   rt.browser.shutdown().await;

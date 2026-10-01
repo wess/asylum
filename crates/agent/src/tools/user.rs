@@ -5,7 +5,7 @@ use super::{arg, def, need, Ctx, Outcome};
 use crate::part::{Field, Part};
 use crate::runtime::Reply;
 use anyhow::{bail, Result};
-use grok::ToolDef;
+use chat::ToolDef;
 use serde_json::{json, Value};
 
 pub fn defs() -> Vec<ToolDef> {

@@ -56,9 +56,9 @@ pub fn render(pane: &mut ChatPane, m: &Message, i: usize, p: &Part, cx: &mut Con
       );
     }
     "saved" => card = card.child(div().text_size(px(12.0)).text_color(ink.success).child(t("Saved securely and kept private"))),
-    "filled" => card = card.child(div().text_size(px(12.0)).text_color(ink.success).child(t("Filled into the page. Secret values were never shown to your Bot."))),
+    "filled" => card = card.child(div().text_size(px(12.0)).text_color(ink.success).child(t("Filled into the page. Secret values were never shown to your Agent."))),
     "failed" => card = card.child(div().text_size(px(12.0)).text_color(ink.danger).child(t("Could not fill into the page"))),
     _ => {}
   }
-  card.child(div().text_size(px(11.0)).text_color(ink.dimmed).child(t("Stored securely, never shown to your Bot"))).into_any_element()
+  card.child(div().text_size(px(11.0)).text_color(ink.dimmed).child(t("Stored securely, never shown to your Agent"))).into_any_element()
 }

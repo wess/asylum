@@ -76,9 +76,9 @@ pub fn render(d: &mut Dialog, cx: &mut Context<Dialog>) -> AnyElement {
       col = col.child(row(t("Most used tools"), Some(&top(&i.tools)), div(), cx));
     }
     if !i.bots.is_empty() {
-      col = col.child(row(t("Busiest Bots"), Some(&top(&i.bots)), div(), cx));
+      col = col.child(row(t("Busiest Agents"), Some(&top(&i.bots)), div(), cx));
     }
-    col = col.child(heading(t("Action Recording"), cx)).child(div().text_size(px(12.0)).text_color(ink.dimmed).pb(px(4.0)).child(t("What Bots did: tool, target, and outcome only. Kept for 90 days.")));
+    col = col.child(heading(t("Action Recording"), cx)).child(div().text_size(px(12.0)).text_color(ink.dimmed).pb(px(4.0)).child(t("What Agents did: tool, target, and outcome only. Kept for 90 days.")));
     col = col.child(log(&a.actions, cx));
     col = col.child(heading(t("Audit log"), cx)).child(log(&a.audit, cx));
   }
@@ -121,7 +121,7 @@ pub fn render(d: &mut Dialog, cx: &mut Context<Dialog>) -> AnyElement {
     .child(heading(t("Admin API"), cx))
     .child(row(
       t("Local Admin API"),
-      Some(&if s.admin_port == 0 { t("Read Bots, actions, the audit log, insights, and conversations over HTTP on this Mac, with a token.").to_string() } else { format!("http://127.0.0.1:{}/v1 · {}", s.admin_port, t("Turning it off takes effect after a restart.")) }),
+      Some(&if s.admin_port == 0 { t("Read Agents, actions, the audit log, insights, and conversations over HTTP on this Mac, with a token.").to_string() } else { format!("http://127.0.0.1:{}/v1 · {}", s.admin_port, t("Turning it off takes effect after a restart.")) }),
       guise::Switch::new("admin-api").checked(s.admin_port != 0).color(guise::ColorName::Violet).on_change({
         let rt = d.rt.clone();
         let on = s.admin_port == 0;

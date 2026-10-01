@@ -75,7 +75,7 @@ pub fn item(root: &mut Root, item: &Item, at: Point<Pixels>, window: &mut Window
     Item::Bot(id) => {
       let bot = root.snap.bot(id).cloned().unwrap_or_default();
       let it = item.clone();
-      m = m.item(t("Rename Bot"), act(root, cx, move |this, w, cx| start_rename(this, &it, w, cx)));
+      m = m.item(t("Rename Agent"), act(root, cx, move |this, w, cx| start_rename(this, &it, w, cx)));
       if let Some(c) = &chat {
         let cid = c.id.clone();
         m = m.item(t("Copy conversation ID"), act(root, cx, move |_, _, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(cid.clone()))));
@@ -95,7 +95,7 @@ pub fn item(root: &mut Root, item: &Item, at: Point<Pixels>, window: &mut Window
       }
       if !bot.primary_bot {
         let bid = bot.id.clone();
-        m = m.item(t("Make primary Bot"), act(root, cx, move |this, _, cx| {
+        m = m.item(t("Make primary Agent"), act(root, cx, move |this, _, cx| {
           let rt = this.rt.clone();
           let bid = bid.clone();
           this.run(cx, async move { store::bots::set_primary(&rt.pool, &bid).await }, |this, _, cx| this.reload(cx));
@@ -133,7 +133,7 @@ pub fn item(root: &mut Root, item: &Item, at: Point<Pixels>, window: &mut Window
         crate::root::dialogs::confirm(
           this,
           crate::i18n::tf("Delete {}?", &[&name]),
-          t("This removes the Bot, its conversation, and its routines. Files on the computer and browser sign-ins stay."),
+          t("This removes the Agent, its conversation, and its routines. Files on the computer and browser sign-ins stay."),
           t("Delete"),
           w,
           cx,
@@ -171,7 +171,7 @@ pub fn item(root: &mut Root, item: &Item, at: Point<Pixels>, window: &mut Window
       let gid = id.clone();
       m = m.danger(t("Delete"), act(root, cx, move |this, w, cx| {
         let gid = gid.clone();
-        crate::root::dialogs::confirm(this, t("Delete this group chat?"), t("The conversation is deleted. The Bots stay."), t("Delete"), w, cx, move |this, _, cx| {
+        crate::root::dialogs::confirm(this, t("Delete this group chat?"), t("The conversation is deleted. The Agents stay."), t("Delete"), w, cx, move |this, _, cx| {
           let rt = this.rt.clone();
           let gid = gid.clone();
           this.history.forget(&gid);

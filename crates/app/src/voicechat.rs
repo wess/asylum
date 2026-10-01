@@ -50,7 +50,7 @@ pub fn start(pane: &mut ChatPane, window: &mut Window, cx: &mut Context<ChatPane
   }
   let Some(bot) = pane.bot().cloned() else { return };
   if bot.is_team() && !bot.owner.is_empty() && bot.owner != pane.rt.settings().user_name {
-    pane.toast(t("Voice chat isn't available with teammates' Team Bots."), cx);
+    pane.toast(t("Voice chat isn't available with teammates' Team Agents."), cx);
     return;
   }
   if config::secret::xai_key().is_none() {

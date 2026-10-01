@@ -150,9 +150,9 @@ impl Runtime {
   }
 
   /// The xAI API, for what only xAI offers here: voice and images.
-  pub fn xai(&self) -> Result<grok::Client> {
+  pub fn xai(&self) -> Result<chat::Client> {
     let key = config::secret::xai_key().ok_or_else(|| anyhow!("Add your xAI API key in Settings to use voice and images."))?;
-    Ok(grok::Client::new(key, None))
+    Ok(chat::Client::new(key, None))
   }
 
   /// Every provider profile, with the xAI preset if none are configured.
@@ -205,12 +205,28 @@ impl Runtime {
       anyhow::bail!("Pick a model for {} in Settings → Providers.", profile.name);
     }
     if profile.preset == "xai" && config::secret::xai_key().is_none() {
-      anyhow::bail!("Add your xAI API key in Settings → Providers to wake your Bots.");
+      anyhow::bail!("Add your xAI API key in Settings → Providers to wake your Agents.");
     }
     if profile.kind == config::Kind::Process && !self.policy().cloud_agents_allowed() {
-      anyhow::bail!("Your admin has turned off Cloud Agents ({}). Pick another provider for this Bot.", profile.name);
+      anyhow::bail!("Your admin has turned off Cloud Agents ({}). Pick another provider for this Agent.", profile.name);
     }
-    provider::Provider::open(&profile, &model, &self.computer.workspace(), s.retries).await
+    let primary = provider::Provider::open(&profile, &model, &self.computer.workspace(), s.retries).await?;
+    Ok(primary.with_fallbacks(self.fallbacks(&profile.name, &model).await))
+  }
+
+  /// The fallback chain from Settings, minus the active provider. Each uses
+  /// its own default model, or the same model name when it has none.
+  async fn fallbacks(&self, active: &str, model: &str) -> Vec<provider::Provider> {
+    let s = self.settings();
+    let mut out = Vec::new();
+    for name in s.fallback_providers.iter().filter(|n| n.as_str() != active) {
+      let Some(p) = self.profile(name) else { continue };
+      let m = if p.model.trim().is_empty() { model.to_string() } else { p.model.clone() };
+      if let Ok(opened) = provider::Provider::open(&p, &m, &self.computer.workspace(), s.retries).await {
+        out.push(opened);
+      }
+    }
+    out
   }
 
   /// The provider for quick background work (Auto-review, memory, names).

@@ -1,4 +1,4 @@
-//! ⌘N: create a Bot (named "New Bot", or the typed name), create a Team
+//! ⌘N: create a Bot (named "New Agent", or the typed name), create a Team
 //! Bot, pick 2 to 6 Bots for a group chat, or browse Team Bots.
 
 use crate::i18n::{t, tf};
@@ -23,8 +23,8 @@ pub fn open(root: &mut Root, window: &mut Window, cx: &mut Context<Root>) {
   let weak = cx.entity().downgrade();
   let bots: Vec<Bot> = root.snap.bots.iter().filter(|b| b.kind != "system").cloned().collect();
   let view = cx.new(|cx| {
-    let input = cx.new(|cx| TextInput::new(cx).placeholder(t("Search or name a new Bot")));
-    let link = cx.new(|cx| TextInput::new(cx).placeholder(t("Paste a Team Bot or template link")).size(Size::Xs));
+    let input = cx.new(|cx| TextInput::new(cx).placeholder(t("Search or name a new Agent")));
+    let link = cx.new(|cx| TextInput::new(cx).placeholder(t("Paste a Team Agent or template link")).size(Size::Xs));
     window.focus(&input.read(cx).focus_handle(), cx);
     let s1 = cx.observe(&input, |_, _, cx| cx.notify());
     let s2 = cx.subscribe_in(&input, window, |this: &mut NewChat, _, ev: &TextInputEvent, w, cx| {
@@ -91,12 +91,12 @@ impl Render for NewChat {
     let root = self.root.clone();
     let exact = self.bots.iter().any(|b| b.name.to_lowercase() == ql);
     let mut col = div().flex().flex_col().gap(px(6.0)).child(self.input.clone());
-    let label = if q.trim().is_empty() || exact { t("Create new Bot").to_string() } else { tf("Create \"{}\" Bot", &[q.trim()]) };
+    let label = if q.trim().is_empty() || exact { t("Create new Agent").to_string() } else { tf("Create \"{}\" Agent", &[q.trim()]) };
     let name = q.trim().to_string();
     col = col
       .child(action("create", IconName::Plus, label.into(), &ink).on_click(cx.listener(move |this, _, w, cx| this.create(Some(name.clone()), w, cx))))
-      .child(action("team", IconName::Users, t("Create new Team Bot").into(), &ink).on_click(cx.listener(|this, _, w, cx| this.team(w, cx))));
-    col = col.child(div().pt(px(8.0)).text_size(px(11.0)).text_color(ink.dimmed).child(t("START A GROUP CHAT WITH 2 TO 6 BOTS")));
+      .child(action("team", IconName::Users, t("Create new Team Agent").into(), &ink).on_click(cx.listener(|this, _, w, cx| this.team(w, cx))));
+    col = col.child(div().pt(px(8.0)).text_size(px(11.0)).text_color(ink.dimmed).child(t("START A GROUP CHAT WITH 2 TO 6 AGENTS")));
     let mut list = div().id("newchat-bots").flex().flex_col().max_h(px(280.0)).overflow_y_scroll();
     for b in self.bots.iter().filter(|b| ql.is_empty() || b.name.to_lowercase().contains(&ql) || b.label.to_lowercase().contains(&ql)) {
       let id = b.id.clone();
@@ -134,13 +134,13 @@ impl Render for NewChat {
         .on_click(cx.listener(|this, _, w, cx| this.group(w, cx))),
     );
     let teams: Vec<&Bot> = self.bots.iter().filter(|b| b.is_team() && b.published).collect();
-    col = col.child(div().pt(px(8.0)).text_size(px(11.0)).text_color(ink.dimmed).child(t("TEAM BOTS")));
+    col = col.child(div().pt(px(8.0)).text_size(px(11.0)).text_color(ink.dimmed).child(t("TEAM AGENTS")));
     if ql.chars().count() >= 3 || ql.is_empty() {
       for b in teams.iter().filter(|b| ql.is_empty() || b.name.to_lowercase().contains(&ql)) {
         col = col.child(div().flex().gap(px(8.0)).items_center().px(px(8.0)).child(crate::avatar::face(b, 20.0, cx)).child(b.name.clone()).child(div().text_size(px(11.0)).text_color(ink.dimmed).child(b.owner.clone())));
       }
     } else {
-      col = col.child(div().px(px(8.0)).text_size(px(12.0)).text_color(ink.dimmed).child(t("Search Team Bots needs at least 3 characters.")));
+      col = col.child(div().px(px(8.0)).text_size(px(12.0)).text_color(ink.dimmed).child(t("Search Team Agents needs at least 3 characters.")));
     }
     col = col.child(div().flex().gap(px(6.0)).child(div().flex_1().child(self.link.clone())).child(Button::new("add-link", t("Add")).size(Size::Xs).variant(Variant::Light).on_click(cx.listener(|this, _, w, cx| this.join(w, cx)))));
     div().absolute().top_0().left_0().size_full().child(

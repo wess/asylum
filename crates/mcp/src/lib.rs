@@ -5,6 +5,7 @@
 pub mod client;
 pub mod http;
 pub mod oauth;
+pub mod path;
 pub mod rpc;
 pub mod stdio;
 

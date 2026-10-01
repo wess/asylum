@@ -24,7 +24,7 @@ pub struct Suggestion {
 }
 
 pub const TEAMMATES: &[Suggestion] = &[
-  Suggestion { name: "Chief of Staff", label: "Runs your day and routes work to the team", description: "Send a morning digest of what changed across my tools, flag decisions I owe, and hand work to the Bot whose job fits. Pull me in only for judgment calls.", skill: "Daily digest", tools: &["Gmail", "Slack", "Google Calendar", "Notion"], avatar: "bot:shape=round;eyes=happy;accessory=headset;tone=#7c5cff" },
+  Suggestion { name: "Chief of Staff", label: "Runs your day and routes work to the team", description: "Send a morning digest of what changed across my tools, flag decisions I owe, and hand work to the Agent whose job fits. Pull me in only for judgment calls.", skill: "Daily digest", tools: &["Gmail", "Slack", "Google Calendar", "Notion"], avatar: "bot:shape=round;eyes=happy;accessory=headset;tone=#7c5cff" },
   Suggestion { name: "Talent Scout", label: "Sources and screens candidates", description: "Find candidates who match the role, skip anyone already contacted, and draft outreach for my approval. Never send without approval.", skill: "Talent scout", tools: &["Gmail", "Notion"], avatar: "bot:shape=tall;eyes=ovals;accessory=antenna;tone=#1fb6ff" },
   Suggestion { name: "Inbox Triage", label: "Keeps your inbox at zero", description: "Sort new email into act, reply, read, and archive. Draft replies in my voice for approval.", skill: "Inbox triage", tools: &["Gmail"], avatar: "bot:shape=square;eyes=dots;accessory=none;tone=#13ce66" },
   Suggestion { name: "Bug Reproducer", label: "Turns bug reports into repro steps", description: "Reproduce reported bugs on the computer, capture evidence, and narrow to the smallest repro.", skill: "Bug reproduction", tools: &["GitHub", "Linear", "Jira", "Sentry"], avatar: "bot:shape=wide;eyes=visor;accessory=antenna;tone=#ff6b6b" },
@@ -48,6 +48,9 @@ pub struct Onboarding {
   step: usize,
   found: Found,
   key: Entity<TextInput>,
+  /// Which keyed provider is being connected (index into `KEYED`), and its address.
+  keyed: usize,
+  address: Entity<TextInput>,
   tools: BTreeSet<&'static str>,
   name: Entity<TextInput>,
   job: Entity<TextInput>,
@@ -74,12 +77,13 @@ pub fn open(root: &mut Root, window: &mut Window, cx: &mut Context<Root>) {
   let rt = root.rt.clone();
   let weak = cx.entity().downgrade();
   let view = cx.new(|cx| {
-    let key = cx.new(|cx| TextInput::new(cx).password(true).placeholder("xai-…"));
+    let key = cx.new(|cx| TextInput::new(cx).password(true).placeholder(t("Paste your API key")));
+    let address = cx.new(|cx| TextInput::new(cx).placeholder("https://litellm.example.com/v1"));
     let name = cx.new(|cx| TextInput::new(cx).placeholder(t("Name")));
     let job = cx.new(|cx| TextInput::new(cx).placeholder(t("One primary job")));
     let about = cx.new(|cx| TextArea::new(cx).rows(3).placeholder(t("What it should do, and any rules")));
     let _ = window;
-    let mut o = Onboarding { rt, root: weak, step: 0, found: Found::default(), key, tools: BTreeSet::new(), name, job, about, status: None };
+    let mut o = Onboarding { rt, root: weak, step: 0, found: Found::default(), key, keyed: 0, address, tools: BTreeSet::new(), name, job, about, status: None };
     o.detect(cx);
     o
   });
@@ -125,30 +129,45 @@ impl Onboarding {
     cx.notify();
   }
 
+  /// Connect the chosen provider with a pasted key (checked first, then
+  /// kept in the Keychain) and make it the default.
   fn save_key(&mut self, cx: &mut Context<Self>) {
     let key = self.key.read(cx).text().trim().to_string();
     if key.is_empty() {
+      self.status = Some(t("Paste the API key first.").into());
+      cx.notify();
       return;
     }
+    let (preset, _) = agent::api::providers::KEYED[self.keyed];
+    let address = self.address.read(cx).text();
+    let name = preset.replace('-', "");
     self.status = Some(t("Checking…").into());
     let rt = self.rt.clone();
     cx.spawn(async move |this, cx| {
       let r = tk::run(async move {
-        grok::Client::new(key.clone(), None).models().await?;
-        config::secret::set(config::secret::XAI_KEY, &key)?;
-        let _ = rt.refresh_models().await;
-        Ok(())
+        let p = agent::api::providers::connect(&rt, preset, &name, &address, &key).await?;
+        if preset == "xai" {
+          let _ = rt.refresh_models().await;
+        }
+        anyhow::Ok(p)
       })
       .await;
       let _ = this.update(cx, |o, cx| match r {
-        Ok(()) => {
+        Ok(p) => {
           o.status = None;
-          crate::settings::save(&o.rt, |s| s.provider = "xai".into());
+          let (n, m) = (p.name.clone(), p.models.first().cloned().unwrap_or_default());
+          crate::settings::save(&o.rt, |s| {
+            s.provider = n;
+            if !m.is_empty() {
+              s.model = m;
+            }
+          });
+          o.key.update(cx, |i, cx| i.set_text("", cx));
           o.step = 2;
           cx.notify();
         }
         Err(e) => {
-          o.status = Some(format!("{}: {e}", t("That key didn't work")));
+          o.status = Some(e.to_string());
           cx.notify();
         }
       });
@@ -229,7 +248,7 @@ impl Render for Onboarding {
         .py(px(20.0))
         .child(gpui::img(std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/icon.png"))).size(px(88.0)))
         .child(div().text_size(px(24.0)).font_weight(gpui::FontWeight::BOLD).child(t("Meet your AI teammates")))
-        .child(div().max_w(px(440.0)).text_center().text_color(ink.dimmed).child(t("Bots have names, jobs, and a computer of their own. They work in your real tools, remember what matters, and keep going while you're away.")))
+        .child(div().max_w(px(440.0)).text_center().text_color(ink.dimmed).child(t("Agents have names, jobs, and a computer of their own. They work in your real tools, remember what matters, and keep going while you're away.")))
         .child(Button::new("start", t("Get started")).size(Size::Lg).on_click(cx.listener(|o, _, _, cx| {
           o.step = 1;
           cx.notify();
@@ -237,7 +256,7 @@ impl Render for Onboarding {
         .into_any_element(),
       1 => {
         let f = self.found.clone();
-        let mut col = div().flex().flex_col().gap(px(8.0)).child(div().text_size(px(18.0)).font_weight(gpui::FontWeight::SEMIBOLD).child(t("Connect a model"))).child(div().text_size(px(13.0)).text_color(ink.dimmed).child(t("Bots think with the model you choose. You can add more providers later in Settings.")));
+        let mut col = div().flex().flex_col().gap(px(8.0)).child(div().text_size(px(18.0)).font_weight(gpui::FontWeight::SEMIBOLD).child(t("Connect a model"))).child(div().text_size(px(13.0)).text_color(ink.dimmed).child(t("Agents think with the model you choose. You can add more providers later in Settings.")));
         if !f.ollama.is_empty() {
           let first = f.ollama.iter().find(|m| m.contains("qwen") || m.contains("llama3")).cloned().or_else(|| f.ollama.first().cloned());
           col = col.child(option("o-ollama", IconName::Cpu, t("Ollama on this Mac").into(), crate::i18n::tf("Found {} models — runs locally", &[&f.ollama.len().to_string()]).into(), &ink).on_click(cx.listener(move |o, _, _, cx| o.use_preset("ollama", first.clone(), cx))));
@@ -251,9 +270,23 @@ impl Render for Onboarding {
         if f.codex {
           col = col.child(option("o-codex", IconName::Terminal, t("Codex").into(), t("Uses your installed codex CLI").into(), &ink).on_click(cx.listener(|o, _, _, cx| o.use_preset("codex", None, cx))));
         }
+        // Any keyed provider: pick it, give the address if it has none of its own, paste the key.
+        let mut kinds = div().flex().flex_wrap().gap(px(4.0));
+        for (i, (_, label)) in agent::api::providers::KEYED.iter().enumerate() {
+          let on = self.keyed == i;
+          kinds = kinds.child(crate::details::profile::chip(SharedString::from(format!("keyed-{i}")), t(label).into(), on, &ink).on_click(cx.listener(move |o, _, _, cx| {
+            o.keyed = i;
+            o.status = None;
+            cx.notify();
+          })));
+        }
+        let preset = agent::api::providers::KEYED[self.keyed].0;
         col = col
-          .child(div().pt(px(6.0)).text_size(px(12.0)).font_weight(gpui::FontWeight::SEMIBOLD).child(t("xAI (Grok)")))
+          .child(div().pt(px(6.0)).text_size(px(12.0)).font_weight(gpui::FontWeight::SEMIBOLD).child(t("Connect with an API key")))
+          .child(kinds)
+          .when(agent::api::providers::needs_endpoint(preset), |c| c.child(self.address.clone()))
           .child(div().flex().gap(px(8.0)).child(div().flex_1().child(self.key.clone())).child(Button::new("save-key", t("Connect")).on_click(cx.listener(|o, _, _, cx| o.save_key(cx)))))
+          .child(div().text_size(px(11.5)).text_color(ink.dimmed).child(t("The key is checked, then kept in your Mac's Keychain. Nothing to set up in a terminal.")))
           .child(Button::new("skip-model", t("Set up later")).variant(Variant::Subtle).size(Size::Xs).on_click(cx.listener(|o, _, _, cx| {
             o.step = 2;
             cx.notify();
@@ -269,9 +302,9 @@ impl Render for Onboarding {
           .flex_col()
           .gap(px(10.0))
           .child(div().text_size(px(18.0)).font_weight(gpui::FontWeight::SEMIBOLD).child(t("How it works")))
-          .child(item(IconName::Bot, "Bots", "Each Bot has a name, a job, its own conversation, and memory that builds over time. Message them like teammates."))
-          .child(item(IconName::Monitor, "A shared computer", "Bots share one computer with a workspace, a browser that stays signed in, and a terminal. Watch any Bot's screen or take over."))
-          .child(item(IconName::CalendarClock, "Routines", "Ask a Bot to do something every weekday at 8, or whenever an event arrives, and it will."))
+          .child(item(IconName::Bot, "Agents", "Each Agent has a name, a job, its own conversation, and memory that builds over time. Message them like teammates."))
+          .child(item(IconName::Monitor, "A shared computer", "Agents share one computer with a workspace, a browser that stays signed in, and a terminal. Watch any Agent's screen or take over."))
+          .child(item(IconName::CalendarClock, "Routines", "Ask an Agent to do something every weekday at 8, or whenever an event arrives, and it will."))
           .child(Button::new("tour-next", t("Next")).on_click(cx.listener(|o, _, _, cx| {
             o.step = 3;
             cx.notify();

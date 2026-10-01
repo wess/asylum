@@ -67,14 +67,14 @@ pub fn render(root: &mut Root, window: &mut Window, cx: &mut Context<Root>) -> i
     list = list.child(row::render(root, it, i, window, cx));
   }
   if items.is_empty() && !compact {
-    list = list.child(div().p(px(12.0)).text_color(ink.dimmed).text_size(px(13.0)).child(t("No Bots yet. Press New to create one.")));
+    list = list.child(div().p(px(12.0)).text_color(ink.dimmed).text_size(px(13.0)).child(t("No Agents yet. Press New to create one.")));
   }
 
   let hidden: Vec<store::Bot> = root.snap.hidden().into_iter().cloned().collect();
   let hidden_label: SharedString = if items.is_empty() && !hidden.is_empty() {
-    t("Show Hidden Bots").into()
+    t("Show Hidden Agents").into()
   } else {
-    format!("{} ({})", t("Hidden Bots"), hidden.len()).into()
+    format!("{} ({})", t("Hidden Agents"), hidden.len()).into()
   };
   let mut footer = div().flex().flex_col().px(px(8.0)).pb(px(10.0)).gap(px(2.0));
   if !hidden.is_empty() && !compact {

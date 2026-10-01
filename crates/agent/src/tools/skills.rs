@@ -1,7 +1,7 @@
 use super::{arg, def, need, Ctx, Outcome};
 use crate::event::Event;
 use anyhow::{anyhow, Result};
-use grok::ToolDef;
+use chat::ToolDef;
 use serde_json::{json, Value};
 use store::skills;
 

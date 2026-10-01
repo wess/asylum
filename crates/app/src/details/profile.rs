@@ -40,7 +40,7 @@ pub fn render(d: &mut Details, _window: &mut Window, cx: &mut Context<Details>) 
       .child(div().text_size(px(11.5)).text_color(ink.dimmed).child(t("Click to change avatar"))),
   );
   col = col
-    .child(section(t("Bot settings"), cx))
+    .child(section(t("Agent settings"), cx))
     .child(field(t("Name"), d.name.clone(), cx))
     .child(field(t("Label (optional)"), d.label.clone(), cx))
     .child(field(if team { format!("{} ({desc_len}/{DESCRIPTION_LIMIT})", t("Description")) } else { t("Description").to_string() }, d.description.clone(), cx))
@@ -56,7 +56,7 @@ pub fn render(d: &mut Details, _window: &mut Window, cx: &mut Context<Details>) 
         color: this.data.bot.as_ref().map(|b| b.color.clone()).unwrap_or_default(),
       };
       if this.data.bot.as_ref().is_some_and(|b| b.is_team()) && p.description.chars().count() > DESCRIPTION_LIMIT {
-        this.status = Some(crate::i18n::tf("Keep a Team Bot's description to {} characters.", &[&DESCRIPTION_LIMIT.to_string()]));
+        this.status = Some(crate::i18n::tf("Keep a Team Agent's description to {} characters.", &[&DESCRIPTION_LIMIT.to_string()]));
         cx.notify();
         return;
       }
@@ -75,7 +75,7 @@ pub fn render(d: &mut Details, _window: &mut Window, cx: &mut Context<Details>) 
       .flex()
       .items_center()
       .gap(px(10.0))
-      .child(div().flex_1().min_w_0().text_size(px(13.0)).child(t("Get notified when this Bot finishes or needs input")))
+      .child(div().flex_1().min_w_0().text_size(px(13.0)).child(t("Get notified when this Agent finishes or needs input")))
       .child(Switch::new("bot-notif").checked(on).color(guise::ColorName::Violet).on_change(cx.listener(move |this, _, _, cx| {
         let rt = this.rt.clone();
         let id = bid2.clone();
@@ -129,7 +129,7 @@ pub fn render(d: &mut Details, _window: &mut Window, cx: &mut Context<Details>) 
 
   // Actions.
   let (bid5, bid6, name) = (b.id.clone(), b.id.clone(), b.name.clone());
-  col = col.child(section(t("Bot"), cx)).child(
+  col = col.child(section(t("Agent"), cx)).child(
     Group::new()
       .gap(Size::Xs)
       .wrap(true)
@@ -151,7 +151,7 @@ pub fn render(d: &mut Details, _window: &mut Window, cx: &mut Context<Details>) 
           crate::root::dialogs::confirm(
             r,
             crate::i18n::tf("Delete {}?", &[&name]),
-            t("This removes the Bot, its conversation, and its routines. Files on the computer and browser sign-ins stay."),
+            t("This removes the Agent, its conversation, and its routines. Files on the computer and browser sign-ins stay."),
             t("Delete"),
             w,
             cx,

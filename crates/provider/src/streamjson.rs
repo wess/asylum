@@ -2,7 +2,7 @@
 //! arrive, and a final result with usage (or an error).
 
 use anyhow::{bail, Result};
-use grok::{StreamEvent, Usage};
+use chat::{StreamEvent, Usage};
 use serde_json::Value;
 
 #[derive(Default)]

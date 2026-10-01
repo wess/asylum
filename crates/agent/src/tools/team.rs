@@ -6,7 +6,7 @@ use crate::event::Event;
 use crate::part::Part;
 use crate::queue::{Job, Origin};
 use anyhow::{anyhow, bail, Result};
-use grok::ToolDef;
+use chat::ToolDef;
 use serde_json::{json, Value};
 use store::{bots, chats, messages};
 
@@ -15,30 +15,30 @@ pub const HANDOFF_WINDOW_MS: i64 = 10 * 60 * 1000;
 
 pub fn defs(chat: &store::Chat) -> Vec<ToolDef> {
   let mut v = vec![
-    def("list_bots", "List every Bot on the team with their job and whether they are busy.", json!({"type": "object", "properties": {}})),
+    def("list_agents", "List every Agent on the team with their job and whether they are busy.", json!({"type": "object", "properties": {}})),
     def(
-      "message_bot",
-      "Send an asynchronous message to another Bot. It wakes, handles it in its own chat, and can reply to you later the same way. Set transfer to hand over ownership of the task. You can share workspace images by path.",
+      "message_agent",
+      "Send an asynchronous message to another Agent. It wakes, handles it in its own chat, and can reply to you later the same way. Set transfer to hand over ownership of the task. You can share workspace images by path.",
       json!({"type": "object", "properties": {
-        "bot": {"type": "string", "description": "the Bot's name"},
+        "agent": {"type": "string", "description": "the Agent's name"},
         "message": {"type": "string"},
         "transfer": {"type": "boolean"},
         "images": {"type": "array", "items": {"type": "string"}}
-      }, "required": ["bot", "message"]}),
+      }, "required": ["agent", "message"]}),
     ),
     def(
-      "create_bot",
-      "Create a focused helper Bot with a name, a one-line job, and standing instructions. Ask the user first if they prefer a small roster.",
+      "create_agent",
+      "Create a focused helper Agent with a name, a one-line job, and standing instructions. Ask the user first if they prefer a small roster.",
       json!({"type": "object", "properties": {
         "name": {"type": "string"}, "label": {"type": "string"}, "description": {"type": "string"}
       }, "required": ["name", "label", "description"]}),
     ),
     def(
       "create_group",
-      "Start a group chat with 2 to 6 Bots (you are added automatically).",
+      "Start a group chat with 2 to 6 Agents (you are added automatically).",
       json!({"type": "object", "properties": {
-        "name": {"type": "string"}, "bots": {"type": "array", "items": {"type": "string"}}, "description": {"type": "string"}
-      }, "required": ["bots"]}),
+        "name": {"type": "string"}, "agents": {"type": "array", "items": {"type": "string"}}, "description": {"type": "string"}
+      }, "required": ["agents"]}),
     ),
   ];
   if !chat.is_group() {
@@ -53,9 +53,9 @@ pub fn defs(chat: &store::Chat) -> Vec<ToolDef> {
 
 pub async fn call(ctx: &Ctx<'_>, name: &str, args: &Value) -> Option<Result<Outcome>> {
   let r = match name {
-    "list_bots" => roster(ctx).await,
-    "message_bot" => handoff(ctx, args).await,
-    "create_bot" => helper(ctx, args).await,
+    "list_agents" => roster(ctx).await,
+    "message_agent" => handoff(ctx, args).await,
+    "create_agent" => helper(ctx, args).await,
     "create_group" => group(ctx, args).await,
     "post_to_group" => post(ctx, args).await,
     _ => return None,
@@ -79,8 +79,8 @@ async fn roster(ctx: &Ctx<'_>) -> Result<Outcome> {
 
 async fn handoff(ctx: &Ctx<'_>, args: &Value) -> Result<Outcome> {
   let pool = &ctx.rt.pool;
-  let to_name = need(args, "bot")?;
-  let to = bots::find(pool, to_name).await?.ok_or_else(|| anyhow!("no Bot named {to_name}"))?;
+  let to_name = need(args, "agent")?;
+  let to = bots::find(pool, to_name).await?.ok_or_else(|| anyhow!("no Agent named {to_name}"))?;
   if to.id == ctx.bot.id {
     bail!("that's you");
   }
@@ -128,7 +128,7 @@ async fn handoff(ctx: &Ctx<'_>, args: &Value) -> Result<Outcome> {
     origin: Origin::Handoff,
     routine: None,
     note: format!(
-      "{} sent you this. Do the work. Use message_bot to reply only when you have a result or a real question for them — never just to thank or acknowledge.",
+      "{} sent you this. Do the work. Use message_agent to reply only when you have a result or a real question for them — never just to thank or acknowledge.",
       ctx.bot.name
     ),
   });
@@ -141,7 +141,7 @@ async fn handoff(ctx: &Ctx<'_>, args: &Value) -> Result<Outcome> {
 async fn helper(ctx: &Ctx<'_>, args: &Value) -> Result<Outcome> {
   let pool = &ctx.rt.pool;
   if bots::count(pool).await? >= crate::turn::ROSTER_LIMIT {
-    bail!("the roster is full ({} Bots and groups)", crate::turn::ROSTER_LIMIT);
+    bail!("the roster is full ({} Agents and groups)", crate::turn::ROSTER_LIMIT);
   }
   let base = need(args, "name")?;
   let name = bots::unique_name(pool, base).await?;
@@ -156,20 +156,20 @@ async fn helper(ctx: &Ctx<'_>, args: &Value) -> Result<Outcome> {
   chats::direct(pool, &b.id).await?;
   ctx.rt.emit(Event::BotsChanged);
   crate::turn::notify(ctx.rt, &b, None, &format!("{} created {}", ctx.bot.name, b.name), &b.label).await;
-  Ok(Outcome::text(format!("Created {} ({}). Reach them with message_bot.", b.name, b.label)))
+  Ok(Outcome::text(format!("Created {} ({}). Reach them with message_agent.", b.name, b.label)))
 }
 
 async fn group(ctx: &Ctx<'_>, args: &Value) -> Result<Outcome> {
   let pool = &ctx.rt.pool;
   let mut ids = vec![ctx.bot.id.clone()];
-  for n in args["bots"].as_array().into_iter().flatten().filter_map(Value::as_str) {
-    let b = bots::find(pool, n).await?.ok_or_else(|| anyhow!("no Bot named {n}"))?;
+  for n in args["agents"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+    let b = bots::find(pool, n).await?.ok_or_else(|| anyhow!("no Agent named {n}"))?;
     if !ids.contains(&b.id) {
       ids.push(b.id);
     }
   }
   if !(2..=6).contains(&ids.len()) {
-    bail!("a group has 2 to 6 Bots");
+    bail!("a group has 2 to 6 Agents");
   }
   let title = match arg(args, "name") {
     "" => crate::turn::group_name(ctx.rt, &ids).await,

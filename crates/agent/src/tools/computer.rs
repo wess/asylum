@@ -3,7 +3,7 @@ use crate::part::Part;
 use anyhow::Result;
 use computer::fs;
 use computer::shell::{self, Place, Spec};
-use grok::ToolDef;
+use chat::ToolDef;
 use serde_json::{json, Value};
 use std::time::Duration;
 

@@ -11,7 +11,7 @@ use anyhow::{bail, Result};
 use store::bots::{self, Profile};
 use store::{chats, memories, routines, Bot, Chat};
 
-pub const DEFAULT_NAME: &str = "New team bot";
+pub const DEFAULT_NAME: &str = "New team agent";
 pub const MAX_DESCRIPTION: usize = 140;
 pub const MAX_FILE_CHARS: usize = 256_000;
 pub const FILE_TYPES: [&str; 7] = ["txt", "md", "markdown", "csv", "json", "yaml", "yml"];
@@ -20,8 +20,8 @@ pub const SETUP: &str = "Hi! I'm your new Team Bot. Tell me what your team needs
 connecting plugins, adding secrets, uploading reference files, and saving skills. When I'm ready, publish me to your team.";
 
 /// Error texts the UI turns into full screens.
-pub const NOT_AVAILABLE: &str = "Team Bots Not Available";
-pub const NOT_FOUND: &str = "Bot Not Found";
+pub const NOT_AVAILABLE: &str = "Team Agents Not Available";
+pub const NOT_FOUND: &str = "Agent Not Found";
 
 pub async fn create(rt: &Runtime) -> Result<(Bot, Chat)> {
   if !rt.policy().team_bots_allowed() {
@@ -55,7 +55,7 @@ async fn sqlx_owner(rt: &Runtime, bot: &str, owner: &str) -> Result<()> {
 
 pub fn ready(b: &Bot) -> Result<()> {
   if b.name.trim().is_empty() || b.name.starts_with(DEFAULT_NAME) {
-    bail!("Give your Team Bot a name before publishing.");
+    bail!("Give your Team Agent a name before publishing.");
   }
   if b.description.trim().is_empty() {
     bail!("Add a description before publishing.");

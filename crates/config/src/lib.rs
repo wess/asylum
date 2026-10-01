@@ -1,4 +1,4 @@
-//! Settings for the app. The source of truth is `bots.json` (JSON with
+//! Settings for the app. The source of truth is `agents.json` (JSON with
 //! comments): compiled-in defaults overridden by whatever keys the user's file
 //! sets. Secrets never live in that file; `secret` keeps them in the OS
 //! keychain.

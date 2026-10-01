@@ -73,6 +73,21 @@ pub fn wire(root: Stateful<Div>, cx: &mut Context<Root>) -> Stateful<Div> {
         this.show_computer(w, cx);
       }
     }))
+    .on_action(cx.listener(|this, _: &OpenBrowser, w, cx| {
+      if this.right == Right::Web {
+        this.close_right(cx);
+      } else {
+        this.show_web(None, w, cx);
+      }
+    }))
+    .on_action(cx.listener(|this, _: &OpenTerminal, w, cx| {
+      if this.right != Right::Computer {
+        this.show_computer(w, cx);
+      }
+      if let Some(p) = this.panel.clone() {
+        p.update(cx, |p, cx| p.show_terminal(w, cx));
+      }
+    }))
     .on_action(cx.listener(|this, _: &SendAnywhere, w, cx| {
       if let Some(p) = &this.pane {
         p.update(cx, |p, cx| p.send(w, cx));

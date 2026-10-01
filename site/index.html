@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Asylum is a free, open-source macOS app for always-on AI teammates: Agents with their own computer, memory, routines, and your choice of model.">
+  <title>Asylum: AI teammates with their own computer</title>
+  <link rel="canonical" href="https://wess.io/asylum/">
+  <link rel="stylesheet" href="assets/site.css">
+  <link rel="icon" type="image/svg+xml" sizes="any" href="assets/favicon.svg">
+</head>
+<body>
+  <a class="skip" href="#main">skip to content</a>
+  <div class="shell">
+    <div class="topline"><strong>ASYLUM 0.1.0</strong><nav aria-label="Main navigation"><a aria-current="page" href="./">Home</a><a href="tutorial/">Tutorial</a><a href="docs/">Docs</a><a href="admin/">Admin</a><a href="https://github.com/wess/asylum/releases">Download</a><a href="https://github.com/wess/asylum">Source</a></nav></div>
+    <main id="main">
+      <section class="hero">
+        <div class="mainpane">
+<div class="brand-art"><img src="assets/mascot.svg" width="96" height="96" alt="Asylum pixel Agent mascot"><pre class="masthead" role="img" aria-label="Asylum">
+ █████╗ ███████╗██╗   ██╗██╗     ██╗   ██╗███╗   ███╗
+██╔══██╗██╔════╝╚██╗ ██╔╝██║     ██║   ██║████╗ ████║
+███████║███████╗ ╚████╔╝ ██║     ██║   ██║██╔████╔██║
+██╔══██║╚════██║  ╚██╔╝  ██║     ██║   ██║██║╚██╔╝██║
+██║  ██║███████║   ██║   ███████╗╚██████╔╝██║ ╚═╝ ██║
+╚═╝  ╚═╝╚══════╝   ╚═╝   ╚══════╝ ╚═════╝ ╚═╝     ╚═╝</pre></div>
+          <div class="prompt">open -a Asylum</div>
+          <h1>Your teammates.<br>Their computer.<br>Your models.</h1>
+          <p class="lede">A native macOS app for always-on AI teammates. Each Agent has a name, a job, memory, and a shared computer — a workspace, a browser that stays signed in, and a terminal. They work in your tools, run on a schedule, hand work to each other, and ask before anything consequential. Free and open source.</p>
+          <div class="actions"><a class="button" href="tutorial/">Start the tutorial</a><a class="button secondary" href="docs/">Read the manual</a></div>
+          <div class="commandbox"><code>curl -LO https://github.com/wess/asylum/releases/latest/download/Asylum.dmg</code><button type="button" data-copy aria-label="Copy download command">copy</button></div>
+        </div>
+        <aside class="sidepane" aria-label="Sidebar preview">
+          <h2>Agents :: 4 teammates</h2>
+          <div class="agent busy"><div><b>Chief of Staff</b>working · sorting your inbox</div></div>
+          <div class="agent"><div><b>Researcher</b>done · 6 sources cited</div></div>
+          <div class="agent busy"><div><b>Bug Reproducer</b>waiting · needs approval</div></div>
+          <div class="agent"><div><b>Helpdesk</b>team agent · in Slack</div></div>
+          <hr class="side-rule">
+          <h2>Computer</h2>
+          <p><span class="prompt">status</span><br>browser: signed in<br>workspace: 1.2 GB<br>network: allowlist</p>
+          <hr class="side-rule">
+          <p><code>⌘K</code> palette<br><code>⌘N</code> new chat<br><code>⌘1..9</code> agents<br><code>⌘.</code> stop</p>
+        </aside>
+      </section>
+      <div class="statusline"><span>4 agents</span><span>2 working</span><span>1 approval</span><span>auto-review on</span><span>qwen3 · opus · gpt</span></div>
+      <section class="content">
+        <h2>A teammate, not a chat window.</h2>
+        <p>Give an Agent a job once and it keeps doing it. It remembers what you told it, saves what it learns as skills, and runs routines on a schedule or when something happens in your tools. When it needs you — to approve a payment, sign in with a passkey, or answer a question — it stops and asks with a card you can act on.</p>
+        <div class="chat-example"><p class="topic">#Bug Reproducer · Reproduce issue #482</p><pre>09:14 &lt;you&gt; Reproduce #482 and tell me which commit broke it.
+09:14 &lt;Bug Reproducer&gt; Cloning the repo into the workspace and
+                    bisecting from v2.3.0.
+09:15      ▸ shell  git bisect run ./repro.sh
+09:21      ▸ browser_open  github.com/acme/app/issues/482
+<span class="card-line">09:22   ┌ Approval · comment on GitHub issue #482 ───────────┐
+        │ Allow once   Always allow   Deny                   │
+        └────────────────────────────────────────────────────┘</span></pre><p class="result">*** Done · bisected to 9f3c2e1 · 7m 48s</p></div>
+        <h2>Bring any model. Mix them.</h2>
+        <p>Asylum talks to xAI, OpenAI, Anthropic, a LiteLLM proxy, Ollama (local or cloud), the Claude Code and Codex CLIs, or any OpenAI-compatible endpoint. Every Agent can pin its own provider and model, so your researcher runs Opus while your inbox Agent runs a local Qwen — in the same group chat.</p>
+        <div class="grid">
+          <article class="card"><span class="index" aria-hidden="true">01</span><h2>Their own computer</h2><p>A shared workspace, a sandboxed shell, and a real Chromium the Agents drive — one screen each. Watch live, take over, or open it in a window for passkeys.</p></article>
+          <article class="card"><span class="index" aria-hidden="true">02</span><h2>Ask before acting</h2><p>Approvals for anything consequential, Auto-review on a fast model, and plain-language rules: "Ask before emailing anyone outside acme.com."</p></article>
+          <article class="card"><span class="index" aria-hidden="true">03</span><h2>Memory that sticks</h2><p>Facts, preferences, and summaries per Agent, team memory for Team Agents, and skills the Agent writes — or that you teach by demonstration.</p></article>
+          <article class="card"><span class="index" aria-hidden="true">04</span><h2>Routines</h2><p>Cron schedules in your timezone, intervals, webhooks, and app events from Slack, GitHub, Linear, Sentry, PagerDuty, and email.</p></article>
+          <article class="card"><span class="index" aria-hidden="true">05</span><h2>Connectors</h2><p>A Marketplace of MCP servers — GitHub, Linear, Notion, Jira, Sentry, Stripe, Google Workspace and more — with OAuth, multiple accounts, and per-tool switches.</p></article>
+          <article class="card"><span class="index" aria-hidden="true">06</span><h2>Teams of Agents</h2><p>Group chats of 2–6 Agents with @mentions, handoffs between Agents, and Team Agents your teammates add by link or meet in Slack.</p></article>
+          <article class="card"><span class="index" aria-hidden="true">07</span><h2>Secrets stay secret</h2><p>Values live in the macOS Keychain, are injected only into the commands that need them, and are redacted from everything an Agent sees.</p></article>
+          <article class="card"><span class="index" aria-hidden="true">08</span><h2>Admin-ready</h2><p>A managed policy for network controls, connector allowlists, locked rules, and execution ceilings — plus an audit log, Action Recording, OpenTelemetry, and a local Admin API.</p></article>
+          <article class="card"><span class="index" aria-hidden="true">09</span><h2>Native and fast</h2><p>Written in Rust on gpui with an embedded terminal from libsinclair. 31 languages, light and dark, and a keyboard shortcut for everything.</p></article>
+        </div>
+        <div class="callout">No API key? Asylum finds a local Ollama or LiteLLM proxy, and installed Claude Code or Codex CLIs, during onboarding. Nothing leaves your Mac unless your provider does.</div>
+      </section>
+    </main>
+    <footer><span>Asylum 0.1.0 · Apache-2.0 · macOS 11+</span><span><a href="https://github.com/wess/asylum/releases">downloads</a> · <a href="docs/#security">security</a> · <a href="docs/#faq">faq</a></span></footer>
+  </div>
+  <script src="assets/site.js"></script>
+</body>
+</html>

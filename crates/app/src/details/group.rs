@@ -18,7 +18,7 @@ pub fn render(d: &mut Details, _window: &mut Window, cx: &mut Context<Details>) 
     .pt(px(10.0))
     .child(field(t("Group name"), d.name.clone(), cx))
     .child(field(t("Description"), d.description.clone(), cx))
-    .child(div().text_size(px(11.5)).text_color(ink.dimmed).pb(px(8.0)).child(t("Every member Bot reads the description.")))
+    .child(div().text_size(px(11.5)).text_color(ink.dimmed).pb(px(8.0)).child(t("Every member Agent reads the description.")))
     .child(Button::new("save-group", t("Save")).size(Size::Sm).on_click(cx.listener(move |this, _, _, cx| {
       let name = this.name.read(cx).text().trim().to_string();
       let desc = this.description.read(cx).text();
@@ -66,5 +66,5 @@ pub fn render(d: &mut Details, _window: &mut Window, cx: &mut Context<Details>) 
         .child(b.name.clone()),
     );
   }
-  col.child(div().pt(px(8.0)).text_size(px(11.5)).text_color(ink.dimmed).child(if d.rt.settings().voice_enabled { t("Groups have 2 to 6 Bots. Voice chat isn't available in groups.") } else { t("Groups have 2 to 6 Bots.") })).into_any_element()
+  col.child(div().pt(px(8.0)).text_size(px(11.5)).text_color(ink.dimmed).child(if d.rt.settings().voice_enabled { t("Groups have 2 to 6 Agents. Voice chat isn't available in groups.") } else { t("Groups have 2 to 6 Agents.") })).into_any_element()
 }

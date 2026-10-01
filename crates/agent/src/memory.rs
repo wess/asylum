@@ -3,7 +3,7 @@
 //! things written), important facts, and a one-line summary of finished work.
 
 use crate::runtime::Runtime;
-use grok::Message;
+use chat::Message;
 use serde::Deserialize;
 use store::{memories, messages};
 
@@ -44,7 +44,7 @@ pub async fn reflect(rt: &Runtime, bot: &str, chat: &str) {
     .iter()
     .filter(|m| !m.body.trim().is_empty())
     .map(|m| {
-      let who = if m.role == messages::USER { "User" } else { "Bot" };
+      let who = if m.role == messages::USER { "User" } else { "Agent" };
       let body: String = m.body.chars().take(1500).collect();
       format!("{who}: {body}")
     })

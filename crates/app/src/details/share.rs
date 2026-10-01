@@ -17,7 +17,7 @@ pub fn render(d: &mut Details, window: &mut Window, cx: &mut Context<Details>) -
 
   // Templates.
   col = col.child(section(t("Template"), cx)).child(div().text_size(px(12.5)).text_color(ink.dimmed).child(t(
-    "A template gives someone their own copy of this Bot: identity, description, skills, and routines. Never the computer, sign-ins, memory, or history.",
+    "A template gives someone their own copy of this Agent: identity, description, skills, and routines. Never the computer, sign-ins, memory, or history.",
   )));
   if let Some(tpl) = d.data.template.clone() {
     let visibility = if tpl.visibility == "team" { t("Team-only") } else { t("Public link") };
@@ -102,7 +102,7 @@ pub fn render(d: &mut Details, window: &mut Window, cx: &mut Context<Details>) -
     col = col.child(section(t("Setup"), cx));
     let files = agent::api::team::files(&d.rt, &b);
     let rows: [(&str, String); 4] = [
-      ("Plugins", t("Connected apps are shared with every Bot").to_string()),
+      ("Plugins", t("Connected apps are shared with every Agent").to_string()),
       ("Secrets", format!("{}", d.data.secrets.len())),
       ("Skills", format!("{}", d.data.enabled.len())),
       ("Files", format!("{}", files.len())),
@@ -140,8 +140,8 @@ pub fn render(d: &mut Details, window: &mut Window, cx: &mut Context<Details>) -
   } else {
     let (b1, b2) = (b.id.clone(), b.id.clone());
     col = col
-      .child(div().text_size(px(12.5)).text_color(ink.dimmed).child(t("Publish to Team makes a Team Bot: one Bot the whole team chats with privately, with team memory and shared setup.")))
-      .child(div().text_size(px(13.0)).font_weight(gpui::FontWeight::MEDIUM).child(t("How should your Team Bot start?")))
+      .child(div().text_size(px(12.5)).text_color(ink.dimmed).child(t("Publish to Team makes a Team Agent: one Agent the whole team chats with privately, with team memory and shared setup.")))
+      .child(div().text_size(px(13.0)).font_weight(gpui::FontWeight::MEDIUM).child(t("How should your Team Agent start?")))
       .child(
         Group::new()
           .gap(Size::Xs)
@@ -339,7 +339,7 @@ fn picker(d: &mut Details, cx: &mut Context<Details>) -> AnyElement {
           cx.notify();
         }))
         .child(guise::Checkbox::new("pick-routines-ck").checked(routines))
-        .child(div().text_size(px(12.5)).child(t("Move this Bot's routines to the Team Bot"))),
+        .child(div().text_size(px(12.5)).child(t("Move this Agent's routines to the Team Agent"))),
     )
     .into_any_element()
 }

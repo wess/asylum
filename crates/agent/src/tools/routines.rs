@@ -3,7 +3,7 @@ use crate::event::Event;
 use crate::part::Part;
 use crate::queue::{Job, Origin};
 use anyhow::{anyhow, Result};
-use grok::ToolDef;
+use chat::ToolDef;
 use serde_json::{json, Value};
 use store::routines::{self, New};
 

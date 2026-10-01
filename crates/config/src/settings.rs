@@ -89,6 +89,8 @@ pub struct Settings {
   pub otel_endpoint: String,
   /// Local Admin API port (0: off). Its token lives in the keychain.
   pub admin_port: u16,
+  /// Providers tried in order when the active one fails before answering.
+  pub fallback_providers: Vec<String>,
 }
 
 impl Default for Settings {
@@ -139,6 +141,7 @@ impl Default for Settings {
       voice_enabled: false,
       otel_endpoint: String::new(),
       admin_port: 0,
+      fallback_providers: Vec::new(),
     }
   }
 }
@@ -158,8 +161,8 @@ pub fn parse(text: &str) -> Load {
   }
   let root = match serde_json::from_str::<Value>(&clean) {
     Ok(Value::Object(m)) => m,
-    Ok(_) => return fail("bots.json must be an object"),
-    Err(e) => return fail(&format!("bots.json: {e}")),
+    Ok(_) => return fail("agents.json must be an object"),
+    Err(e) => return fail(&format!("agents.json: {e}")),
   };
   let defaults = match serde_json::to_value(Settings::default()) {
     Ok(Value::Object(m)) => m,

@@ -26,6 +26,7 @@ mod template;
 mod theme;
 mod tk;
 mod voicechat;
+mod web;
 
 use futures::StreamExt;
 use gpui::App;
@@ -147,7 +148,7 @@ fn open(rt: agent::Runtime, cx: &mut App) -> anyhow::Result<()> {
   Ok(())
 }
 
-/// Live-reload bots.json.
+/// Live-reload agents.json.
 fn watch(rt: agent::Runtime, cx: &mut App) {
   let (tx, mut rx) = futures::channel::mpsc::unbounded::<()>();
   let handle = config::watch(&config::settings_path(), move || {

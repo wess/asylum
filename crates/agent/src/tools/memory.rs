@@ -1,6 +1,6 @@
 use super::{arg, def, need, Ctx, Outcome};
 use anyhow::Result;
-use grok::ToolDef;
+use chat::ToolDef;
 use serde_json::{json, Value};
 use store::memories;
 
@@ -12,7 +12,7 @@ pub fn defs() -> Vec<ToolDef> {
       json!({"type": "object", "properties": {
         "content": {"type": "string"},
         "kind": {"type": "string", "enum": ["preference", "fact", "summary"]},
-        "scope": {"type": "string", "enum": ["bot", "team", "person"], "description": "Team Bots only: team memory or notes about this person"}
+        "scope": {"type": "string", "enum": ["bot", "team", "person"], "description": "Team Agents only: team memory or notes about this person"}
       }, "required": ["content"]}),
     ),
     def(

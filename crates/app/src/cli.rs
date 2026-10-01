@@ -28,7 +28,7 @@ pub fn dispatch(args: &[String], rt: &agent::Runtime) -> Option<i32> {
     }
     Some("pin") if args.len() >= 3 => Some(tk::runtime().block_on(async {
       let Ok(Some(bot)) = store::bots::find(&rt.pool, &args[1]).await else {
-        eprintln!("no Bot named {}", args[1]);
+        eprintln!("no Agent named {}", args[1]);
         return 1;
       };
       let (p, m) = if args[2] == "default" { (String::new(), String::new()) } else { (args[2].clone(), args.get(3).cloned().unwrap_or_default()) };
@@ -57,6 +57,55 @@ pub fn dispatch(args: &[String], rt: &agent::Runtime) -> Option<i32> {
       println!("default model: {}", if s.model.is_empty() { "(auto)" } else { &s.model });
       Some(0)
     }
+    // A small real request: proves key, model name, and upstream access.
+    Some("check") if args.len() >= 2 => Some(tk::runtime().block_on(async {
+      let Some(p) = rt.profile(&args[1]) else {
+        eprintln!("no provider named {} (see `asylumdev providers`)", args[1]);
+        return 1;
+      };
+      let s = rt.settings();
+      let model = args.get(2).cloned().filter(|m| !m.is_empty()).or_else(|| Some(p.model.clone()).filter(|m| !m.is_empty())).or_else(|| (s.provider == p.name).then(|| s.model.clone()).filter(|m| !m.is_empty())).or_else(|| p.models.first().cloned()).unwrap_or_default();
+      if model.is_empty() {
+        eprintln!("no model: pass one, e.g. `asylumdev check {} gpt-4o`", p.name);
+        return 1;
+      }
+      match provider::check(&p, &model, &rt.computer.workspace()).await {
+        Ok(reply) => {
+          println!("{} {model}: ok ({reply})", p.name);
+          0
+        }
+        Err(e) => {
+          eprintln!("{} {model}: {e}", p.name);
+          1
+        }
+      }
+    })),
+    // LiteLLM: the key's teams and the models each is scoped to.
+    Some("teams") if args.len() >= 2 => Some(tk::runtime().block_on(async {
+      let Some(p) = rt.profile(&args[1]) else {
+        eprintln!("no provider named {}", args[1]);
+        return 1;
+      };
+      let key = provider::credential::resolve_for(&p).await.ok().flatten().unwrap_or_default();
+      match provider::litellm::teams(&p.endpoint, &key).await {
+        Ok(teams) if teams.is_empty() => {
+          println!("no teams: this key sees the gateway's whole catalog");
+          0
+        }
+        Ok(teams) => {
+          for t in teams {
+            let mark = if p.team.as_deref() == Some(t.id.as_str()) { "*" } else { " " };
+            let scope = if t.models.is_empty() { "all models".to_string() } else { t.models.join(", ") };
+            println!("{mark} {:<24} {:<20} {scope}", t.name, t.id);
+          }
+          0
+        }
+        Err(e) => {
+          eprintln!("{e}");
+          1
+        }
+      }
+    })),
     _ => None,
   }
 }

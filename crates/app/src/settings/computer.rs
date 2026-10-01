@@ -39,10 +39,10 @@ pub fn render(d: &mut Dialog, window: &mut Window, cx: &mut Context<Dialog>) -> 
     .flex()
     .flex_col()
     .child(heading(t("Computers"), cx))
-    .child(row(t("This Mac"), Some(t("The computer every Bot shares: one workspace, one browser profile, a screen per Bot.")), div().child(d.local.clone()).w(px(200.0)), cx))
+    .child(row(t("This Mac"), Some(t("The computer every Agent shares: one workspace, one browser profile, a screen per Agent.")), div().child(d.local.clone()).w(px(200.0)), cx))
     .child(row(t("Workspace"), Some(&ws), Button::new("reveal-ws", t("Show in Finder")).size(Size::Xs).variant(Variant::Light).on_click(move |_, _, cx| cx.reveal_path(std::path::Path::new(&ws2))), cx))
     .child(row(t("Browser"), Some(&chrome), div(), cx))
-    .child(row(t("Route traffic through this computer"), Some(t("Bots already browse from this Mac's network.")), guise::Switch::new("egress").checked(true).disabled(true), cx))
+    .child(row(t("Route traffic through this computer"), Some(t("Agents already browse from this Mac's network.")), guise::Switch::new("egress").checked(true).disabled(true), cx))
     .child(heading(t("Disk"), cx))
     .child(row(t("Workspace files"), None, div().child(gb(disk.workspace)), cx))
     .child(row(t("Browser data"), None, div().child(gb(disk.browser)), cx))
@@ -67,10 +67,10 @@ pub fn render(d: &mut Dialog, window: &mut Window, cx: &mut Context<Dialog>) -> 
         })
         .detach();
       }))), cx))
-    .when_some(d.update_at, |c, at| c.child(div().text_size(px(12.0)).text_color(ink.dimmed).pb(px(6.0)).child(crate::i18n::tf("Computer update scheduled for {}. It waits until no Bot is working.", &[&chrono::DateTime::from_timestamp_millis(at).map(|d| d.with_timezone(&chrono::Local).format("%a %-I:%M %p").to_string()).unwrap_or_default()]))))
+    .when_some(d.update_at, |c, at| c.child(div().text_size(px(12.0)).text_color(ink.dimmed).pb(px(6.0)).child(crate::i18n::tf("Computer update scheduled for {}. It waits until no Agent is working.", &[&chrono::DateTime::from_timestamp_millis(at).map(|d| d.with_timezone(&chrono::Local).format("%a %-I:%M %p").to_string()).unwrap_or_default()]))))
     .child(row(t("Recover computer"), Some(t("Rebuild the parts that can break, keeping your files. Use it when the computer can't be reached.")), Button::new("recover", t("Recover")).size(Size::Xs).variant(Variant::Default).on_click(cx.listener(|this, _, _, cx| op(this, "Recovering", cx, |rt| Box::pin(async move { agent::api::computer::recover(&rt).await })))), cx))
-    .child(row(t("Recreate computer"), Some(t("A fresh computer on the same disk: Bots pause at a safe point and resume on it. Files, sign-ins, and backups stay.")), Button::new("recreate", t("Recreate")).size(Size::Xs).variant(Variant::Default).on_click(cx.listener(|this, _, _, cx| op(this, "Recreating", cx, |rt| Box::pin(async move { agent::api::computer::recreate(&rt).await })))), cx))
-    .child(row(t("Hibernate when idle"), Some(t("Stop the browser after 30 idle minutes to save memory. It wakes when a Bot needs it.")), guise::Switch::new("hibernate").checked(d.rt.settings().hibernate_minutes > 0).color(guise::ColorName::Violet).on_change({
+    .child(row(t("Recreate computer"), Some(t("A fresh computer on the same disk: Agents pause at a safe point and resume on it. Files, sign-ins, and backups stay.")), Button::new("recreate", t("Recreate")).size(Size::Xs).variant(Variant::Default).on_click(cx.listener(|this, _, _, cx| op(this, "Recreating", cx, |rt| Box::pin(async move { agent::api::computer::recreate(&rt).await })))), cx))
+    .child(row(t("Hibernate when idle"), Some(t("Stop the browser after 30 idle minutes to save memory. It wakes when an Agent needs it.")), guise::Switch::new("hibernate").checked(d.rt.settings().hibernate_minutes > 0).color(guise::ColorName::Violet).on_change({
       let rt = d.rt.clone();
       let on = d.rt.settings().hibernate_minutes == 0;
       move |_, _, cx| {
@@ -79,8 +79,8 @@ pub fn render(d: &mut Dialog, window: &mut Window, cx: &mut Context<Dialog>) -> 
       }
     }), cx))
     .child(row(t("Reset Asylum's Computer"), Some(t("Last resort: restore the workspace from the latest backup.")), Button::new("reset", t("Reset")).size(Size::Xs).color(guise::ColorName::Red).variant(Variant::Light).on_click(cx.listener(|this, _, _, cx| op(this, "Resetting", cx, |rt| Box::pin(async move { agent::api::computer::reset(&rt).await })))), cx))
-    .child(row(t("Stop computer"), Some(t("Shut it down now. It starts again when a Bot needs it.")), Button::new("stop-computer", t("Stop")).size(Size::Xs).variant(Variant::Default).on_click(cx.listener(|this, _, _, cx| op(this, "Stopping", cx, |rt| Box::pin(async move { agent::api::computer::stop(&rt).await })))), cx))
-    .child(row(t("Delete computer and data"), Some(t("Erase workspace files, browser sign-ins, and backups. Bots and conversations stay. This can't be undone.")), Button::new("delete-computer", t("Delete")).size(Size::Xs).color(guise::ColorName::Red).variant(Variant::Light).on_click(cx.listener(|this, _, w, cx| {
+    .child(row(t("Stop computer"), Some(t("Shut it down now. It starts again when an Agent needs it.")), Button::new("stop-computer", t("Stop")).size(Size::Xs).variant(Variant::Default).on_click(cx.listener(|this, _, _, cx| op(this, "Stopping", cx, |rt| Box::pin(async move { agent::api::computer::stop(&rt).await })))), cx))
+    .child(row(t("Delete computer and data"), Some(t("Erase workspace files, browser sign-ins, and backups. Agents and conversations stay. This can't be undone.")), Button::new("delete-computer", t("Delete")).size(Size::Xs).color(guise::ColorName::Red).variant(Variant::Light).on_click(cx.listener(|this, _, w, cx| {
       let Some(root) = this.root.upgrade() else { return };
       root.update(cx, |r, cx| {
         crate::root::dialogs::confirm(r, t("Delete computer and data?"), t("Workspace files, browser sign-ins, and backups are erased. This can't be undone."), t("Delete"), w, cx, move |r, _, cx| {

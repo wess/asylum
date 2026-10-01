@@ -1,0 +1,387 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="The Asylum manual: installing, providers and models, Agents, chat, the computer, approvals, secrets, routines, connectors, Team Agents, settings, shortcuts, and security."><title>Asylum manual</title><link rel="canonical" href="https://wess.io/asylum/docs/"><link rel="stylesheet" href="../assets/site.css"><link rel="icon" type="image/svg+xml" sizes="any" href="../assets/favicon.svg"></head>
+<body><a class="skip" href="#main">skip to content</a><div class="shell">
+<div class="topline"><strong>ASYLUM :: MANUAL</strong><nav aria-label="Main navigation"><a href="../">Home</a><a href="../tutorial/">Tutorial</a><a aria-current="page" href="./">Docs</a><a href="../admin/">Admin</a><a href="https://github.com/wess/asylum/releases">Download</a><a href="https://github.com/wess/asylum">Source</a></nav></div>
+<main id="main" class="content"><header><p class="eyebrow">Operator's manual · 0.1.0</p><h1>Reference</h1><p class="lede">Everything Asylum does, every setting it reads, and every limit it keeps. New here? Start with the <a href="../tutorial/">tutorial</a>.</p></header>
+<div class="split"><nav class="toc" aria-label="Page sections">
+<p class="group">Start</p><a href="#install">Install</a><a href="#build">Build from source</a><a href="#concepts">Concepts</a>
+<p class="group">Models</p><a href="#providers">Providers</a><a href="#pinning">Per-Agent models</a><a href="#litellm">LiteLLM</a><a href="#cli">CLI agents</a><a href="#credentials">Credentials</a>
+<p class="group">Agents</p><a href="#agents">Agents</a><a href="#chat">Chat and composer</a><a href="#cards">Cards</a><a href="#groups">Groups and handoffs</a><a href="#memory">Memory</a><a href="#skills">Skills</a><a href="#routines">Routines</a><a href="#connectors">Connectors</a><a href="#jira">Jira</a><a href="#templates">Templates</a><a href="#teambots">Team Agents</a><a href="#slack">Slack</a><a href="#voice">Voice</a>
+<p class="group">Computer</p><a href="#computer">The computer</a><a href="#webview">Built-in browser</a><a href="#browser">Agents' browser</a><a href="#takeover">Takeover</a><a href="#lifecycle">Maintenance</a>
+<p class="group">Safety</p><a href="#approvals">Approvals</a><a href="#autoreview">Auto-review</a><a href="#local">Local execution</a><a href="#secrets">Secrets</a><a href="#security">Security</a>
+<p class="group">Data</p><a href="#activity">Activity</a><a href="#sync">Sync</a><a href="#usage">Usage</a>
+<p class="group">Reference</p><a href="#tools">Built-in tools</a><a href="#settings">Settings file</a><a href="#shortcuts">Shortcuts</a><a href="#commands">Command line</a><a href="#paths">Paths</a><a href="#languages">Languages</a><a href="#troubleshooting">Troubleshooting</a><a href="#faq">FAQ</a>
+</nav>
+<article class="doc">
+
+<h2 id="install">Install</h2>
+<p>Download <code>Asylum.dmg</code> from <a href="https://github.com/wess/asylum/releases">GitHub releases</a>, open it, and drag Asylum to Applications. Asylum needs macOS 11 or later and a Chromium-family browser — Chrome, Edge, Chromium, or Brave — for the Agents' computer.</p>
+<p>With <strong>Automatic updates</strong> on (the default), Asylum checks GitHub for new releases and tells you when one is out. If a newer release exists and your build is more than 14 days old, it asks you to update before continuing. Turn Automatic updates off to skip both.</p>
+
+<h2 id="build">Build from source</h2>
+<p>You need Rust stable 1.96 or later and Xcode's command-line tools.</p>
+<pre><code>git clone https://github.com/wess/asylum && cd asylum
+cargo run -p app            # dev build: the binary is asylumdev
+cargo test --workspace      # all tests
+scripts/bundle.sh           # release build + dist/Asylum.app
+scripts/dmg.sh              # dist/Asylum.dmg</code></pre>
+<p>The dev binary is named <code>asylumdev</code> so it never collides with an installed <code>asylum</code>. To sign and notarize a release, see <a href="#faq">the FAQ</a>.</p>
+
+<h2 id="concepts">Concepts</h2>
+<dl>
+<dt>Agent</dt><dd>An AI teammate with a name, a label, an avatar, a description (its lasting rules), memory, skills, routines, secrets, and optionally its own model.</dd>
+<dt>Chat</dt><dd>Each Agent has one direct conversation with you. Group chats hold 2–6 Agents. Any message can start a thread.</dd>
+<dt>Computer</dt><dd>One machine every Agent shares: a workspace folder, a sandboxed shell, a terminal, and a Chromium browser with a screen per Agent.</dd>
+<dt>Card</dt><dd>Something in the conversation you can act on: an approval, a takeover, a secret request, a form, a draft, a routine.</dd>
+<dt>Routine</dt><dd>Work an Agent does on its own — on a schedule, an interval, a webhook, or an app event.</dd>
+<dt>Skill</dt><dd>A saved, reusable procedure. Agents write them, you teach them, or they come with a template.</dd>
+<dt>Connector</dt><dd>An MCP server that gives Agents tools in another product: GitHub, Linear, Notion and so on.</dd>
+<dt>Team Agent</dt><dd>An Agent you set up once and publish so teammates can add it, with team memory and optional Slack.</dd>
+</dl>
+
+<h2 id="providers">Providers</h2>
+<p>A provider is a profile in <strong>Settings → Providers</strong>: either an HTTP endpoint that speaks the OpenAI chat-completions API, or a coding-agent CLI fed the conversation on stdin. Start from a preset:</p>
+<table><thead><tr><th>Preset</th><th>Kind</th><th>Default endpoint</th><th>Credential</th></tr></thead><tbody>
+<tr><td>xAI (Grok)</td><td>HTTP</td><td><code>https://api.x.ai/v1</code></td><td>Keychain</td></tr>
+<tr><td>OpenAI / ChatGPT</td><td>HTTP</td><td><code>https://api.openai.com/v1</code></td><td><code>OPENAI_API_KEY</code></td></tr>
+<tr><td>Anthropic (Claude)</td><td>HTTP</td><td><code>https://api.anthropic.com/v1</code></td><td><code>ANTHROPIC_API_KEY</code></td></tr>
+<tr><td>LiteLLM proxy</td><td>HTTP</td><td><code>http://127.0.0.1:4000/v1</code></td><td><code>LITELLM_API_KEY</code></td></tr>
+<tr><td>Ollama (local)</td><td>HTTP</td><td><code>http://127.0.0.1:11434/v1</code></td><td>none</td></tr>
+<tr><td>Ollama Cloud</td><td>HTTP</td><td><code>https://api.ollama.com/v1</code></td><td><code>OLLAMA_API_KEY</code></td></tr>
+<tr><td>Claude Code (CLI)</td><td>Process</td><td><code>claude -p --output-format stream-json</code></td><td>the CLI's own login</td></tr>
+<tr><td>Codex (CLI)</td><td>Process</td><td><code>codex exec</code></td><td>the CLI's own login</td></tr>
+<tr><td>Custom endpoint</td><td>HTTP</td><td>any URL</td><td>your choice</td></tr>
+</tbody></table>
+<p><strong>Refresh models</strong> asks an HTTP provider for its <code>/models</code>. One provider is the default for new Agents; a <strong>fast</strong> provider and model handle background work — Auto-review, memory summaries, names — and fall back to the default.</p>
+<p>Requests that fail before any text arrives (a connection error, 408, 429, or 5xx) are retried with jittered backoff, three times by default (<code>retries</code>). A reply that has started streaming is never retried.</p>
+
+<h2 id="pinning">Per-Agent models</h2>
+<p>Every Agent can pin its own provider and model in <strong>Agent settings → Model</strong>. Unpinned Agents follow the default. Pinned Agents are told which model they are, and the pin survives changes to the default — so in one group chat, your researcher can be Opus through Anthropic, your writer GPT through LiteLLM, and your coder a local Qwen.</p>
+<pre><code>asylumdev pin Researcher anthropic claude-opus-4
+asylumdev pin Coder ollama qwen3-coder:30b</code></pre>
+
+<h2 id="litellm">LiteLLM</h2>
+<p>Point one profile at a <a href="https://docs.litellm.ai/">LiteLLM proxy</a> and every model behind it is available. Add the <strong>LiteLLM proxy</strong> preset and change the endpoint to your gateway (<code>https://litellm.acme.dev/v1</code>, or <code>http://127.0.0.1:4000/v1</code> for a local proxy).</p>
+<h3>The key</h3>
+<p>Paste it into the profile's key field and press <strong>Save key</strong>. Asylum checks it against the gateway first, so a refused key is refused now rather than at an Agent's first turn, then keeps it in the Keychain. An exported <code>LITELLM_API_KEY</code> still wins over the saved key, so a shell or a CI job can override it.</p>
+<h3>Teams</h3>
+<p><strong>Load teams</strong> lists the teams the key belongs to. Pick one and the model list follows the team's scope — a team limited to three models is offered three, not thirty. A key in no team (or a gateway without its database) sees the whole catalog. If the key itself is narrower than its team, Asylum says which models it can't call, because in a picker that just looks like a gateway with fewer models.</p>
+<h3>Reasoning, fallbacks, and checks</h3>
+<dl>
+<dt>Reasoning</dt><dd>Off, Low, Medium, or High, sent as <code>reasoning_effort</code> with every request to that provider.</dd>
+<dt>Use as fallback</dt><dd>Adds the provider to the fallback chain. When the active provider fails before saying anything, the next one in the chain answers, with its own default model or the same model name. A provider that has started answering is never replaced, so a reply is never duplicated. Only providers that call Asylum's tools stand in for each other.</dd>
+<dt>Check provider</dt><dd>Sends a small, real (billed) request to the model. Listing models only proves the gateway answers; this proves the key, the model name, and the upstream provider all work.</dd>
+</dl>
+<pre><code>asylumdev teams litellm              # the key's teams and their models
+asylumdev check litellm claude-sonnet  # a real request through the gateway
+asylumdev pin Researcher litellm claude-opus</code></pre>
+
+<h2 id="cli">CLI agents</h2>
+<p>The Claude Code and Codex presets run the installed, signed-in CLI headlessly in the workspace, feeding it the conversation on stdin and turning its final answer (or Claude's <code>stream-json</code> events) into the Agent's reply. CLI providers bring their own tools, so Asylum's tools aren't offered to them. Use them for Agents that do heavy coding; hand work to them from other Agents.</p>
+<div class="callout">An admin can turn CLI agents off for everyone with <code>cloud-agents: false</code>. See the <a href="../admin/#policy">admin guide</a>.</div>
+
+<h2 id="credentials">Credentials</h2>
+<p>Asylum never writes an API key to its settings file. The usual way is to paste it: in onboarding (<strong>Connect with an API key</strong>), in <strong>Add provider</strong> (the default, <strong>Paste a key</strong>), or in the key field on any provider's card. Asylum checks the key against the provider first and refuses one that doesn't work, then keeps it in the macOS Keychain. Pasting a key on a provider set up another way switches it to the pasted key.</p>
+<p>A profile's credential is one of:</p>
+<dl><dt>Keychain</dt><dd>A pasted key, kept in the macOS Keychain. The default.</dd><dt>Environment</dt><dd>The name of an environment variable, for keys you already export in your shell. If the variable isn't set, a key pasted for that provider is used instead.</dd><dt>Synapse</dt><dd>A secret name in <a href="https://wess.io/synapse/">Synapse</a>, resolved into a variable.</dd><dt>None</dt><dd>For local servers that don't need one.</dd></dl>
+
+<h2 id="agents">Agents</h2>
+<p>Create an Agent with <kbd>⌘N</kbd>, from a template link, or from onboarding's gallery: Chief of Staff, Talent Scout, Inbox Triage, Bug Reproducer, Expense Manager, and Researcher. An Agent's <strong>description</strong> holds durable rules ("Never send external messages without approval"); messages hold the task at hand.</p>
+<p>In the sidebar, Agents can be pinned, filed into <strong>sections</strong>, hidden, duplicated, renamed, or deleted. An Agent's status dot shows idle, working, waiting on you, or done. Deleting an Agent removes its conversation and routines; files on the computer and browser sign-ins stay.</p>
+<p><strong>Avatars</strong> can be built from parts (shape, eyes, accessory, color), generated from a description, or uploaded.</p>
+
+<h2 id="chat">Chat and composer</h2>
+<ul>
+<li><strong>Streaming replies</strong> with every tool call shown inline; expand one to see its input and output. Turn on <strong>Show reasoning</strong> to see a model's thinking.</li>
+<li><strong>Attachments</strong>: drag, paste, or pick up to 6 files, 25 MB each (videos up to 200 MB). They're copied into the workspace.</li>
+<li><code>@</code> mentions an Agent; <code>/</code> picks a skill.</li>
+<li><strong>Threads</strong>: reply to any message to keep side conversations out of the main flow.</li>
+<li><strong>Reactions</strong>, <strong>Find</strong> (<kbd>⌘F</kbd>), drafts that survive switching chats, and <strong>Enter sends</strong> (or <kbd>⌘↩</kbd> with it off).</li>
+<li>A new message <strong>preempts</strong> the Agent's current reply in that chat; routine runs and handoffs queue behind it.</li>
+<li><kbd>⌘.</kbd> stops the Agent and drops its queue.</li>
+</ul>
+
+<h2 id="cards">Cards</h2>
+<table><thead><tr><th>Card</th><th>What it does</th></tr></thead><tbody>
+<tr><td>Approval</td><td>Allow once, Always allow (saves a rule), or Deny an action. Expires after 10 minutes when nobody is watching.</td></tr>
+<tr><td>Takeover</td><td>The Agent needs you in its browser — a login, a captcha, a passkey.</td></tr>
+<tr><td>Secret</td><td>Asks for a value that goes straight to the Keychain.</td></tr>
+<tr><td>Form</td><td>Structured questions with fields you fill in.</td></tr>
+<tr><td>Email / Slack draft</td><td>Edit before it's sent.</td></tr>
+<tr><td>Table, board, chart</td><td>Data the Agent prepared, rendered in place.</td></tr>
+<tr><td>File, image, link</td><td>Open, preview, save as. Links preview their page on hover.</td></tr>
+<tr><td>Routine</td><td>A routine created or changed, with its schedule in plain English.</td></tr>
+<tr><td>Handoff</td><td>Work passed between Agents.</td></tr>
+<tr><td>Connect</td><td>A connector needs signing in again.</td></tr>
+</tbody></table>
+
+<h2 id="groups">Groups and handoffs</h2>
+<p>Start a group chat from <kbd>⌘N</kbd> by ticking 2 to 6 Agents. Messages go to the Agents you <code>@mention</code>, to everyone with <code>@everyone</code>, or — with no mention — to the Agent that makes sense to answer. Agents can <strong>hand work</strong> to another Agent or post into a group; the result comes back as a handoff card. To stop thank-you loops, a pair of Agents can hand off at most 3 times in 10 minutes without you saying something.</p>
+
+<h2 id="memory">Memory</h2>
+<p>Agents remember facts, preferences, and summaries of past work, recalled into each conversation. Review and delete memories in the Agent's details. Turn memory off globally with <strong>Memory</strong> in settings. Team Agents keep <strong>team memory</strong>; when you turn a personal Agent into a Team Agent you pick which memories come along — facts and summaries by default, preferences stay private.</p>
+
+<h2 id="skills">Skills</h2>
+<p>Skills are reusable procedures in one library, enabled per Agent. They come from four places: an Agent <strong>writes</strong> one when you ask it to save what worked; you <strong>teach</strong> one by demonstration; an Agent <strong>learns</strong> one from repeated work; or one is <strong>packaged</strong> with a template. Pick one with <code>/</code> in the composer, or let the Agent choose.</p>
+<h3>Teach a task</h3>
+<p>Click <strong>Teach a task</strong> in a chat's header and do the task in the Agent's browser. Asylum records clicks, typing, form submits, and pages — up to 10 minutes — with password fields stored as <code>[secret]</code>. Stop, and the Agent turns the recording into a skill you can edit.</p>
+
+<h2 id="routines">Routines</h2>
+<p>Ask an Agent to do something regularly and it creates a routine. Each Agent can hold up to 50; each keeps its last 20 runs.</p>
+<table><thead><tr><th>Trigger</th><th>Runs</th></tr></thead><tbody>
+<tr><td>Schedule</td><td>Five-field cron in your timezone, daylight-saving safe: <code>0 8 * * 1-5</code> is "Every weekday at 8:00 AM"</td></tr>
+<tr><td>Interval</td><td>Every N minutes or hours</td></tr>
+<tr><td>Webhook</td><td>When something posts to the routine's URL</td></tr>
+<tr><td>Slack, GitHub, Linear, Sentry, PagerDuty, email</td><td>When a matching app event is posted to the routine's URL (filtered by event, channel, or text)</td></tr>
+</tbody></table>
+<pre><code>curl -X POST http://127.0.0.1:47821/routines/&lt;routine-id&gt; \
+  -H "Authorization: Bearer &lt;routine-key&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{"event": "issue.opened", "title": "Checkout fails on Safari"}'</code></pre>
+<p>The JSON body is handed to the run with the routine's instruction. <code>200</code> means a run started; <code>401</code> a wrong key; <code>409</code> a paused routine. The server listens on <code>127.0.0.1</code> only — expose it with a tunnel if a service outside your Mac needs to reach it.</p>
+<p>Routines run while Asylum is running (the window can be closed). If you haven't opened Asylum in a week, it asks whether to keep routines running and pauses them a day later if you don't answer.</p>
+
+<h2 id="connectors">Connectors</h2>
+<p>The <strong>Marketplace</strong> (<kbd>⌘⇧M</kbd>) lists MCP servers Agents can use:</p>
+<p><span class="pill">GitHub</span><span class="pill">Linear</span><span class="pill">Notion</span><span class="pill">Jira &amp; Confluence</span><span class="pill">Jira &amp; Confluence (API token)</span><span class="pill">Sentry</span><span class="pill">Stripe</span><span class="pill">Supabase</span><span class="pill">Vercel</span><span class="pill">Hugging Face</span><span class="pill">DeepWiki</span><span class="pill">Context7</span><span class="pill">Google Workspace</span><span class="pill">Slack</span><span class="pill">PagerDuty</span><span class="pill">Brave Search</span><span class="pill">Postgres</span><span class="pill">Playwright</span><span class="pill">Datadog</span><span class="pill">Salesforce</span><span class="pill">Figma</span></p>
+<p>Remote servers sign in through your browser with OAuth (discovery, dynamic registration, PKCE, refresh) or take a pasted token; local servers run as a command with the fields they need. Connectors can hold several labeled accounts, and each tool can be switched off. <strong>Custom MCP server</strong> adds any HTTPS URL or local command. Tools appear to Agents as <code>&lt;connector&gt;__&lt;tool&gt;</code>; read-only tools run freely, the rest go through <a href="#approvals">approvals</a>.</p>
+
+<h3 id="jira">Jira and Confluence</h3>
+<p>There are two ways in, and the Jira skills work with either:</p>
+<table><thead><tr><th>Connector</th><th>How it connects</th><th>Use it when</th></tr></thead><tbody>
+<tr><td>Jira &amp; Confluence</td><td>Atlassian's hosted MCP server (<code>mcp.atlassian.com</code>); you sign in with your Atlassian account in the browser</td><td>Your Atlassian organization allows its MCP server</td></tr>
+<tr><td>Jira &amp; Confluence (API token)</td><td>The open-source <a href="https://pypi.org/project/mcp-atlassian/">mcp-atlassian</a> server, run on your Mac with <code>uvx</code>, using an API token</td><td>You can't use the hosted server, or you're on Jira Data Center</td></tr>
+</tbody></table>
+<p>For the API-token connector, create a token at <strong>id.atlassian.com → Security → API tokens</strong>, then enter your site URL (<code>https://acme.atlassian.net</code>), your account email, and the token. Confluence fields are optional. Asylum checks the credentials against Jira before saving them. It needs <a href="https://docs.astral.sh/uv/">uv</a> (<code>brew install uv</code>).</p>
+<p>Reading issues runs freely; creating, editing, transitioning, commenting, and deleting go through <a href="#approvals">approvals</a>. The Marketplace's <strong>Skills</strong> tab has seven Jira skills, each marked with whether a Jira connector is connected:</p>
+<table><thead><tr><th>Skill</th><th>Does</th></tr></thead><tbody>
+<tr><td><code>/Jira triage</code></td><td>Fills in type, priority, component, and labels on new issues, flags duplicates, asks reporters for what's missing</td></tr>
+<tr><td><code>/Jira bug report</code></td><td>Turns a report or a reproduction into a well-formed bug, after a duplicate check</td></tr>
+<tr><td><code>/Sprint report</code></td><td>Done, in progress, blocked, scope added mid-sprint, and risk to the goal</td></tr>
+<tr><td><code>/Jira standup</code></td><td>Per person: what moved, what's in progress, what's blocked</td></tr>
+<tr><td><code>/Jira release notes</code></td><td>Release notes from a fix version, grouped and in plain language</td></tr>
+<tr><td><code>/Backlog grooming</code></td><td>Stale, duplicate, and incomplete issues with a proposed action for each</td></tr>
+<tr><td><code>/Action items to Jira</code></td><td>Meeting notes or a thread into issues with owners and due dates</td></tr>
+</tbody></table>
+<p>Every skill proposes changes and asks before writing to Jira. Pair them with routines — "every weekday at 9:00, run /Jira standup for SHOP" — and they run on their own.</p>
+
+<h2 id="templates">Templates</h2>
+<p><strong>Create template</strong> (Agent details → Share) packages an Agent's name, avatar, description, skills, and routines — never secrets, memories, or files — into an <code>asylum://template/…</code> link, public or team-only. Opening a link shows what it contains and any warnings, and asks you to accept the third-party Agent terms before adding it. Strip API keys, internal URLs, and customer data from descriptions before sharing.</p>
+
+<h2 id="teambots">Team Agents</h2>
+<p>Create one from <kbd>⌘N</kbd> → <strong>Create new Team Agent</strong>, or convert a personal Agent with <strong>Publish to Team</strong> (copy it, or start fresh). A Team Agent's setup covers connectors, secrets, reference files (<code>.txt .md .csv .json .yaml</code>, up to 256,000 characters each), and skills. It needs a name and a description of at most 140 characters before it can be published. Teammates add it with its team link and run it on their own Mac.</p>
+<p>Team Agent secrets have their own limits: 100 per Agent, 32 KB each, 96 KB in total.</p>
+
+<h2 id="slack">Slack</h2>
+<p>Optional. A published Team Agent can get its own Slack app: <strong>Bring to your team's Slack</strong> in its Share tab.</p>
+<ol>
+<li><strong>Create Slack app</strong> opens Slack with a generated manifest (bot user, scopes, events, Socket Mode). Install it to your workspace.</li>
+<li>Paste the <strong>Bot User OAuth Token</strong> (<code>xoxb-…</code>) and an app-level token with <code>connections:write</code> (<code>xapp-…</code>), then <strong>Connect</strong>.</li>
+<li>Invite it to channels with <code>/invite</code>.</li>
+</ol>
+<p>It connects over Socket Mode, so nothing on your Mac is exposed to the internet. It answers every DM; in channels and group DMs it answers when mentioned and then follows that thread. It ignores other bots. If you list <strong>linked Slack accounts</strong> in Settings → Team Setup, only those teammates get answers — others are asked, privately, to link. If your workspace needs admin approval for apps, choose <strong>My workspace needs admin approval</strong> to track it.</p>
+
+<h2 id="voice">Voice</h2>
+<p>Off by default. Turn on <strong>Settings → General → Voice features</strong> to get dictation (<kbd>⌘D</kbd> — tap to toggle, hold to talk), live voice chat with an Agent (barge-in, transcripts, mute, follow-up work after the call), and voice memos. Voice uses xAI's speech and realtime APIs and needs an xAI key, whatever your chat provider. Voice, speed, and language can be changed during a call.</p>
+
+<h2 id="computer">The computer</h2>
+<p>All Agents share one computer, kept in Asylum's data folder:</p>
+<dl>
+<dt>Workspace</dt><dd>The shared filesystem. Agents read and write files here; you browse it in the <strong>Files</strong> tab.</dd>
+<dt>Shell</dt><dd>With <strong>Isolate the computer</strong> on (the default), commands run under a macOS <code>sandbox-exec</code> profile that allows writes only to the workspace, temp folders, and tool caches. Output is clipped and secret values are redacted.</dd>
+<dt>Terminal</dt><dd>A real terminal in the workspace, embedded with libsinclair.</dd>
+<dt>Browser</dt><dd>A Chromium profile shared by every Agent, so sign-ins carry over, with one page — a screen — per Agent.</dd>
+</dl>
+<p>Open the panel with <kbd>⌘⇧O</kbd>. It keeps working with the window closed.</p>
+
+<h2 id="webview">Built-in browser</h2>
+<p>Press <kbd>⌘⇧B</kbd> (or click a link card) to open a web page in the right-hand pane: back, forward, reload, an address bar that takes URLs or searches, and a button to open the page in your default browser (<kbd>⌘</kbd>-click a link to go straight there). Clicking an HTML page, image, PDF, or text file in the computer's <strong>Files</strong> tab previews it here. This is your browser — the Agents keep their own on the computer, where sign-ins are shared between them.</p>
+
+<h2 id="browser">The Agents' browser</h2>
+<p>Agents see pages as numbered elements and act on them: open, look, click, type, press keys, scroll, go back, screenshot. The Screen tab shows the selected Agent's page live. Network Controls, if your admin sets them, apply to every page and redirect.</p>
+
+<h2 id="takeover">Takeover</h2>
+<p>When an Agent can't go on — a login, a captcha, a payment form — it asks you to take over. You click, type, and scroll in the panel (or full-window), then press <strong>I'm done</strong> and the Agent carries on. For passkeys and hardware security keys choose <strong>Open in a window</strong>: the browser relaunches visibly so macOS can show its own prompt, and returns to headless afterwards.</p>
+
+<h2 id="lifecycle">Maintenance</h2>
+<p>In <strong>Settings → Computer</strong>:</p>
+<table><thead><tr><th>Action</th><th>What happens</th></tr></thead><tbody>
+<tr><td>Back up</td><td>A compressed snapshot of the workspace. Asylum also backs up daily and keeps a week.</td></tr>
+<tr><td>Software update</td><td>Restarts the browser; keeps everything.</td></tr>
+<tr><td>Computer update</td><td>Also clears caches and temp files; keeps files and sign-ins. <strong>Update tonight</strong> schedules it for 2:00 AM once no Agent is working.</td></tr>
+<tr><td>Recover</td><td>For when the computer can't be reached: rebuilds the parts that break (locks, caches).</td></tr>
+<tr><td>Recreate</td><td>A fresh computer on the same disk. Agents pause between jobs (up to 2 minutes) and resume on it.</td></tr>
+<tr><td>Reset</td><td>Restores the workspace from the latest backup.</td></tr>
+<tr><td>Stop</td><td>Shuts the browser down now; it starts again when an Agent needs it.</td></tr>
+<tr><td>Delete computer and data</td><td>Erases workspace files, sign-ins, and backups. Agents and conversations stay.</td></tr>
+<tr><td>Sign out of every site</td><td>Clears the shared browser's cookies.</td></tr>
+</tbody></table>
+<p>With <strong>Hibernate when idle</strong> on, the browser stops after 30 idle minutes and wakes on next use. Asylum warns when free disk drops under 5 GB and again under 1 GB; <strong>Disk Saver</strong> has an Agent audit what's taking space.</p>
+
+<h2 id="approvals">Approvals</h2>
+<p>Every tool call is classed before it runs:</p>
+<dl><dt>Free</dt><dd>Reading, looking, searching — runs without asking.</dd><dt>Review</dt><dd>Changes that are easy to undo — checked by Auto-review if it's on.</dd><dt>Consequential</dt><dd>Sending, posting, paying, deleting, publishing — asks unless a rule or Auto-review allows it.</dd><dt>Local</dt><dd>Anything on your own Mac outside the computer — see <a href="#local">local execution</a>.</dd></dl>
+<p>Connector tools whose names start with get, list, search, read, fetch, find, query, view, lookup, describe, or ask are treated as reads. Approvals requested by routines or handoffs (with nobody watching) expire after 10 minutes and the Agent reports what it skipped.</p>
+
+<h2 id="autoreview">Auto-review and rules</h2>
+<p>With <strong>Auto-review</strong> on, a fast model reads each non-free action, the request it serves, and your rules, and either proceeds, denies with a reason, or asks you. Rules are plain sentences of two kinds — <strong>Ask first</strong> and <strong>Allow automatically</strong> — and Ask first wins a conflict. <strong>Always allow</strong> on a card saves an Allow rule. Rules an admin sets are locked.</p>
+
+<h2 id="local">Local execution</h2>
+<p><strong>Execution on Local Computer</strong> controls whether Agents may run commands or read files on your Mac itself, outside their computer: <strong>Ask</strong> (default; the card offers Always allow / Allow once / Never / Deny once), <strong>Always</strong>, or <strong>Never</strong>. An admin can set a stricter ceiling.</p>
+
+<h2 id="secrets">Secrets</h2>
+<p>Per-Agent secrets have a name in capitals (<code>API_TOKEN</code>) and a description; the value is stored in the macOS Keychain and never shown again. When an Agent runs a command the value is injected as that environment variable and redacted from the output. An Agent can also fill a secret into a page field without reading it. Limits: 25 per Agent, 8 to 4,096 bytes each (Team Agents: 100, up to 32 KB, 96 KB total). Names the computer sets — <code>PATH</code>, <code>HOME</code>, proxy variables, anything starting <code>ASYLUM_</code> — are reserved.</p>
+
+<h2 id="security">Security</h2>
+<ul>
+<li>Everything runs on your Mac. Conversations, memories, and settings stay in Asylum's data folder; the only outbound traffic is to the model providers, connectors, and sites you choose.</li>
+<li>Agents within one Mac share a computer; they are not isolated from each other. Use separate macOS users for separation.</li>
+<li>Web pages and tool results are marked untrusted to the model. Approvals are the boundary that matters: keep Auto-review on and add Ask-first rules for anything you care about.</li>
+<li>Keys and secrets live in the Keychain, never in <code>agents.json</code>.</li>
+<li>The routine webhook and Admin API listen on <code>127.0.0.1</code> only and need a key or token.</li>
+<li>Report vulnerabilities privately through <a href="https://github.com/wess/asylum/security">GitHub security advisories</a>.</li>
+</ul>
+
+<h2 id="activity">Activity</h2>
+<p><strong>Settings → Activity</strong> has a week of <strong>Insights</strong> (conversations, messages, actions, what approvals stopped, top tools and Agents), the <strong>Action Recording</strong> log (tool, target, outcome — never arguments or results — kept 90 days), the <strong>audit log</strong> of settings, rules, connectors, policy, and computer changes, and <strong>export</strong>. Export one conversation from its sidebar menu, or all of them as JSON plus Markdown with prompts, responses, and tool input and output. OpenTelemetry and the Admin API are covered in the <a href="../admin/#activity">admin guide</a>.</p>
+
+<h2 id="sync">Sync</h2>
+<p>Turn on <strong>Sync sections across your Macs</strong> and sections, which Agents are in them, and pins sync through a folder in iCloud Drive. Agents are matched by name across Macs.</p>
+
+<h2 id="usage">Usage</h2>
+<p><strong>Settings → Usage</strong> shows tokens used this week, by Agent, against an optional <strong>weekly limit</strong> (resets Mondays). With <strong>Keep going</strong> on, Agents continue past it up to a <strong>monthly allowance</strong>; a running Agent always finishes its turn. Nothing is charged — the limits only cap spend on your own provider accounts.</p>
+
+<h2 id="tools">Built-in tools</h2>
+<table><thead><tr><th>Area</th><th>Tools</th></tr></thead><tbody>
+<tr><td>Computer</td><td><code>shell</code> <code>read_file</code> <code>write_file</code> <code>edit_file</code> <code>list_files</code> <code>search_files</code> <code>move_file</code> <code>delete_file</code> <code>share_file</code></td></tr>
+<tr><td>Browser</td><td><code>browser_open</code> <code>browser_look</code> <code>browser_click</code> <code>browser_type</code> <code>browser_press</code> <code>browser_scroll</code> <code>browser_back</code> <code>browser_screenshot</code> <code>request_takeover</code></td></tr>
+<tr><td>Web</td><td><code>web_search</code> <code>fetch_url</code></td></tr>
+<tr><td>Your Mac</td><td><code>local_shell</code> <code>local_read_file</code> <code>copy_from_local</code> <code>copy_to_local</code></td></tr>
+<tr><td>Memory and skills</td><td><code>remember</code> <code>forget</code> <code>save_skill</code> <code>use_skill</code> <code>list_skills</code></td></tr>
+<tr><td>Routines</td><td><code>create_routine</code> <code>update_routine</code> <code>set_routine_active</code> <code>delete_routine</code> <code>list_routines</code> <code>test_routine</code></td></tr>
+<tr><td>Team</td><td><code>list_agents</code> <code>message_agent</code> <code>create_agent</code> <code>create_group</code> <code>post_to_group</code></td></tr>
+<tr><td>You</td><td><code>ask_user</code> <code>request_secret</code> <code>show_form</code> <code>show_card</code> <code>draft_email</code> <code>draft_slack</code></td></tr>
+<tr><td>Media</td><td><code>generate_image</code> (xAI), <code>voice_memo</code> (with voice on)</td></tr>
+</tbody></table>
+
+<h2 id="settings">Settings file</h2>
+<p>Settings live in <code>~/.config/asylum/agents.json</code> (JSON with comments). The app writes it; you can edit it too — changes are picked up live, unknown keys are reported, and a bad value falls back to its default rather than stopping the app.</p>
+<table><thead><tr><th>Key</th><th>Default</th><th>Meaning</th></tr></thead><tbody>
+<tr><td><code>appearance</code></td><td><code>system</code></td><td><code>system</code>, <code>light</code>, or <code>dark</code></td></tr>
+<tr><td><code>language</code></td><td><code>system</code></td><td>UI language code, e.g. <code>de</code>, <code>ja</code>, <code>zh-hans</code></td></tr>
+<tr><td><code>user-name</code></td><td>empty</td><td>What Agents call you</td></tr>
+<tr><td><code>timezone</code></td><td><code>auto</code></td><td>IANA zone for routine schedules</td></tr>
+<tr><td><code>providers</code></td><td>[]</td><td>Provider profiles</td></tr>
+<tr><td><code>provider</code> / <code>model</code></td><td>—</td><td>Default provider and model</td></tr>
+<tr><td><code>fast-provider</code> / <code>fast-model</code></td><td>—</td><td>Background-work provider and model</td></tr>
+<tr><td><code>retries</code></td><td><code>3</code></td><td>Provider retries before text arrives</td></tr>
+<tr><td><code>approval</code></td><td><code>ask</code></td><td><code>ask</code> on consequential actions, or <code>auto</code></td></tr>
+<tr><td><code>auto-review</code></td><td><code>true</code></td><td>Review actions on the fast model</td></tr>
+<tr><td><code>local-exec</code></td><td><code>ask</code></td><td><code>ask</code>, <code>always</code>, or <code>never</code></td></tr>
+<tr><td><code>max-parallel-agents</code></td><td><code>4</code></td><td>Agents working at once</td></tr>
+<tr><td><code>max-steps</code></td><td><code>40</code></td><td>Tool steps per turn</td></tr>
+<tr><td><code>memory</code></td><td><code>true</code></td><td>Remember across conversations</td></tr>
+<tr><td><code>show-reasoning</code></td><td><code>false</code></td><td>Show model reasoning</td></tr>
+<tr><td><code>send-on-enter</code></td><td><code>true</code></td><td>Enter sends; off means ⌘Enter</td></tr>
+<tr><td><code>notifications</code> / <code>notification-sound</code></td><td><code>true</code></td><td>Desktop notifications</td></tr>
+<tr><td><code>background-work</code></td><td><code>true</code></td><td>Run routines</td></tr>
+<tr><td><code>browser-home</code></td><td>DuckDuckGo</td><td>The browser's start page</td></tr>
+<tr><td><code>security-keys</code></td><td><code>true</code></td><td>Let the browser use hardware keys</td></tr>
+<tr><td><code>hibernate-minutes</code></td><td><code>30</code></td><td>Idle minutes before hibernating (0: never)</td></tr>
+<tr><td><code>webhook-port</code></td><td><code>47821</code></td><td>Routine webhook port</td></tr>
+<tr><td><code>weekly-limit</code></td><td><code>5000000</code></td><td>Tokens per week</td></tr>
+<tr><td><code>on-demand</code> / <code>monthly-limit</code></td><td><code>false</code> / <code>20000000</code></td><td>Keep going past the weekly limit, up to this</td></tr>
+<tr><td><code>voice-enabled</code></td><td><code>false</code></td><td>Dictation, voice chat, memos</td></tr>
+<tr><td><code>voice</code> / <code>voice-speed</code> / <code>voice-language</code></td><td><code>Ara</code> / <code>1.0</code> / <code>auto</code></td><td>Voice settings</td></tr>
+<tr><td><code>sync-folder</code></td><td>empty</td><td>Folder sections sync through</td></tr>
+<tr><td><code>otel-endpoint</code></td><td>empty</td><td>OTLP/HTTP collector</td></tr>
+<tr><td><code>admin-port</code></td><td><code>0</code></td><td>Admin API port (0: off)</td></tr>
+<tr><td><code>fallback-providers</code></td><td>[]</td><td>Providers tried in order when the active one fails before answering</td></tr>
+<tr><td><code>automatic-updates</code></td><td><code>true</code></td><td>Check for releases</td></tr>
+<tr><td><code>zoom</code> / <code>compact-sidebar</code></td><td><code>1.0</code> / <code>false</code></td><td>Interface size and sidebar</td></tr>
+<tr><td><code>microphone</code></td><td>empty</td><td>Input device for voice (empty: system default)</td></tr>
+<tr><td><code>isolate-computer</code></td><td><code>true</code></td><td>Confine computer commands to the workspace sandbox; off runs them unconfined</td></tr>
+</tbody></table>
+<div class="callout warn">Another tool keeps its own <code>settings.json</code> in the same folder. Asylum only reads and writes <code>agents.json</code>.</div>
+
+<h2 id="shortcuts">Shortcuts</h2>
+<table><thead><tr><th>Keys</th><th>Action</th></tr></thead><tbody>
+<tr><td><kbd>⌘K</kbd></td><td>Command palette: Agents, messages, files, routines, commands</td></tr>
+<tr><td><kbd>⌘⇧F</kbd></td><td>Search Agents</td></tr>
+<tr><td><kbd>⌘N</kbd></td><td>New chat, Agent, Team Agent, or group</td></tr>
+<tr><td><kbd>⌘1</kbd> … <kbd>⌘9</kbd></td><td>Jump to an Agent</td></tr>
+<tr><td><kbd>⌥↑</kbd> / <kbd>⌥↓</kbd></td><td>Previous / next Agent</td></tr>
+<tr><td><kbd>⌃⇥</kbd> / <kbd>⌃⇧⇥</kbd></td><td>Cycle chats</td></tr>
+<tr><td><kbd>⌘[</kbd> / <kbd>⌘]</kbd></td><td>Back / forward</td></tr>
+<tr><td><kbd>⌘F</kbd></td><td>Find in chat</td></tr>
+<tr><td><kbd>⌘L</kbd> or <kbd>⌘I</kbd></td><td>Focus the composer</td></tr>
+<tr><td><kbd>⌘↩</kbd></td><td>Send</td></tr>
+<tr><td><kbd>⌘.</kbd></td><td>Stop the Agent</td></tr>
+<tr><td><kbd>⌘D</kbd></td><td>Dictate (voice on)</td></tr>
+<tr><td><kbd>⌘⇧O</kbd></td><td>Open the computer</td></tr>
+<tr><td><kbd>⌘⇧T</kbd></td><td>Open the computer's terminal</td></tr>
+<tr><td><kbd>⌘⇧B</kbd></td><td>Open the built-in browser</td></tr>
+<tr><td><kbd>⌘⇧M</kbd></td><td>Marketplace</td></tr>
+<tr><td><kbd>⌘⇧,</kbd></td><td>Agent settings</td></tr>
+<tr><td><kbd>⌘⇧I</kbd></td><td>Details</td></tr>
+<tr><td><kbd>⌘B</kbd></td><td>Compact sidebar</td></tr>
+<tr><td><kbd>⌘,</kbd></td><td>Settings</td></tr>
+<tr><td><kbd>⌘=</kbd> / <kbd>⌘-</kbd> / <kbd>⌘0</kbd></td><td>Zoom in / out / reset</td></tr>
+<tr><td><kbd>⌃⌘F</kbd></td><td>Full screen</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Close a dialog</td></tr>
+<tr><td><kbd>⌘W</kbd> / <kbd>⌘Q</kbd></td><td>Close window / quit</td></tr>
+</tbody></table>
+
+<h2 id="commands">Command line</h2>
+<p>The app binary also runs without a window. In a release, it's <code>/Applications/Asylum.app/Contents/MacOS/asylum</code>; from source, <code>target/debug/asylumdev</code>.</p>
+<table><thead><tr><th>Command</th><th>Does</th></tr></thead><tbody>
+<tr><td><code>asylum ask &lt;agent&gt; "&lt;message&gt;"</code></td><td>Send a message and print the reply when the Agent is done</td></tr>
+<tr><td><code>asylum providers</code></td><td>List provider profiles</td></tr>
+<tr><td><code>asylum pin &lt;agent&gt; &lt;provider&gt; [model]</code></td><td>Put one Agent on its own provider and model</td></tr>
+<tr><td><code>asylum plugin add &lt;id&gt;</code></td><td>Add a Marketplace connector by id</td></tr>
+<tr><td><code>asylum check &lt;provider&gt; [model]</code></td><td>Send a small real request to prove the provider works</td></tr>
+<tr><td><code>asylum teams &lt;provider&gt;</code></td><td>List a LiteLLM key's teams and the models each allows</td></tr>
+</tbody></table>
+<p>Environment: <code>ASYLUM_TRACE=&lt;file&gt;</code> logs each model exchange; <code>ASYLUM_POLICY=&lt;file&gt;</code> points at a policy file other than the system one.</p>
+
+<h2 id="paths">Paths</h2>
+<table><thead><tr><th>What</th><th>Where</th></tr></thead><tbody>
+<tr><td>Settings</td><td><code>~/.config/asylum/agents.json</code> (or <code>$XDG_CONFIG_HOME/asylum</code>)</td></tr>
+<tr><td>Database</td><td><code>~/Library/Application Support/asylum/asylum.db</code></td></tr>
+<tr><td>Computer</td><td><code>~/Library/Application Support/asylum/computer/</code> — <code>workspace/</code>, <code>browser/</code>, <code>snapshots/</code></td></tr>
+<tr><td>Secrets and keys</td><td>macOS Keychain</td></tr>
+<tr><td>Admin policy</td><td><code>/Library/Application Support/asylum/policy.json</code></td></tr>
+<tr><td>Sync</td><td><code>~/Library/Mobile Documents/com~apple~CloudDocs/Asylum/sections.json</code></td></tr>
+</tbody></table>
+
+<h2 id="languages">Languages</h2>
+<p>31 interface languages: English, Afrikaans, Arabic, Bengali, Chinese (Simplified and Traditional), Czech, Danish, Dutch, Finnish, French, German, Greek, Hebrew, Hindi, Hungarian, Indonesian, Italian, Japanese, Korean, Norwegian Bokmål, Polish, Portuguese, Russian, Swedish, Thai, Turkish, Ukrainian, Urdu, and Vietnamese. Choose one in Settings → General, or follow the system. Translations improve with your help — see <code>crates/app/i18n/</code> in the repository.</p>
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+<dl>
+<dt>"Couldn't reach the computer"</dt><dd>Press <strong>Retry</strong>, then <strong>Recover computer</strong>. Make sure a Chromium-family browser is installed. A previous crash can leave a browser holding the profile; Asylum reclaims it on the next start.</dd>
+<dt>An Agent says to pick a model</dt><dd>The provider has no default model. Open Settings → Providers, refresh models, pick one.</dd>
+<dt>LiteLLM returns 401</dt><dd>The key variable isn't set in the environment Asylum was launched from. Launching from Finder doesn't read your shell profile; set it with <code>launchctl setenv LITELLM_API_KEY …</code> or use a Keychain credential.</dd>
+<dt>Ollama replies are empty</dt><dd>Some models think and then stop. Asylum nudges a model that returned only reasoning once; if it persists, try a different model or turn on Show reasoning to see what happened.</dd>
+<dt>A routine didn't run</dt><dd>Check it's active, that Background work is on, and its run history in Agent details → Tasks. Routines run only while Asylum is running.</dd>
+<dt>A local connector won't start</dt><dd>Local connectors run with <code>npx</code> or <code>uvx</code>. Install Node or uv; Asylum uses your login shell's PATH, so anything on it is found even when Asylum is opened from Finder.</dd>
+<dt>Jira says it rejected the credentials</dt><dd>Use your Atlassian account email and an API token (not your password), and the site URL without a path, e.g. <code>https://acme.atlassian.net</code>.</dd>
+<dt>A connector says sign in again</dt><dd>Its OAuth token expired and couldn't refresh. Use the Connect card or the Marketplace.</dd>
+<dt>"Blocked by your admin's network policy"</dt><dd>Network Controls are on. Ask your admin to allow the site.</dd>
+</dl>
+
+<h2 id="faq">FAQ</h2>
+<h3>Is it free?</h3><p>Yes. Asylum is open source under the Apache 2.0 license, with no account, subscription, or telemetry. You pay only your model providers, if any.</p>
+<h3>Does it work offline?</h3><p>With a local model through Ollama, chat and the computer work without internet; web tools and connectors obviously don't.</p>
+<h3>Windows or Linux?</h3><p>Not yet. Asylum is macOS-only for now.</p>
+<h3>Who makes Asylum?</h3><p>It's an independent open-source project. It isn't affiliated with any model provider; xAI, OpenAI, Anthropic and the rest are simply providers you can choose.</p>
+<h3>How do I sign and notarize a release?</h3>
+<pre><code>xcrun notarytool store-credentials asylum \
+  --apple-id &lt;apple-id&gt; --team-id &lt;TEAMID&gt; --password &lt;app-specific-password&gt;
+export CODESIGN_IDENTITY="Developer ID Application: &lt;Name&gt; (&lt;TEAMID&gt;)"
+export NOTARY_PROFILE=asylum
+scripts/bundle.sh &amp;&amp; scripts/dmg.sh</code></pre>
+<h3>Where's the architecture documented?</h3><p>In <a href="https://github.com/wess/asylum/blob/main/CLAUDE.md">CLAUDE.md</a>, with the feature list in <a href="https://github.com/wess/asylum/blob/main/docs/features.md">docs/features.md</a>.</p>
+</article></div></main>
+<div class="statusline"><span>manual</span><span>0.1.0</span><span>macOS</span></div>
+<footer><span>Asylum 0.1.0 · Apache-2.0</span><span><a href="../tutorial/">tutorial</a> · <a href="../admin/">admin</a> · <a href="https://github.com/wess/asylum/issues">issues</a></span></footer>
+</div><script src="../assets/site.js"></script></body></html>

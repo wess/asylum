@@ -30,7 +30,7 @@ pub async fn manifest_url(rt: &Runtime, bot: &str) -> Result<String> {
 pub async fn connect(rt: &Runtime, bot: &str, bot_token: &str, app_token: &str, base: Option<&str>) -> Result<()> {
   let b = store::bots::get(&rt.pool, bot).await?;
   if !b.is_team() {
-    bail!("Only Team Bots can be brought to Slack.");
+    bail!("Only Team Agents can be brought to Slack.");
   }
   if !b.published {
     bail!("Connect after publishing.");
@@ -111,7 +111,7 @@ async fn handle(rt: &Runtime, bot: &str, me: &str, token: &str, base: &str, e: r
   let Decision::Answer { conversation, thread, follow } = route::decide(&e, me, &followed) else { return Ok(()) };
   let links = store::slack::links(&rt.pool).await?;
   if !links.is_empty() && !links.iter().any(|l| l.slack_user == e.user) {
-    let _ = slack::web::ephemeral(base, token, &e.channel, &e.user, "Link your Slack account in Asylum (Settings → Team Setup → Link) to talk with this Bot.").await;
+    let _ = slack::web::ephemeral(base, token, &e.channel, &e.user, "Link your Slack account in Asylum (Settings → Team Setup → Link) to talk with this Agent.").await;
     if thread.is_some() {
       slack::web::post(base, token, &e.channel, "I can only help teammates who have linked their account.", thread.as_deref()).await?;
     }
@@ -149,7 +149,7 @@ async fn wait_reply(rt: &Runtime, chat: &str, since: i64, timeout: Duration) -> 
       return Ok(if m.body.trim().is_empty() { "Done.".into() } else { m.body.clone() });
     }
     if start.elapsed() > timeout {
-      bail!("timed out waiting for the Bot");
+      bail!("timed out waiting for the Agent");
     }
     tokio::time::sleep(Duration::from_millis(400)).await;
   }

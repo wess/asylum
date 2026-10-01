@@ -33,7 +33,7 @@ pub fn open(root: &mut Root, bot: &str, window: &mut Window, cx: &mut Context<Ro
   let rt = root.rt.clone();
   let weak = cx.entity().downgrade();
   let view = cx.new(|cx| {
-    let tabs = cx.new(|cx| SegmentedControl::new(cx).data([t("Bot"), t("Generate"), t("Upload")]).selected(0).size(Size::Sm));
+    let tabs = cx.new(|cx| SegmentedControl::new(cx).data([t("Agent"), t("Generate"), t("Upload")]).selected(0).size(Size::Sm));
     let sub = cx.subscribe(&tabs, |this: &mut Picker, _, ev: &SegmentedControlEvent, cx| {
       this.tab = ev.0;
       cx.notify();

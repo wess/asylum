@@ -59,7 +59,7 @@ async fn handoff_between_bots() {
   let rt = runtime(dir.path()).await;
   let (a, chat) = api::bots::create(&rt, Some("Lead")).await.unwrap();
   let (b, _) = api::bots::create(&rt, Some("Writer")).await.unwrap();
-  api::chat::send(&rt, &chat.id, "Use message_bot to ask Writer to write a two-line poem about Rust. Then tell me you handed it off.", &[], None).await.unwrap();
+  api::chat::send(&rt, &chat.id, "Use message_agent to ask Writer to write a two-line poem about Rust. Then tell me you handed it off.", &[], None).await.unwrap();
   settle(&rt, &[a.id.clone(), b.id.clone()]).await;
   let writer_chat = store::chats::direct(&rt.pool, &b.id).await.unwrap();
   let msgs = store::messages::list(&rt.pool, &writer_chat.id).await.unwrap();

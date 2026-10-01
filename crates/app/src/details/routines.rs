@@ -80,7 +80,7 @@ pub fn render(d: &mut Details, window: &mut Window, cx: &mut Context<Details>) -
   if !d.data.routines.is_empty() {
     col = col.child(Button::new("add-routine2", t("Add routine")).size(Size::Xs).variant(Variant::Subtle).on_click(cx.listener(|this, _, w, cx| prefill(this, "Set up a routine to ", w, cx))));
   }
-  col.child(div().pt(px(8.0)).text_size(px(11.5)).text_color(ink.dimmed).child(crate::i18n::tf("Up to {} routines per Bot.", &[&store::routines::LIMIT_PER_BOT.to_string()]))).into_any_element()
+  col.child(div().pt(px(8.0)).text_size(px(11.5)).text_color(ink.dimmed).child(crate::i18n::tf("Up to {} routines per Agent.", &[&store::routines::LIMIT_PER_BOT.to_string()]))).into_any_element()
 }
 
 /// Put text into this chat's composer.
