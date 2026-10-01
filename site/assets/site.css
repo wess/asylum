@@ -130,7 +130,6 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10
 /* asylum additions */
 .brand-art { display: flex; align-items: center; gap: 26px; margin-bottom: 26px; }
 .brand-art .masthead { margin: 0; }
-.brand-art img { width: 96px; height: 96px; image-rendering: pixelated; flex: 0 0 auto; }
 .doc code { overflow-wrap: anywhere; }
 .doc pre code { overflow-wrap: normal; }
 .commandbox { grid-template-columns: minmax(0, 1fr) auto; }
@@ -168,7 +167,6 @@ input:focus-visible, select:focus-visible, summary:focus-visible, pre:focus-visi
 @media (max-width: 800px) {
   .hero, .split, .grid { grid-template-columns: minmax(0, 1fr); }
   .brand-art { gap: 12px; }
-  .brand-art img { width: 56px; height: 56px; }
   .masthead { font-size: clamp(5px, 1.55vw, 9px); }
   .doc table { font-size: .85rem; }
 }
