@@ -2,12 +2,12 @@
 
 **[Website](https://wess.io/asylum/) · [Tutorial](https://wess.io/asylum/tutorial/) · [Manual](https://wess.io/asylum/docs/) · [Admin guide](https://wess.io/asylum/admin/)**
 
-Always-on AI teammates with their own computer. A native macOS app (Rust,
-[gpui](https://github.com/zed-industries/zed) + [guise](https://github.com/wess/guise)).
-Agents have names, jobs, memory, and a shared
-computer — a workspace, a browser that stays signed in, and a terminal — that
-work in your tools, run routines, hand work to each other, and ask before
-anything consequential.
+A party of AI agents that runs on your Mac. Asylum is a free, open-source
+native macOS app (Rust, [gpui](https://github.com/zed-industries/zed) +
+[guise](https://github.com/wess/guise)). Each agent gets a class, a job, and a
+memory; they share a workspace, a browser, and a terminal on your machine, run
+on whatever models you point them at, and check with you before doing anything
+you can't take back.
 
 ## Features
 
